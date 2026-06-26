@@ -12,6 +12,7 @@ import com.project.booking.config.BookingDatabaseConstraintInitializer;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.exception.BookingNotCancellableException;
 import com.project.booking.exception.BookingNotFoundException;
+import com.project.booking.kafka.BookingNotificationEventPublisher;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
@@ -20,6 +21,7 @@ import com.project.booking.service.BookingService;
 import com.project.booking.service.ResolvedOperatingHours;
 import com.project.booking.service.SubFieldProjectionService;
 import com.project.booking.util.BookingCodeGenerator;
+import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingStatus;
 import com.project.common.exception.BadRequestException;
@@ -28,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +67,7 @@ public class BookingServiceImpl implements BookingService {
     private final FieldClosureProjectionRepository fieldClosureProjectionRepository;
     private final PricingStrategy pricingStrategy;
     private final BookingMapper bookingMapper;
+    private final BookingNotificationEventPublisher bookingNotificationEventPublisher;
 
     @Value("${booking.payment-timeout-minutes:15}")
     private int paymentTimeoutMinutes = 15;
@@ -105,6 +109,7 @@ public class BookingServiceImpl implements BookingService {
         }
         log.info("Booking created: code={}, clientId={}, subFieldId={}",
                 saved.getBookingCode(), userId, subField.getId());
+        bookingNotificationEventPublisher.publishBookingCreated(saved, subField, null);
 
         return bookingMapper.toResponse(saved, subField);
     }
@@ -141,6 +146,7 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking cancelled by client: id={}, clientId={}",
                 cancelled.getId(),
                 userId);
+        bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
 
         return bookingMapper.toResponse(cancelled);
     }
@@ -177,6 +183,7 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking cancelled by owner: id={}, ownerId={}",
                 cancelled.getId(),
                 ownerId);
+        bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
 
         return bookingMapper.toResponse(cancelled);
     }
@@ -210,6 +217,8 @@ public class BookingServiceImpl implements BookingService {
 
         log.info("Mock payment confirmed booking: id={}, clientId={}",
                 confirmed.getId(), userId);
+        bookingNotificationEventPublisher.publishBookingConfirmed(confirmed, null);
+        bookingNotificationEventPublisher.publishPaymentSuccess(confirmed, null);
 
         return bookingMapper.toResponse(confirmed);
     }
@@ -234,20 +243,16 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<BookingResponse> getMyBookings(UUID userId) {
-        return bookingRepository.findByClientId(userId)
-                .stream()
-                .map(bookingMapper::toResponse)
-                .collect(Collectors.toList());
+    public PageResponse<BookingResponse> getMyBookings(UUID userId, Pageable pageable) {
+        return PageResponse.from(bookingRepository.findByClientId(userId, pageable)
+                .map(bookingMapper::toResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<BookingResponse> getOwnerBookings(UUID ownerId) {
-        return bookingRepository.findByOwnerId(ownerId)
-                .stream()
-                .map(bookingMapper::toResponse)
-                .collect(Collectors.toList());
+    public PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, Pageable pageable) {
+        return PageResponse.from(bookingRepository.findByOwnerId(ownerId, pageable)
+                .map(bookingMapper::toResponse));
     }
 
     @Override

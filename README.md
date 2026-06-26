@@ -82,11 +82,32 @@ The system is built on a microservices architecture, promoting separation of con
 -   Java 21 SDK
 -   Apache Maven
 -   Docker and Docker Compose
--   PostgreSQL databases created for `user-service`, `field-service`, and `booking-service`.
+-   Docker and Docker Compose can start local PostgreSQL, Kafka, and Redis for development.
 
 ### 1. Environment Configuration
 
-Create a file named `.env.properties` inside the `backend/common/` directory. This file will hold all necessary environment variables. Populate it with the following keys:
+The backend uses Spring profiles selected by `APP_MODE`.
+
+- `APP_MODE=DEV` or no `APP_MODE`: loads `application-dev.yaml`, optionally imports `backend/common/.env-dev.properties`, uses local Docker defaults, and bypasses the downstream internal gateway secret check.
+- `APP_MODE=PROD`: loads `application-prod.yaml`, optionally imports `backend/common/.env-prod.properties`, requires real secrets and database settings, and rejects downstream requests without the internal gateway secret.
+
+For local development, you can start with no env file. The default local values are:
+
+```properties
+USER_DB_URL=jdbc:postgresql://localhost:5432/user_db
+FIELD_DB_URL=jdbc:postgresql://localhost:5432/field_db
+BOOKING_DB_URL=jdbc:postgresql://localhost:5432/booking_db
+NOTIFICATION_DB_URL=jdbc:postgresql://localhost:5432/notification_db
+*_DB_USERNAME=football
+*_DB_PASSWORD=football
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+REDIS_HOST=localhost
+REDIS_PORT=6379
+EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
+INTERNAL_GATEWAY_SECRET=dev-internal-gateway-secret
+```
+
+For production, create `backend/common/.env-prod.properties` and provide all required values. Use the same `INTERNAL_GATEWAY_SECRET` in the gateway and every downstream service:
 
 ```properties
 # Database URLs and Credentials
@@ -102,10 +123,17 @@ BOOKING_DB_URL=jdbc:postgresql://localhost:5432/booking_db
 BOOKING_DB_USERNAME=your_username
 BOOKING_DB_PASSWORD=your_password
 
+NOTIFICATION_DB_URL=jdbc:postgresql://localhost:5432/notification_db
+NOTIFICATION_DB_USERNAME=your_username
+NOTIFICATION_DB_PASSWORD=your_password
+
 # JWT Configuration
 JWT_SECRET=your_super_strong_base64_encoded_jwt_secret_key
 JWT_EXPIRATION=3600000 # 1 hour in ms
 JWT_REFRESH_EXPIRATION=604800000 # 7 days in ms
+
+# Gateway-to-service internal protection
+INTERNAL_GATEWAY_SECRET=your_shared_gateway_secret
 
 # Cloudinary API Credentials
 CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
@@ -127,7 +155,7 @@ SMTP_PASSWORD=your_app_password
 
 ### 2. Run Infrastructure
 
-Start the required Kafka and Zookeeper containers using Docker Compose.
+Start the local PostgreSQL, Kafka, and Redis containers using Docker Compose.
 
 ```bash
 cd backend/

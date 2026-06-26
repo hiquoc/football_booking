@@ -1,0 +1,29 @@
+spring:
+  config:
+    import:
+      - optional:file:common/.env-dev.properties
+  datasource:
+    url: ${USER_DB_URL:jdbc:postgresql://localhost:5432/user_db}
+    username: ${USER_DB_USERNAME:football}
+    password: ${USER_DB_PASSWORD:football}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:dev-google-client}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dev-google-secret}
+          facebook:
+            client-id: ${FACEBOOK_CLIENT_ID:dev-facebook-client}
+            client-secret: ${FACEBOOK_CLIENT_SECRET:dev-facebook-secret}
+
+jwt:
+  secret: ${JWT_SECRET:ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==}
+  expiration: ${JWT_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+    enforce-secret: false
+    allow-docs-without-secret: true

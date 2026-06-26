@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:user-service-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client
+            client-secret: test-google-secret
+            scope: email, profile
+          facebook:
+            client-id: test-facebook-client
+            client-secret: test-facebook-secret
+            scope: email, public_profile
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: test-secret-test-secret-test-secret-test-secret
+  expiration: 3600000
+  refresh-expiration: 86400000
+
+internal:
+  gateway:
+    secret: test-internal-gateway-secret
+    enforce-secret: true

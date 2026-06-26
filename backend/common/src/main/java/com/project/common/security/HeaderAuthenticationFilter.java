@@ -9,6 +9,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -21,9 +22,31 @@ import java.util.UUID;
 @Component
 public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
+    private final String internalGatewaySecret;
+    private final boolean enforceSecret;
+    private final boolean allowDocsWithoutSecret;
+
+    public HeaderAuthenticationFilter(
+            @Value("${internal.gateway.secret}") String internalGatewaySecret,
+            @Value("${internal.gateway.enforce-secret:true}") boolean enforceSecret,
+            @Value("${internal.gateway.allow-docs-without-secret:false}") boolean allowDocsWithoutSecret) {
+        this.internalGatewaySecret = internalGatewaySecret;
+        this.enforceSecret = enforceSecret;
+        this.allowDocsWithoutSecret = allowDocsWithoutSecret;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
+        if (enforceSecret && !hasValidInternalSecret(request)) {
+            if (allowDocsWithoutSecret && isSwaggerRequest(request)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
+            return;
+        }
 
         String userIdStr = request.getHeader(GlobalConstants.HEADER_USER_ID);
         String userRole = request.getHeader(GlobalConstants.HEADER_USER_ROLE);
@@ -52,5 +75,19 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean hasValidInternalSecret(HttpServletRequest request) {
+        String requestSecret = request.getHeader(GlobalConstants.HEADER_INTERNAL_SECRET);
+        return StringUtils.hasText(requestSecret) && requestSecret.equals(internalGatewaySecret);
+    }
+
+    private boolean isSwaggerRequest(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.equals("/swagger-ui.html")
+                || path.equals("/v3/api-docs")
+                || path.startsWith("/swagger-ui/")
+                || path.startsWith("/v3/api-docs/")
+                || path.startsWith("/webjars/");
     }
 }

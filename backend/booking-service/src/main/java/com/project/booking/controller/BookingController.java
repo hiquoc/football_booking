@@ -6,9 +6,11 @@ import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.service.BookingService;
 import com.project.common.dto.ApiResponse;
+import com.project.common.dto.PageResponse;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,15 +18,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -189,57 +192,81 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success("Payment confirmed successfully", response));
     }
 
-    @Operation(summary = "Get my bookings", description = "Returns the booking history for the authenticated client")
+    @Operation(summary = "Get my bookings", description = "Returns paginated booking history for the authenticated client. Supports page, size, and sort query parameters.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
-            description = "List of bookings",
+            description = "Page of bookings",
             content = @Content(
                 schema = @Schema(implementation = BookingResponse.class),
                 examples = @ExampleObject(value = """
                     {
                       "success": true,
                       "message": null,
-                      "data": [""" + BOOKING_EXAMPLE + """
-                      ]
+                      "data": {
+                        "content": [""" + BOOKING_EXAMPLE + """
+                        ],
+                        "page": 0,
+                        "size": 20,
+                        "totalElements": 1,
+                        "totalPages": 1,
+                        "first": true,
+                        "last": true,
+                        "empty": false
+                      }
                     }
                     """)
             )
         )
     })
     @PreAuthorize("hasRole('CLIENT')")
+    @PageableAsQueryParam
     @GetMapping("/my")
-    public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyBookings(
-            @CurrentUser UserPrincipal user) {
+    public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getMyBookings(
+            @Parameter(hidden = true) @CurrentUser UserPrincipal user,
+            @Parameter(hidden = true)
+            Pageable pageable) {
 
-        List<BookingResponse> bookings = bookingService.getMyBookings(user.id());
+        PageResponse<BookingResponse> bookings = bookingService.getMyBookings(user.id(), pageable);
         return ResponseEntity.ok(ApiResponse.success(bookings));
     }
 
-    @Operation(summary = "Get owner bookings", description = "Returns all bookings across the authenticated owner's sub-fields")
+    @Operation(summary = "Get owner bookings", description = "Returns paginated bookings across the authenticated owner's sub-fields. Supports page, size, and sort query parameters.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
-            description = "List of bookings for the owner",
+            description = "Page of bookings for the owner",
             content = @Content(
                 schema = @Schema(implementation = BookingResponse.class),
                 examples = @ExampleObject(value = """
                     {
                       "success": true,
                       "message": null,
-                      "data": [""" + BOOKING_EXAMPLE + """
-                      ]
+                      "data": {
+                        "content": [""" + BOOKING_EXAMPLE + """
+                        ],
+                        "page": 0,
+                        "size": 20,
+                        "totalElements": 1,
+                        "totalPages": 1,
+                        "first": true,
+                        "last": true,
+                        "empty": false
+                      }
                     }
                     """)
             )
         )
     })
     @PreAuthorize("hasRole('OWNER')")
+    @PageableAsQueryParam
     @GetMapping("/owner")
-    public ResponseEntity<ApiResponse<List<BookingResponse>>> getOwnerBookings(
-            @CurrentUser UserPrincipal user) {
+    public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getOwnerBookings(
+            @Parameter(hidden = true) @CurrentUser UserPrincipal user,
+            @Parameter(hidden = true)
+            Pageable pageable) {
 
-        List<BookingResponse> bookings = bookingService.getOwnerBookings(user.id());
+        PageResponse<BookingResponse> bookings = bookingService.getOwnerBookings(user.id(), pageable);
         return ResponseEntity.ok(ApiResponse.success(bookings));
     }
 

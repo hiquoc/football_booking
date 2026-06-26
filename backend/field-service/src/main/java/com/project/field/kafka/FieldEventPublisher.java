@@ -7,8 +7,9 @@ import com.project.field.entity.FieldOperatingHours;
 import com.project.field.entity.SubField;
 import com.project.field.entity.SubFieldOperatingHours;
 import com.project.field.entity.TimePriceRule;
+import com.project.common.outbox.dto.OutboxSaveRequest;
+import com.project.common.outbox.service.OutboxService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,10 +18,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FieldEventPublisher {
 
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final OutboxService outboxService;
 
     public void publishSubFieldCreated(SubField subField) {
-        kafkaTemplate.send(
+        save("SubField", subField.getId().toString(),
                 FieldEventTopics.SUB_FIELD_CREATED,
                 subField.getId().toString(),
                 new SubFieldCreatedEvent(
@@ -38,7 +39,7 @@ public class FieldEventPublisher {
     }
 
     public void publishSubFieldUpdated(SubField subField) {
-        kafkaTemplate.send(
+        save("SubField", subField.getId().toString(),
                 FieldEventTopics.SUB_FIELD_UPDATED,
                 subField.getId().toString(),
                 new SubFieldUpdatedEvent(
@@ -56,7 +57,7 @@ public class FieldEventPublisher {
     }
 
     public void publishSubFieldDeleted(SubField subField) {
-        kafkaTemplate.send(
+        save("SubField", subField.getId().toString(),
                 FieldEventTopics.SUB_FIELD_DELETED,
                 subField.getId().toString(),
                 new SubFieldDeletedEvent(subField.getId()));
@@ -67,7 +68,7 @@ public class FieldEventPublisher {
             return;
         }
         FieldOperatingHours first = hours.getFirst();
-        kafkaTemplate.send(
+        save("FieldOperatingHours", first.getFieldId().toString(),
                 FieldEventTopics.FIELD_OPERATING_HOURS_UPDATED,
                 first.getFieldId().toString(),
                 new FieldOperatingHoursUpdatedEvent(
@@ -80,7 +81,7 @@ public class FieldEventPublisher {
             return;
         }
         SubFieldOperatingHours first = hours.getFirst();
-        kafkaTemplate.send(
+        save("SubFieldOperatingHours", first.getSubFieldId().toString(),
                 FieldEventTopics.SUB_FIELD_OPERATING_HOURS_UPDATED,
                 first.getSubFieldId().toString(),
                 new SubFieldOperatingHoursUpdatedEvent(
@@ -92,7 +93,7 @@ public class FieldEventPublisher {
         if (closures == null || closures.isEmpty()) {
             return;
         }
-        kafkaTemplate.send(
+        save("SubFieldClosure", closures.getFirst().getSubFieldId().toString(),
                 FieldEventTopics.FIELD_CLOSURE_CREATED,
                 closures.getFirst().getSubFieldId().toString(),
                 new FieldClosureCreatedEvent(
@@ -101,7 +102,7 @@ public class FieldEventPublisher {
     }
 
     public void publishClosureUpdated(SubFieldClosure closure) {
-        kafkaTemplate.send(
+        save("SubFieldClosure", closure.getId().toString(),
                 FieldEventTopics.FIELD_CLOSURE_UPDATED,
                 closure.getId().toString(),
                 new FieldClosureUpdatedEvent(
@@ -113,12 +114,22 @@ public class FieldEventPublisher {
     }
 
     public void publishClosureDeleted(SubFieldClosure closure) {
-        kafkaTemplate.send(
+        save("SubFieldClosure", closure.getId().toString(),
                 FieldEventTopics.FIELD_CLOSURE_DELETED,
                 closure.getId().toString(),
                 new FieldClosureDeletedEvent(
                         closure.getId(),
                         closure.getSubFieldId()));
+    }
+
+    private void save(String aggregateType, String aggregateId, String topic, String key, Object payload) {
+        outboxService.save(new OutboxSaveRequest(
+                aggregateType,
+                aggregateId,
+                payload.getClass().getSimpleName(),
+                topic,
+                key,
+                payload));
     }
 
     private Integer minMinutes(BookingRule bookingRule) {

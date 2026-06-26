@@ -40,6 +40,8 @@ Desktop.ini
 # Environment files
 .env
 .env.properties
+.env-dev.properties
+.env-prod.properties
 .env.local
 .env.dev
 .env.prod

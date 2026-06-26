@@ -1,0 +1,19 @@
+spring:
+  config:
+    import:
+      - optional:file:common/.env-dev.properties
+  datasource:
+    url: ${FIELD_DB_URL:jdbc:postgresql://localhost:5432/field_db}
+    username: ${FIELD_DB_USERNAME:football}
+    password: ${FIELD_DB_PASSWORD:football}
+
+cloudinary:
+  cloud_name: ${CLOUDINARY_CLOUD_NAME:dev-cloudinary-cloud}
+  api_key: ${CLOUDINARY_API_KEY:dev-cloudinary-key}
+  api_secret: ${CLOUDINARY_API_SECRET:dev-cloudinary-secret}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+    enforce-secret: false
+    allow-docs-without-secret: true

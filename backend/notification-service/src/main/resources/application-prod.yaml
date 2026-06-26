@@ -1,0 +1,19 @@
+spring:
+  config:
+    import:
+      - optional:file:common/.env-prod.properties
+  datasource:
+    url: ${NOTIFICATION_DB_URL}
+    username: ${NOTIFICATION_DB_USERNAME}
+    password: ${NOTIFICATION_DB_PASSWORD}
+  mail:
+    host: ${SMTP_HOST}
+    port: ${SMTP_PORT}
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET}
+    enforce-secret: true
+    allow-docs-without-secret: false

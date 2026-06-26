@@ -2,11 +2,16 @@ server:
   port: 8080
 
 spring:
-  application:
-    name: gateway-service
   config:
     import:
       - optional:file:common/.env.properties
+  application:
+    name: gateway-service
+  profiles:
+    active: ${APP_MODE:dev}
+    group:
+      DEV: dev
+      PROD: prod
   cloud:
     gateway:
       server:
@@ -28,14 +33,26 @@ spring:
             uri: lb://booking-service
             predicates:
               - Path=/api/v1/bookings/**
+          - id: notification-service-api
+            uri: lb://notification-service
+            predicates:
+              - Path=/api/v1/notifications/**
+          - id: notification-service-websocket
+            uri: lb://notification-service
+            predicates:
+              - Path=/ws, /ws/**
 
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true

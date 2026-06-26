@@ -4,9 +4,10 @@ import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingResponse;
+import com.project.common.dto.PageResponse;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 public interface BookingService {
@@ -58,17 +59,17 @@ public interface BookingService {
      * Returns the booking history for a client.
      *
      * @param userId the authenticated user's ID
-     * @return list of all bookings for that client
+     * @return page of bookings for that client
      */
-    List<BookingResponse> getMyBookings(UUID userId);
+    PageResponse<BookingResponse> getMyBookings(UUID userId, Pageable pageable);
 
     /**
      * Returns all bookings for a field owner across their sub-fields.
      *
      * @param ownerId the authenticated owner's ID
-     * @return list of bookings for that owner
+     * @return page of bookings for that owner
      */
-    List<BookingResponse> getOwnerBookings(UUID ownerId);
+    PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, Pageable pageable);
 
     /**
      * Returns a booking by ID.

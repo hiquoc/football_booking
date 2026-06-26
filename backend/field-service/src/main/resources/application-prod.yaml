@@ -1,0 +1,19 @@
+spring:
+  config:
+    import:
+      - optional:file:common/.env-prod.properties
+  datasource:
+    url: ${FIELD_DB_URL}
+    username: ${FIELD_DB_USERNAME}
+    password: ${FIELD_DB_PASSWORD}
+
+cloudinary:
+  cloud_name: ${CLOUDINARY_CLOUD_NAME}
+  api_key: ${CLOUDINARY_API_KEY}
+  api_secret: ${CLOUDINARY_API_SECRET}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET}
+    enforce-secret: true
+    allow-docs-without-secret: false

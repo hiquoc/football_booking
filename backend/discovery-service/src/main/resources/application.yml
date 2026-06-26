@@ -3,13 +3,21 @@ server:
 
 eureka:
   instance:
-    hostname: localhost
+    hostname: ${EUREKA_HOSTNAME:localhost}
   client:
     registerWithEureka: false
     fetchRegistry: false
     serviceUrl:
-      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://${eureka.instance.hostname}:${server.port}/eureka/}
 
 spring:
+  config:
+    import:
+      - optional:file:common/.env.properties
   application:
     name: discovery-service
+  profiles:
+    active: ${APP_MODE:dev}
+    group:
+      DEV: dev
+      PROD: prod

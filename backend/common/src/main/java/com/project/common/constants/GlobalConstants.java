@@ -8,6 +8,7 @@ public final class GlobalConstants {
     public static final String CORRELATION_HEADER_NAME = "X-Correlation-Id";
     
     // Gateway-forwarded headers
+    public static final String HEADER_INTERNAL_SECRET = "X-Internal-Gateway-Secret";
     public static final String HEADER_USER_ID = "X-User-Id";
     public static final String HEADER_USER_ROLE = "X-User-Role";
     public static final String HEADER_USER_EMAIL = "X-User-Email";

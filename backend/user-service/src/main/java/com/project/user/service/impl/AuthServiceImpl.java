@@ -9,6 +9,7 @@ import com.project.user.dto.SendOtpRequest;
 import com.project.user.dto.TokenResponse;
 import com.project.user.dto.VerifyOtpRequest;
 import com.project.user.entity.User;
+import com.project.user.kafka.UserNotificationEventPublisher;
 import com.project.user.repository.UserRepository;
 import com.project.user.service.AuthService;
 import com.project.user.service.RedisService;
@@ -30,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RedisService redisService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserNotificationEventPublisher userNotificationEventPublisher;
 
     @Override
     public void sendOtp(SendOtpRequest request) {
@@ -56,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
         redisService.set(codeKey, otpCode, 300); // 5 minutes TTL
         redisService.set(cooldownKey, "true", 60); // 60 seconds cooldown
         redisService.set(attemptKey, "0", 300); // Reset attempts, 5 mins TTL
+        userNotificationEventPublisher.publishUserRequestOtp(phone);
     }
 
     @Override

@@ -1,0 +1,14 @@
+spring:
+  config:
+    import:
+      - optional:file:common/.env-prod.properties
+  datasource:
+    url: ${BOOKING_DB_URL}
+    username: ${BOOKING_DB_USERNAME}
+    password: ${BOOKING_DB_PASSWORD}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET}
+    enforce-secret: true
+    allow-docs-without-secret: false

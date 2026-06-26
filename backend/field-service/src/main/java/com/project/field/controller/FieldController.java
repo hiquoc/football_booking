@@ -5,6 +5,8 @@ import com.project.common.security.UserPrincipal;
 import java.util.List;
 import java.util.UUID;
 
+import com.project.common.dto.PageResponse;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,7 @@ import com.project.field.service.FieldScheduleService;
 import com.project.field.service.FieldService;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,6 +34,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.converters.models.PageableAsQueryParam;
 
 @RestController
 @RequestMapping("/api/v1/fields")
@@ -150,11 +154,57 @@ public class FieldController {
         return ApiResponse.success(fieldService.getById(id));
     }
 
-    @Operation(summary = "Get all fields", description = "Returns a list of all active, approved fields.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "List returned successfully")
+    @Operation(
+            summary = "Get all fields",
+            description = "Returns paginated active, approved fields. Supports Spring pageable query parameters: page, size, and sort."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Fields returned successfully",
+            content = @Content(
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(value = """
+                            {
+                              "success": true,
+                              "message": "Operation completed successfully",
+                              "data": {
+                                "content": [
+                                  {
+                                    "id": "123e4567-e89b-12d3-a456-426614174000",
+                                    "ownerId": "b1e1c606-6b76-4154-af38-7dda890395ce",
+                                    "name": "ABC Football Center",
+                                    "description": "Premier football venue in the city",
+                                    "address": "123 Nguyen Hue, Ho Chi Minh City",
+                                    "latitude": 10.7769,
+                                    "longitude": 106.7009,
+                                    "phoneNumber": "0862470050",
+                                    "email": "abc@football.vn",
+                                    "status": "APPROVED",
+                                    "active": true,
+                                    "ratingAverage": 4.8,
+                                    "totalReviews": 24,
+                                    "images": [],
+                                    "fieldTypes": []
+                                  }
+                                ],
+                                "page": 0,
+                                "size": 20,
+                                "totalElements": 1,
+                                "totalPages": 1,
+                                "first": true,
+                                "last": true,
+                                "empty": false
+                              }
+                            }
+                            """)
+            )
+    )
+    @PageableAsQueryParam
     @GetMapping
-    public ApiResponse<List<FieldDto>> getAll() {
-        return ApiResponse.success(fieldService.getAll());
+    public ApiResponse<PageResponse<FieldDto>> getAll(
+            @Parameter(hidden = true)
+            Pageable pageable) {
+        return ApiResponse.success(fieldService.getAll(pageable));
     }
 
     @Operation(summary = "Get field operating hours", description = "Returns the configured weekly schedule for a field.")

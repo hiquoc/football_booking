@@ -7,6 +7,7 @@ import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.dto.response.TimePriceRuleDto;
 import com.project.booking.entity.Booking;
 import com.project.booking.exception.BookingConflictException;
+import com.project.booking.kafka.BookingNotificationEventPublisher;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
@@ -59,6 +60,9 @@ class BookingServiceImplTest {
 
     @Mock
     private BookingMapper bookingMapper;
+
+    @Mock
+    private BookingNotificationEventPublisher bookingNotificationEventPublisher;
 
     @InjectMocks
     private BookingServiceImpl bookingService;

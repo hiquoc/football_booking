@@ -88,6 +88,6 @@ class FieldImageBatchOrderTest {
         assertThat(result).extracting(FieldImageDto::getDisplayOrder).containsExactly(0, 1, 2);
         assertThat(result).filteredOn(FieldImageDto::getIsPrimary)
                 .extracting(FieldImageDto::getId)
-                .containsExactly(10L);
+                .containsExactly(12L);
     }
 }

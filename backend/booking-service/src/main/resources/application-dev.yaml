@@ -1,0 +1,14 @@
+spring:
+  config:
+    import:
+      - optional:file:common/.env-dev.properties
+  datasource:
+    url: ${BOOKING_DB_URL:jdbc:postgresql://localhost:5432/booking_db}
+    username: ${BOOKING_DB_USERNAME:football}
+    password: ${BOOKING_DB_PASSWORD:football}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+    enforce-secret: false
+    allow-docs-without-secret: true

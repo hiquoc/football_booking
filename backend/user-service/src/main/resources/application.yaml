@@ -7,10 +7,12 @@ spring:
       - optional:file:common/.env.properties
   application:
     name: user-service
+  profiles:
+    active: ${APP_MODE:dev}
+    group:
+      DEV: dev
+      PROD: prod
   datasource:
-    url: ${USER_DB_URL}
-    username: ${USER_DB_USERNAME}
-    password: ${USER_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -25,10 +27,15 @@ spring:
     show-sql: false
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: true
   security:
     oauth2:
       client:
@@ -44,11 +51,42 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
 
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION}
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION}
+  secret: ${JWT_SECRET:ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==}
+  expiration: ${JWT_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+internal:
+  gateway:
+    secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+
+outbox:
+  batch-size: 50
+  poll-interval: 5000
+  max-retries: 5
+  scheduler-concurrency: 1
+  retry-delays:
+    - 10s
+    - 30s
+    - 1m
+    - 5m
+    - 15m
+  dlq:
+    enabled: true
+    topic-suffix: .dlq
+
+inbox:
+  batch-size: 50
+  poll-interval: 5000
+  max-retries: 5
+  scheduler-concurrency: 1
+  retry-delays:
+    - 10s
+    - 30s
+    - 1m
+    - 5m
+    - 15m

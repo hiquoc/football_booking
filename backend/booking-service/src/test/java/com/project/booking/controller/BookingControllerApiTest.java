@@ -10,6 +10,7 @@ import com.project.booking.dto.response.UnavailableSlotResponse;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.service.BookingService;
 import com.project.common.constants.GlobalConstants;
+import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.GlobalExceptionHandler;
@@ -46,6 +47,7 @@ class BookingControllerApiTest {
     private static final UUID USER_ID = UUID.fromString("b1e1c606-6b76-4154-af38-7dda890395ce");
     private static final UUID BOOKING_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SUB_FIELD_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final String INTERNAL_SECRET = "dev-internal-gateway-secret";
 
     @Autowired
     private MockMvc mockMvc;
@@ -163,20 +165,22 @@ class BookingControllerApiTest {
 
     @Test
     void getMyBookingsWithClientHeaderReturnsList() throws Exception {
-        when(bookingService.getMyBookings(USER_ID)).thenReturn(List.of(bookingResponse()));
+        when(bookingService.getMyBookings(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(bookingPageResponse());
 
         mockMvc.perform(get("/api/v1/bookings/my").headers(clientHeaders()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(BOOKING_ID.toString()));
+                .andExpect(jsonPath("$.data.content[0].id").value(BOOKING_ID.toString()));
     }
 
     @Test
     void getOwnerBookingsWithOwnerHeaderReturnsList() throws Exception {
-        when(bookingService.getOwnerBookings(USER_ID)).thenReturn(List.of(bookingResponse()));
+        when(bookingService.getOwnerBookings(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(bookingPageResponse());
 
         mockMvc.perform(get("/api/v1/bookings/owner").headers(ownerHeaders()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(BOOKING_ID.toString()));
+                .andExpect(jsonPath("$.data.content[0].id").value(BOOKING_ID.toString()));
     }
 
     @Test
@@ -201,6 +205,7 @@ class BookingControllerApiTest {
                 .build());
 
         mockMvc.perform(get("/api/v1/bookings/availability")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET)
                         .param("subFieldId", SUB_FIELD_ID.toString())
                         .param("date", date.toString()))
                 .andExpect(status().isOk())
@@ -241,6 +246,19 @@ class BookingControllerApiTest {
                 .build();
     }
 
+    private PageResponse<BookingResponse> bookingPageResponse() {
+        return PageResponse.<BookingResponse>builder()
+                .content(List.of(bookingResponse()))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .first(true)
+                .last(true)
+                .empty(false)
+                .build();
+    }
+
     private org.springframework.http.HttpHeaders clientHeaders() {
         return headers("CLIENT");
     }
@@ -251,6 +269,7 @@ class BookingControllerApiTest {
 
     private org.springframework.http.HttpHeaders headers(String role) {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET);
         headers.add(GlobalConstants.HEADER_USER_ID, USER_ID.toString());
         headers.add(GlobalConstants.HEADER_USER_ROLE, role);
         headers.add(GlobalConstants.HEADER_USER_EMAIL, "api-test@example.com");

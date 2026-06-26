@@ -3,6 +3,8 @@ package com.project.booking.repository;
 import com.project.common.enums.BookingStatus;
 import com.project.booking.entity.Booking;
 import com.project.common.enums.BookingCancelledBy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
@@ -40,9 +42,9 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                         LocalDate bookingDate,
                         Collection<BookingStatus> reservingStatuses);
 
-        List<Booking> findByClientId(UUID clientId);
+        Page<Booking> findByClientId(UUID clientId, Pageable pageable);
 
-        List<Booking> findByOwnerId(UUID ownerId);
+        Page<Booking> findByOwnerId(UUID ownerId, Pageable pageable);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""

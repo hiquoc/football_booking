@@ -1,6 +1,7 @@
 package com.project.field.service.impl;
 
 import com.project.common.dto.ApiResponse;
+import com.project.common.dto.PageResponse;
 import com.project.common.enums.UserType;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.ForbiddenException;
@@ -24,6 +25,7 @@ import com.project.field.repository.FieldRepository;
 import com.project.field.service.CloudinaryService;
 import com.project.field.service.FieldService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -85,10 +87,10 @@ public class FieldServiceImpl implements FieldService {
     }
 
     @Override
-    public List<FieldDto> getAll() {
-        return fieldRepository.findAll().stream()
-                .map(fieldMapper::toDto)
-                .collect(Collectors.toList());
+    public PageResponse<FieldDto> getAll(Pageable pageable) {
+        List<Field> Fields = fieldRepository.findAll();
+        System.out.println(Fields);
+        return PageResponse.from(fieldRepository.findAll(pageable).map(fieldMapper::toDto));
     }
 
     @Override

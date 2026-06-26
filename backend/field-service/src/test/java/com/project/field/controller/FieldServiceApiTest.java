@@ -2,6 +2,7 @@ package com.project.field.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.common.constants.GlobalConstants;
+import com.project.common.dto.PageResponse;
 import com.project.common.enums.SportType;
 import com.project.common.enums.SubFieldType;
 import com.project.common.exception.BadRequestException;
@@ -60,6 +61,7 @@ class FieldServiceApiTest {
     private static final UUID SUB_FIELD_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID CLOSURE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
     private static final UUID REVIEW_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
+    private static final String INTERNAL_SECRET = "test-internal-gateway-secret";
 
     @Autowired
     private MockMvc mockMvc;
@@ -134,15 +136,26 @@ class FieldServiceApiTest {
     @Test
     void getFieldAndListFieldsArePublic() throws Exception {
         when(fieldService.getById(FIELD_ID)).thenReturn(fieldDto());
-        when(fieldService.getAll()).thenReturn(List.of(fieldDto()));
+        when(fieldService.getAll(org.mockito.ArgumentMatchers.any())).thenReturn(PageResponse.<FieldDto>builder()
+                .content(List.of(fieldDto()))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .first(true)
+                .last(true)
+                .empty(false)
+                .build());
 
-        mockMvc.perform(get("/api/v1/fields/{id}", FIELD_ID))
+        mockMvc.perform(get("/api/v1/fields/{id}", FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(FIELD_ID.toString()));
 
-        mockMvc.perform(get("/api/v1/fields"))
+        mockMvc.perform(get("/api/v1/fields")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(FIELD_ID.toString()));
+                .andExpect(jsonPath("$.data.content[0].id").value(FIELD_ID.toString()));
     }
 
     @Test
@@ -152,7 +165,8 @@ class FieldServiceApiTest {
                 eq(FIELD_ID), eq(USER_ID), eq("OWNER"), org.mockito.ArgumentMatchers.anyList()))
                 .thenReturn(List.of(operatingHoursDto()));
 
-        mockMvc.perform(get("/api/v1/fields/{id}/operating-hours", FIELD_ID))
+        mockMvc.perform(get("/api/v1/fields/{id}/operating-hours", FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].dayOfWeek").value("MONDAY"));
 
@@ -185,7 +199,8 @@ class FieldServiceApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Sub-field created successfully"));
 
-        mockMvc.perform(get("/api/v1/sub-fields/field/{fieldId}", FIELD_ID))
+        mockMvc.perform(get("/api/v1/sub-fields/field/{fieldId}", FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(SUB_FIELD_ID.toString()));
 
@@ -225,7 +240,8 @@ class FieldServiceApiTest {
                 eq(CLOSURE_ID), eq(USER_ID), eq("OWNER"), org.mockito.ArgumentMatchers.any(FieldClosureRequest.class)))
                 .thenReturn(closureDto());
 
-        mockMvc.perform(get("/api/v1/sub-fields/{id}/operating-hours", SUB_FIELD_ID))
+        mockMvc.perform(get("/api/v1/sub-fields/{id}/operating-hours", SUB_FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].dayOfWeek").value("MONDAY"));
 
@@ -235,7 +251,8 @@ class FieldServiceApiTest {
                         .content(objectMapper.writeValueAsString(openWeek())))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/sub-fields/{id}/closures", SUB_FIELD_ID))
+        mockMvc.perform(get("/api/v1/sub-fields/{id}/closures", SUB_FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(CLOSURE_ID.toString()));
 
@@ -283,7 +300,8 @@ class FieldServiceApiTest {
                 .status("ACTIVE")
                 .build());
 
-        mockMvc.perform(get("/api/v1/internal/sub-fields/{subFieldId}", SUB_FIELD_ID))
+        mockMvc.perform(get("/api/v1/internal/sub-fields/{subFieldId}", SUB_FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Fetched sub-field successfully"))
                 .andExpect(jsonPath("$.data.id").value(SUB_FIELD_ID.toString()));
@@ -366,7 +384,8 @@ class FieldServiceApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Field type deleted successfully"));
 
-        mockMvc.perform(get("/api/v1/field-types"))
+        mockMvc.perform(get("/api/v1/field-types")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].name").value("FOOTBALL"));
     }
@@ -405,7 +424,8 @@ class FieldServiceApiTest {
                 .andExpect(jsonPath("$.message").value("Review submitted successfully"))
                 .andExpect(jsonPath("$.data.userId").value(USER_ID.toString()));
 
-        mockMvc.perform(get("/api/v1/reviews/field/{fieldId}", FIELD_ID))
+        mockMvc.perform(get("/api/v1/reviews/field/{fieldId}", FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value(REVIEW_ID.toString()));
     }
@@ -546,6 +566,7 @@ class FieldServiceApiTest {
 
     private org.springframework.http.HttpHeaders headers(String role) {
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET);
         headers.add(GlobalConstants.HEADER_USER_ID, USER_ID.toString());
         headers.add(GlobalConstants.HEADER_USER_ROLE, role);
         headers.add(GlobalConstants.HEADER_USER_EMAIL, "api-test@example.com");
