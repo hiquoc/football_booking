@@ -1,6 +1,7 @@
 package com.project.booking.config;
 
 import com.project.common.security.HeaderAuthenticationFilter;
+import com.project.common.security.IncomingRequestLogFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,11 @@ public class SecurityConfig {
     private final HeaderAuthenticationFilter headerAuthenticationFilter;
 
     @Bean
+    public IncomingRequestLogFilter incomingRequestLogFilter() {
+        return new IncomingRequestLogFilter("booking-service");
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -28,6 +34,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll()) // Will be handled by gateway
+                .addFilterBefore(incomingRequestLogFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -21,6 +23,8 @@ import java.util.UUID;
 
 @Component
 public class HeaderAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(HeaderAuthenticationFilter.class);
 
     private final String internalGatewaySecret;
     private final boolean enforceSecret;
@@ -44,6 +48,9 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
                 filterChain.doFilter(request, response);
                 return;
             }
+            log.warn("request_rejected reason=invalid_internal_gateway_secret method={} path={} correlationId={}",
+                    request.getMethod(), request.getRequestURI(),
+                    request.getHeader(GlobalConstants.CORRELATION_HEADER_NAME));
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
             return;
         }
@@ -70,7 +77,9 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (IllegalArgumentException e) {
-                // Ignore format errors and proceed with an unauthenticated request.
+                log.warn("authentication_header_rejected reason=invalid_user_id method={} path={} correlationId={}",
+                        request.getMethod(), request.getRequestURI(),
+                        request.getHeader(GlobalConstants.CORRELATION_HEADER_NAME));
             }
         }
 

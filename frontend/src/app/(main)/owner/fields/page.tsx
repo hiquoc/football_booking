@@ -1,0 +1,33 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { OwnerFieldsPanel } from "@/components/owner/owner-fields-panel";
+import { PageHeading } from "@/components/ui/page-heading";
+import { BackLink } from "@/components/ui/back-link";
+
+export const metadata: Metadata = { title: "Sân của tôi" };
+
+export default function OwnerFieldsPage() {
+  return (
+    <>
+      <BackLink href="/owner" className="mb-5">
+        Quản lý sân
+      </BackLink>
+      <PageHeading
+        eyebrow="Địa điểm"
+        title="Sân của tôi"
+        action={
+          <Link
+            href="/owner/fields/new"
+            className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white"
+          >
+            <Plus className="size-4" /> Thêm sân
+          </Link>
+        }
+      />
+      <div className="mt-8">
+        <OwnerFieldsPanel />
+      </div>
+    </>
+  );
+}

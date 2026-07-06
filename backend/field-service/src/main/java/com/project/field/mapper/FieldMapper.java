@@ -16,9 +16,11 @@ import com.project.field.entity.FieldImage;
 public class FieldMapper {
 
     private final FieldTypeMapper fieldTypeMapper;
+    private final SubFieldMapper subFieldMapper;
 
-    public FieldMapper(FieldTypeMapper fieldTypeMapper) {
+    public FieldMapper(FieldTypeMapper fieldTypeMapper, SubFieldMapper subFieldMapper) {
         this.fieldTypeMapper = fieldTypeMapper;
+        this.subFieldMapper = subFieldMapper;
     }
 
     public FieldDto toDto(Field entity) {
@@ -29,6 +31,14 @@ public class FieldMapper {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .address(entity.getAddress())
+                .ward(entity.getWard())
+                .wardCode(entity.getWardCode())
+                .province(entity.getProvince())
+                .provinceCode(entity.getProvinceCode())
+                .legacyWard(entity.getLegacyWard())
+                .legacyWardCode(entity.getLegacyWardCode())
+                .legacyDistrict(entity.getLegacyDistrict())
+                .legacyProvince(entity.getLegacyProvince())
                 .latitude(entity.getLatitude())
                 .longitude(entity.getLongitude())
                 .phoneNumber(entity.getPhoneNumber())
@@ -41,6 +51,7 @@ public class FieldMapper {
                 .updatedAt(entity.getUpdatedAt())
                 .images(entity.getImages() != null
                         ? entity.getImages().stream()
+                                .filter(image -> image.getImageUrl() != null)
                                 .sorted(Comparator.comparing(FieldImage::getDisplayOrder)
                                         .thenComparing(FieldImage::getId))
                                 .map(this::toImageDto)
@@ -48,6 +59,9 @@ public class FieldMapper {
                         : null)
                 .fieldTypes(entity.getFieldTypes() != null
                         ? entity.getFieldTypes().stream().map(fieldTypeMapper::toDto).collect(Collectors.toList())
+                        : null)
+                .subFields(entity.getSubFields() != null
+                        ? entity.getSubFields().stream().map(subFieldMapper::toDto).collect(Collectors.toList())
                         : null)
                 .build();
     }
@@ -69,6 +83,14 @@ public class FieldMapper {
                 .name(request.getName())
                 .description(request.getDescription())
                 .address(request.getAddress())
+                .ward(request.getWard())
+                .wardCode(request.getWardCode())
+                .province(request.getProvince())
+                .provinceCode(request.getProvinceCode())
+                .legacyWard(request.getLegacyWard())
+                .legacyWardCode(request.getLegacyWardCode())
+                .legacyDistrict(request.getLegacyDistrict())
+                .legacyProvince(request.getLegacyProvince())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .phoneNumber(request.getPhoneNumber())
@@ -87,6 +109,14 @@ public class FieldMapper {
         if (request.getName() != null) entity.setName(request.getName());
         if (request.getDescription() != null) entity.setDescription(request.getDescription());
         if (request.getAddress() != null) entity.setAddress(request.getAddress());
+        if (request.getWard() != null) entity.setWard(request.getWard());
+        if (request.getWardCode() != null) entity.setWardCode(request.getWardCode());
+        if (request.getProvince() != null) entity.setProvince(request.getProvince());
+        if (request.getProvinceCode() != null) entity.setProvinceCode(request.getProvinceCode());
+        if (request.getLegacyWard() != null) entity.setLegacyWard(request.getLegacyWard());
+        if (request.getLegacyWardCode() != null) entity.setLegacyWardCode(request.getLegacyWardCode());
+        if (request.getLegacyDistrict() != null) entity.setLegacyDistrict(request.getLegacyDistrict());
+        if (request.getLegacyProvince() != null) entity.setLegacyProvince(request.getLegacyProvince());
         if (request.getLatitude() != null) entity.setLatitude(request.getLatitude());
         if (request.getLongitude() != null) entity.setLongitude(request.getLongitude());
         if (request.getPhoneNumber() != null) entity.setPhoneNumber(request.getPhoneNumber());

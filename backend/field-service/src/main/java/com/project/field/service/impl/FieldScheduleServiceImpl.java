@@ -4,6 +4,7 @@ import com.project.common.exception.BadRequestException;
 import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
 import com.project.field.dto.FieldClosureDto;
+import com.project.field.client.BookingServiceClient;
 import com.project.field.dto.FieldClosureRequest;
 import com.project.field.dto.OperatingHoursDto;
 import com.project.field.dto.OperatingHoursRequest;
@@ -46,6 +47,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
     private final SubFieldOperatingHoursRepository subFieldOperatingHoursRepository;
     private final FieldClosureRepository fieldClosureRepository;
     private final FieldEventPublisher fieldEventPublisher;
+    private final BookingServiceClient bookingServiceClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -133,7 +135,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
     @Transactional(readOnly = true)
     public List<FieldClosureDto> getClosures(UUID subFieldId) {
         requireSubField(subFieldId);
-        return fieldClosureRepository.findBySubFieldIdOrderByStartDateAsc(subFieldId).stream()
+        return fieldClosureRepository.findBySubFieldIdOrderByStartDateDesc(subFieldId).stream()
                 .map(this::toDto)
                 .toList();
     }
@@ -152,6 +154,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
         Set<UUID> requestedSubFieldIds = subFields.stream()
                 .map(SubField::getId)
                 .collect(Collectors.toSet());
+        rejectBookingConflicts(requestedSubFieldIds, request);
         Set<UUID> subFieldIdsWithExistingClosure = fieldClosureRepository
                 .findOverlappingClosures(requestedSubFieldIds, request.getStartDate(), request.getEndDate())
                 .stream()
@@ -181,6 +184,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
         SubField subField = requireSubField(closure.getSubFieldId());
         verifyCanManage(subField.getField(), currentUserId, role);
         validateClosure(request);
+        rejectBookingConflicts(Set.of(closure.getSubFieldId()), request);
 
         closure.setStartDate(request.getStartDate());
         closure.setEndDate(request.getEndDate());
@@ -268,6 +272,14 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
         }
         if (request.getEndDate().isBefore(request.getStartDate())) {
             throw new BadRequestException("Closure end date cannot be before start date");
+        }
+    }
+
+    private void rejectBookingConflicts(Set<UUID> subFieldIds, FieldClosureRequest request) {
+        Boolean conflicts = bookingServiceClient.hasBookingConflicts(
+                subFieldIds, request.getStartDate(), request.getEndDate()).getData();
+        if (Boolean.TRUE.equals(conflicts)) {
+            throw new BadRequestException("Cannot close a sub-field that has pending or confirmed bookings in this date range");
         }
     }
 

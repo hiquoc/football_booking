@@ -6,14 +6,19 @@ import feign.RequestTemplate;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Configuration
 public class FeignConfig implements RequestInterceptor {
 
+    @Value("${internal.gateway.secret}")
+    private String internalGatewaySecret;
+
     @Override
     public void apply(RequestTemplate template) {
+        template.header(GlobalConstants.HEADER_INTERNAL_SECRET, internalGatewaySecret);
         String correlationId = MDC.get("correlationId");
         if (correlationId != null) {
             template.header(GlobalConstants.CORRELATION_HEADER_NAME, correlationId);

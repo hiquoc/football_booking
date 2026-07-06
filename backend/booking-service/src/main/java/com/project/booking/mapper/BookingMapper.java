@@ -32,7 +32,7 @@ public interface BookingMapper {
     @Mapping(target = "fieldName",     source = "subField.fieldName")
     BookingResponse toResponse(Booking booking, SubFieldResponse subField);
 
-    @Mapping(target = "subFieldName", ignore = true)
-    @Mapping(target = "fieldName", ignore = true)
+    @Mapping(target = "subFieldName", source = "subField.name")
+    @Mapping(target = "fieldName", source = "subField.fieldName")
     BookingResponse toResponse(Booking booking);
 }

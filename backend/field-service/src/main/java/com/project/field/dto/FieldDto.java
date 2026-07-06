@@ -19,6 +19,14 @@ public class FieldDto {
     private String name;
     private String description;
     private String address;
+    private String ward;
+    private String wardCode;
+    private String province;
+    private String provinceCode;
+    private String legacyWard;
+    private String legacyWardCode;
+    private String legacyDistrict;
+    private String legacyProvince;
     private BigDecimal latitude;
     private BigDecimal longitude;
     private String phoneNumber;
@@ -32,4 +40,5 @@ public class FieldDto {
     private List<FieldImageDto> images;
     /** The sport categories (FieldTypes) supported by this venue. */
     private List<FieldTypeDto> fieldTypes;
+    private List<SubFieldDto> subFields;
 }

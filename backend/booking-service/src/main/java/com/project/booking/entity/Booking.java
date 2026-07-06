@@ -40,6 +40,10 @@ public class Booking extends BaseEntity {
     @Column(name = "sub_field_id", nullable = false)
     private UUID subFieldId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sub_field_id", insertable = false, updatable = false)
+    private SubFieldProjection subField;
+
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 

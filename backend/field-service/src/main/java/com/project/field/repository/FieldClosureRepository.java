@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface FieldClosureRepository extends JpaRepository<SubFieldClosure, UUID> {
-    List<SubFieldClosure> findBySubFieldIdOrderByStartDateAsc(UUID subFieldId);
+    List<SubFieldClosure> findBySubFieldIdOrderByStartDateDesc(UUID subFieldId);
 
     @Query("""
             select closure

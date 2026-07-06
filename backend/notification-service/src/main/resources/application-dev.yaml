@@ -3,9 +3,11 @@ spring:
     import:
       - optional:file:common/.env-dev.properties
   datasource:
-    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/notification_db}
+    url: ${NOTIFICATION_DB_URL}
     username: ${NOTIFICATION_DB_USERNAME:football}
     password: ${NOTIFICATION_DB_PASSWORD:football}
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev-migration
   mail:
     host: ${SMTP_HOST:localhost}
     port: ${SMTP_PORT:1025}

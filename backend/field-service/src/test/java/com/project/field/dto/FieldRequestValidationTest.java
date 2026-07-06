@@ -25,6 +25,8 @@ class FieldRequestValidationTest {
 
         assertThat(validator.validate(request, FieldRequest.Create.class))
                 .extracting(violation -> violation.getPropertyPath().toString())
-                .contains("name", "address", "phoneNumber");
+                .contains("name", "address", "ward", "wardCode", "province", "provinceCode",
+                        "legacyWard", "legacyWardCode", "legacyDistrict", "legacyProvince",
+                        "latitude", "longitude", "phoneNumber");
     }
 }

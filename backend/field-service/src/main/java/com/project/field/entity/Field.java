@@ -43,10 +43,34 @@ public class Field extends BaseEntity {
     @Column(name = "address", nullable = false)
     private String address;
 
-    @Column(name = "latitude", precision = 9, scale = 6)
+    @Column(name = "ward", nullable = false)
+    private String ward;
+
+    @Column(name = "ward_code", length = 20, nullable = false)
+    private String wardCode;
+
+    @Column(name = "province", nullable = false)
+    private String province;
+
+    @Column(name = "province_code", length = 20, nullable = false)
+    private String provinceCode;
+
+    @Column(name = "legacy_ward", nullable = false)
+    private String legacyWard;
+
+    @Column(name = "legacy_ward_code", length = 20, nullable = false)
+    private String legacyWardCode;
+
+    @Column(name = "legacy_district", nullable = false)
+    private String legacyDistrict;
+
+    @Column(name = "legacy_province", nullable = false)
+    private String legacyProvince;
+
+    @Column(name = "latitude", precision = 9, scale = 6, nullable = false)
     private BigDecimal latitude;
 
-    @Column(name = "longitude", precision = 9, scale = 6)
+    @Column(name = "longitude", precision = 9, scale = 6, nullable = false)
     private BigDecimal longitude;
 
     @Column(name = "phone_number", length = 20, nullable = false)

@@ -56,6 +56,13 @@ public interface BookingService {
     int expirePendingBookings();
 
     /**
+     * Completes confirmed bookings whose booked time has ended.
+     *
+     * @return number of bookings completed
+     */
+    int completeFinishedBookings();
+
+    /**
      * Returns the booking history for a client.
      *
      * @param userId the authenticated user's ID

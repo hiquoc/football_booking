@@ -1,6 +1,7 @@
 package com.project.user.controller;
 
 import com.project.common.dto.ApiResponse;
+import com.project.common.dto.PageResponse;
 import com.project.common.enums.UserType;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
@@ -8,6 +9,10 @@ import com.project.user.dto.ChangeRoleRequest;
 import com.project.user.dto.UpdateProfileRequest;
 import com.project.user.dto.UserDto;
 import com.project.user.service.UserService;
+import com.project.user.service.AvatarUploadService;
+import com.project.user.dto.AvatarUploadSlotRequest;
+import com.project.user.dto.AvatarUploadSlotDto;
+import com.project.user.dto.AvatarUploadConfirmRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -18,6 +23,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Pageable;
+import org.springdoc.core.converters.models.PageableAsQueryParam;
 
 import java.util.UUID;
 
@@ -28,6 +35,7 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final AvatarUploadService avatarUploadService;
 
     private static final String USER_EXAMPLE = """
             {
@@ -44,6 +52,14 @@ public class UserController {
               "updatedAt": "2025-06-01T12:00:00"
             }
             """;
+
+    @Operation(summary = "Get users (Admin only)", description = "Returns a paginated list of users.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PageableAsQueryParam
+    @GetMapping
+    public ApiResponse<PageResponse<UserDto>> getUsers(Pageable pageable) {
+        return ApiResponse.success(userService.getUsers(pageable));
+    }
 
     @Operation(summary = "Get my profile", description = "Returns the profile of the currently authenticated user")
     @ApiResponses({
@@ -90,13 +106,12 @@ public class UserController {
     }
 
     @Operation(summary = "Update my profile",
-            description = "Allows the authenticated user to update their full name and avatar URL. Role changes are not permitted here.",
+            description = "Updates the authenticated user's full name. Avatars must use the dedicated signed upload endpoints.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
                     content = @Content(schema = @Schema(implementation = UpdateProfileRequest.class),
                             examples = @ExampleObject(value = """
                                     {
-                                      "fullName": "Nguyen Van B",
-                                      "avatarUrl": "https://cdn.example.com/avatars/42-new.png"
+                                      "fullName": "Nguyen Van B"
                                     }
                                     """))))
     @ApiResponses({
@@ -116,6 +131,22 @@ public class UserController {
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody UpdateProfileRequest request) {
         return ApiResponse.success("Profile updated successfully", userService.updateUserProfile(user, request));
+    }
+
+    @Operation(summary = "Request a signed Cloudinary avatar upload slot")
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/me/avatar/upload-slot")
+    public ApiResponse<AvatarUploadSlotDto> requestAvatarUpload(
+            @CurrentUser UserPrincipal user, @Valid @RequestBody AvatarUploadSlotRequest request) {
+        return ApiResponse.success("Avatar upload slot issued", avatarUploadService.issueSlot(user.id(), request));
+    }
+
+    @Operation(summary = "Confirm a direct Cloudinary avatar upload")
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/me/avatar/confirm")
+    public ApiResponse<UserDto> confirmAvatarUpload(
+            @CurrentUser UserPrincipal user, @Valid @RequestBody AvatarUploadConfirmRequest request) {
+        return ApiResponse.success("Avatar updated successfully", avatarUploadService.confirm(user.id(), request));
     }
 
     @Operation(summary = "Change user role (Admin only)",

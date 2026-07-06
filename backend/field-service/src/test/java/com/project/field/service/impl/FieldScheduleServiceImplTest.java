@@ -1,6 +1,8 @@
 package com.project.field.service.impl;
 
 import com.project.common.exception.BadRequestException;
+import com.project.common.dto.ApiResponse;
+import com.project.field.client.BookingServiceClient;
 import com.project.field.dto.FieldClosureRequest;
 import com.project.field.dto.OperatingHoursRequest;
 import com.project.field.entity.Field;
@@ -53,6 +55,9 @@ class FieldScheduleServiceImplTest {
 
     @Mock
     private FieldEventPublisher fieldEventPublisher;
+
+    @Mock
+    private BookingServiceClient bookingServiceClient;
 
     @InjectMocks
     private FieldScheduleServiceImpl service;
@@ -116,6 +121,8 @@ class FieldScheduleServiceImplTest {
         when(subFieldRepository.findWithFieldById(secondSubFieldId)).thenReturn(Optional.of(secondSubField));
         when(fieldClosureRepository.findOverlappingClosures(anySet(), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(List.of());
+        when(bookingServiceClient.hasBookingConflicts(anySet(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(ApiResponse.success(false));
         when(fieldClosureRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.createClosures(ownerId, "OWNER", FieldClosureRequest.builder()
@@ -145,6 +152,8 @@ class FieldScheduleServiceImplTest {
                         .startDate(LocalDate.now().plusDays(1))
                         .endDate(LocalDate.now().plusDays(2))
                         .build()));
+        when(bookingServiceClient.hasBookingConflicts(anySet(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(ApiResponse.success(false));
         when(fieldClosureRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.createClosures(ownerId, "OWNER", FieldClosureRequest.builder()
@@ -162,6 +171,53 @@ class FieldScheduleServiceImplTest {
             return count == 1;
         }));
         verify(fieldEventPublisher).publishClosureCreated(anyList());
+    }
+
+    @Test
+    void createClosuresRejectsAnySelectedSubFieldWithBooking() {
+        UUID subFieldId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        Field field = Field.builder().id(UUID.randomUUID()).ownerId(ownerId).build();
+        when(subFieldRepository.findWithFieldById(subFieldId))
+                .thenReturn(Optional.of(SubField.builder().id(subFieldId).field(field).build()));
+        when(bookingServiceClient.hasBookingConflicts(anySet(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(ApiResponse.success(true));
+
+        FieldClosureRequest request = FieldClosureRequest.builder()
+                .subFieldIds(List.of(subFieldId))
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(2))
+                .reason("Maintenance")
+                .build();
+
+        assertThrows(BadRequestException.class,
+                () -> service.createClosures(ownerId, "OWNER", request));
+        verify(fieldClosureRepository, org.mockito.Mockito.never()).saveAll(anyList());
+    }
+
+    @Test
+    void updateClosureRejectsBookedDateRange() {
+        UUID closureId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        Field field = Field.builder().id(UUID.randomUUID()).ownerId(ownerId).build();
+        SubFieldClosure closure = SubFieldClosure.builder().id(closureId).subFieldId(subFieldId).build();
+        when(fieldClosureRepository.findById(closureId)).thenReturn(Optional.of(closure));
+        when(subFieldRepository.findWithFieldById(subFieldId))
+                .thenReturn(Optional.of(SubField.builder().id(subFieldId).field(field).build()));
+        when(bookingServiceClient.hasBookingConflicts(anySet(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(ApiResponse.success(true));
+
+        FieldClosureRequest request = FieldClosureRequest.builder()
+                .subFieldIds(List.of(subFieldId))
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(2))
+                .reason("Maintenance")
+                .build();
+
+        assertThrows(BadRequestException.class,
+                () -> service.updateClosure(closureId, ownerId, "OWNER", request));
+        verify(fieldClosureRepository, org.mockito.Mockito.never()).save(any(SubFieldClosure.class));
     }
 
     private List<OperatingHoursRequest> openWeek() {

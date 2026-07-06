@@ -28,7 +28,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
+import com.project.booking.repository.BookingRepository;
+import com.project.common.enums.BookingStatus;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -37,10 +41,23 @@ import java.util.UUID;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final BookingRepository bookingRepository;
+
+    @Operation(summary = "Check booking conflicts", description = "Internal endpoint used before creating or updating field closures.")
+    @GetMapping("/internal/conflicts")
+    public ApiResponse<Boolean> hasBookingConflicts(
+            @RequestParam Collection<UUID> subFieldIds,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        boolean conflicts = bookingRepository.existsBySubFieldIdInAndBookingDateBetweenAndStatusIn(
+                subFieldIds, startDate, endDate,
+                List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
+        return ApiResponse.success(conflicts);
+    }
 
     @Operation(
         summary = "Create booking",
-        description = "Creates a new booking for the authenticated client",
+        description = "Creates a new booking for the authenticated client. When a booking overlaps multiple price rules, each segment is charged proportionally and the total is rounded up to the nearest 1,000 VND.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(

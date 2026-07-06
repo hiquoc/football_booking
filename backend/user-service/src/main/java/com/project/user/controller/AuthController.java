@@ -1,27 +1,30 @@
 package com.project.user.controller;
 
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.project.common.dto.ApiResponse;
+import com.project.user.dto.LogoutRequest;
 import com.project.user.dto.SendOtpRequest;
 import com.project.user.dto.TokenResponse;
 import com.project.user.dto.VerifyOtpRequest;
 import com.project.user.service.AuthService;
+
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.CookieValue;
-import com.project.user.dto.RefreshTokenRequest;
-import com.project.user.dto.LogoutRequest;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -67,7 +70,7 @@ public class AuthController {
         return ApiResponse.success("OTP sent successfully", null);
     }
 
-    @Operation(summary = "Verify OTP", description = "Verifies the OTP and returns a JWT token pair. If the user does not exist, they are automatically registered as a CLIENT.", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(schema = @Schema(implementation = VerifyOtpRequest.class), examples = @ExampleObject(name = "example", value = """
+    @Operation(summary = "Verify OTP", description = "Verifies the OTP, returns the access token, and stores the refresh token in an HttpOnly cookie. If the user does not exist, they are automatically registered as a CLIENT.", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(schema = @Schema(implementation = VerifyOtpRequest.class), examples = @ExampleObject(name = "example", value = """
             {
               "phoneNumber": "0862470050",
               "code": "111111"
@@ -78,10 +81,7 @@ public class AuthController {
                     {
                       "success": true,
                       "message": "OTP verified successfully",
-                      "data": {
-                        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                      }
+                      "data": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                     }
                     """))),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired OTP", content = @Content(examples = @ExampleObject(value = """
@@ -93,20 +93,22 @@ public class AuthController {
                     """)))
     })
     @PostMapping("/otp/verify")
-    public ApiResponse<TokenResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request, HttpServletResponse response) {
+    public ApiResponse<String> verifyOtp(@Valid @RequestBody VerifyOtpRequest request, HttpServletResponse response) {
         TokenResponse tokenResponse = authService.verifyOtp(request);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
-        return ApiResponse.success("OTP verified successfully", tokenResponse);
+        return ApiResponse.success("OTP verified successfully", tokenResponse.getAccessToken());
     }
 
-    @Operation(summary = "Refresh Token", description = "Get a new access token using a refresh token")
+    @Operation(summary = "Refresh Token", description = "Rotates the HttpOnly refreshToken cookie and returns a new access token. The request body is not used.")
     @PostMapping("/refresh")
-    public ApiResponse<TokenResponse> refreshToken(@Valid @RequestBody(required = false) RefreshTokenRequest request,
-                                                   @CookieValue(name = "refreshToken", required = false) String refreshTokenCookie,
-                                                   HttpServletResponse response) {
-        TokenResponse tokenResponse = authService.refreshToken(request, refreshTokenCookie);
+    public ApiResponse<String> refreshToken(
+            @Parameter(name = "refreshToken", in = ParameterIn.COOKIE, required = true,
+                    description = "HttpOnly refresh token cookie")
+            @CookieValue(name = "refreshToken") String refreshTokenCookie,
+            HttpServletResponse response) {
+        TokenResponse tokenResponse = authService.refreshToken(refreshTokenCookie);
         setRefreshTokenCookie(response, tokenResponse.getRefreshToken());
-        return ApiResponse.success("Token refreshed successfully", tokenResponse);
+        return ApiResponse.success("Token refreshed successfully", tokenResponse.getAccessToken());
     }
 
     @Operation(summary = "Logout", description = "Invalidate a refresh token")

@@ -15,15 +15,22 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.common.dto.ApiResponse;
 import com.project.field.dto.FieldDto;
+import com.project.field.dto.FieldDetailsDto;
+import com.project.field.dto.FieldCardDto;
+import java.math.BigDecimal;
 import com.project.field.dto.OperatingHoursDto;
 import com.project.field.dto.OperatingHoursRequest;
 import com.project.field.dto.FieldRequest;
+import com.project.field.dto.FieldStatusRequest;
+import com.project.field.enums.FieldStatus;
 import com.project.field.service.FieldScheduleService;
 import com.project.field.service.FieldService;
+import com.project.field.service.ReviewService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -44,6 +51,7 @@ public class FieldController {
 
     private final FieldService fieldService;
     private final FieldScheduleService fieldScheduleService;
+    private final ReviewService reviewService;
 
     @Operation(
             summary = "Create a field",
@@ -56,7 +64,15 @@ public class FieldController {
                                     {
                                       "name": "ABC Football Center",
                                       "description": "Premier football venue in the city",
-                                      "address": "123 Nguyen Hue, Ho Chi Minh City",
+                                      "address": "123 Nguyen Hue",
+                                      "ward": "Phuong Sai Gon",
+                                      "wardCode": "26743",
+                                      "province": "Thanh pho Ho Chi Minh",
+                                      "provinceCode": "79",
+                                      "legacyWard": "Phuong Ben Nghe",
+                                      "legacyWardCode": "26743",
+                                      "legacyDistrict": "Quan 1",
+                                      "legacyProvince": "Thanh pho Ho Chi Minh",
                                       "latitude": 10.7769,
                                       "longitude": 106.7009,
                                       "phoneNumber": "0862470050",
@@ -115,7 +131,15 @@ public class FieldController {
                                     {
                                       "name": "ABC Football Center",
                                       "description": "Premier football venue in the city",
-                                      "address": "123 Nguyen Hue, Ho Chi Minh City",
+                                      "address": "123 Nguyen Hue",
+                                      "ward": "Phuong Sai Gon",
+                                      "wardCode": "26743",
+                                      "province": "Thanh pho Ho Chi Minh",
+                                      "provinceCode": "79",
+                                      "legacyWard": "Phuong Ben Nghe",
+                                      "legacyWardCode": "26743",
+                                      "legacyDistrict": "Quan 1",
+                                      "legacyProvince": "Thanh pho Ho Chi Minh",
                                       "latitude": 10.7769,
                                       "longitude": 106.7009,
                                       "phoneNumber": "0862470050",
@@ -144,14 +168,74 @@ public class FieldController {
         return ApiResponse.success("Field updated successfully", fieldService.update(id,currentUser.id(), request));
     }
 
-    @Operation(summary = "Get a field by ID", description = "Returns the full details of a single field, including images and supported field types.")
+    @Operation(
+            summary = "Get a field by ID",
+            description = "Returns the full details of a single field, including images, supported field types, and subfields. Approved fields are public. Pending or rejected fields can only be viewed by admins or by the owner of that field."
+    )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Field found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Unapproved field can only be viewed by the owner or an admin", content = @Content),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Field not found", content = @Content)
     })
     @GetMapping("/{id}")
-    public ApiResponse<FieldDto> getById(@PathVariable UUID id) {
-        return ApiResponse.success(fieldService.getById(id));
+    public ApiResponse<FieldDto> getById(@PathVariable UUID id, @CurrentUser UserPrincipal currentUser) {
+        return ApiResponse.success(fieldService.getWithDetailsById(id,currentUser));
+    }
+
+    @Operation(
+            summary = "Get complete field details",
+            description = "Returns all data required by the field details page in one response. Approved fields are public. Pending or rejected fields can only be viewed by admins or by the owner of that field."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Field details returned successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Unapproved field can only be viewed by the owner or an admin", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Field not found", content = @Content)
+    })
+    @GetMapping("/{id}/details")
+    public ApiResponse<FieldDetailsDto> getDetails(@PathVariable UUID id, @CurrentUser UserPrincipal currentUser) {
+        FieldDto field = fieldService.getWithDetailsById(id,currentUser);
+        return ApiResponse.success(FieldDetailsDto.builder()
+                .field(field)
+                .operatingHours(fieldScheduleService.getFieldOperatingHours(id))
+                .subFields(field.getSubFields())
+                .reviews(reviewService.getByFieldId(id))
+                .build());
+    }
+
+    @Operation(summary = "Search compact field cards", description = "Optimized public search returning only card data and one primary image.")
+    @GetMapping("/cards")
+    public ApiResponse<PageResponse<FieldCardDto>> searchCards(
+            @RequestParam(required = false) String fieldType,
+            @RequestParam(required = false) String subFieldType,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String provinceCode,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
+            @RequestParam(required = false) Double radiusKm,
+            @RequestParam(defaultValue = "rating") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return ApiResponse.success(fieldService.searchCards(fieldType, subFieldType, district, provinceCode,
+                latitude, longitude, radiusKm, sortBy, direction, page, size));
+    }
+
+    @Operation(
+            summary = "Get the current owner's fields",
+            description = "Returns every field owned by the authenticated owner, including pending, rejected, inactive, and approved fields. Supports page, size, and sort parameters."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Owner fields returned successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Authentication required", content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Owner role required", content = @Content)
+    })
+    @PageableAsQueryParam
+    @PreAuthorize("hasRole('OWNER')")
+    @GetMapping("/owner")
+    public ApiResponse<PageResponse<FieldDto>> getOwnerFields(
+            @CurrentUser UserPrincipal currentUser,
+            @Parameter(hidden = true) Pageable pageable) {
+        return ApiResponse.success(fieldService.getByOwnerId(currentUser.id(), pageable));
     }
 
     @Operation(
@@ -174,7 +258,15 @@ public class FieldController {
                                     "ownerId": "b1e1c606-6b76-4154-af38-7dda890395ce",
                                     "name": "ABC Football Center",
                                     "description": "Premier football venue in the city",
-                                    "address": "123 Nguyen Hue, Ho Chi Minh City",
+                                    "address": "123 Nguyen Hue",
+                                    "ward": "Phuong Sai Gon",
+                                    "wardCode": "26743",
+                                    "province": "Thanh pho Ho Chi Minh",
+                                    "provinceCode": "79",
+                                    "legacyWard": "Phuong Ben Nghe",
+                                    "legacyWardCode": "26743",
+                                    "legacyDistrict": "Quan 1",
+                                    "legacyProvince": "Thanh pho Ho Chi Minh",
                                     "latitude": 10.7769,
                                     "longitude": 106.7009,
                                     "phoneNumber": "0862470050",
@@ -200,11 +292,23 @@ public class FieldController {
             )
     )
     @PageableAsQueryParam
+    @PreAuthorize("#status == null or hasRole('ADMIN')")
     @GetMapping
     public ApiResponse<PageResponse<FieldDto>> getAll(
+            @RequestParam(required = false) FieldStatus status,
             @Parameter(hidden = true)
             Pageable pageable) {
-        return ApiResponse.success(fieldService.getAll(pageable));
+        return ApiResponse.success(fieldService.getAll(status, pageable));
+    }
+
+    @Operation(summary = "Update field approval status", description = "Allows an administrator to mark a field as pending, approved, or rejected.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/status")
+    public ApiResponse<FieldDto> updateStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody FieldStatusRequest request) {
+        return ApiResponse.success("Field status updated successfully",
+                fieldService.updateStatus(id, request.getStatus()));
     }
 
     @Operation(summary = "Get field operating hours", description = "Returns the configured weekly schedule for a field.")

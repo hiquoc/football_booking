@@ -3,6 +3,12 @@ package com.project.field.controller;
 import com.project.common.dto.ApiResponse;
 import com.project.field.dto.FieldImageDto;
 import com.project.field.dto.FieldImageOrderRequest;
+import com.project.field.dto.ImageUploadSlotRequest;
+import com.project.field.dto.ImageUploadSlotDto;
+import com.project.field.dto.ImageUploadBatchConfirmRequest;
+import com.project.field.service.FieldImageUploadService;
+import com.project.common.security.CurrentUser;
+import com.project.common.security.UserPrincipal;
 import com.project.field.service.FieldService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,10 +19,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
-import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,53 +31,28 @@ import java.util.UUID;
 public class FieldImageController {
 
     private final FieldService fieldService;
+    private final FieldImageUploadService imageUploadService;
 
-    @Operation(
-            summary = "Upload images for a field",
-            description = "Uploads one or more files to Cloudinary and stores their URLs under the specified field. " +
-                          "New images are appended after existing images and are not automatically selected as primary. " +
-                          "Use the image ordering endpoint after upload to reorder images and select the cover image."
-    )
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Images uploaded and saved",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "success": true,
-                                      "message": "Images uploaded successfully",
-                                      "data": [
-                                        {
-                                          "id": 1,
-                                          "imageUrl": "https://res.cloudinary.com/demo/image/upload/v1/sample-1.jpg",
-                                          "isPrimary": false,
-                                          "displayOrder": 2
-                                        },
-                                        {
-                                          "id": 2,
-                                          "imageUrl": "https://res.cloudinary.com/demo/image/upload/v1/sample-2.jpg",
-                                          "isPrimary": false,
-                                          "displayOrder": 3
-                                        }
-                                      ]
-                                    }
-                                    """)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Field not found", content = @Content),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "No file provided or unsupported format", content = @Content)
-    })
+    @Operation(summary = "Request direct-upload slots",
+            description = "Creates idempotent placeholders and returns signed Cloudinary parameters. Reuse requestId when retrying a batch.")
     @PreAuthorize("hasRole('OWNER')")
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<List<FieldImageDto>> uploadImages(
-            @Parameter(description = "ID of the field to attach the image to") @PathVariable UUID fieldId,
-            @Parameter(description = "Image files to upload (JPEG, PNG, WEBP supported)")
-            @RequestPart("files") List<MultipartFile> files) {
+    @PostMapping("/upload-slots")
+    public ApiResponse<List<ImageUploadSlotDto>> issueUploadSlots(
+            @PathVariable UUID fieldId, @CurrentUser UserPrincipal currentUser,
+            @Valid @RequestBody ImageUploadSlotRequest request) {
+        return ApiResponse.success("Upload slots issued successfully",
+                imageUploadService.issueSlots(fieldId, currentUser.id(), request));
+    }
 
-        List<FieldImageDto> images = fieldService.uploadImages(fieldId, files);
-        return ApiResponse.success("Images uploaded successfully", images);
+    @Operation(summary = "Confirm direct Cloudinary uploads as a batch",
+            description = "Atomically validates signed Cloudinary results and idempotently completes all owned placeholders.")
+    @PreAuthorize("hasRole('OWNER')")
+    @PostMapping("/confirm")
+    public ApiResponse<List<FieldImageDto>> confirmUpload(
+            @PathVariable UUID fieldId, @CurrentUser UserPrincipal currentUser,
+            @Valid @RequestBody ImageUploadBatchConfirmRequest request) {
+        return ApiResponse.success("Image uploads confirmed successfully",
+                imageUploadService.confirmBatch(fieldId, currentUser.id(), request));
     }
 
     @Operation(

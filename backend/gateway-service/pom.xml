@@ -21,6 +21,17 @@
         <dependency>
             <groupId>com.project</groupId>
             <artifactId>common</artifactId>
+            <exclusions>
+                <!-- Gateway is stateless and must not activate JDBC/JPA auto-configuration. -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-jpa</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-web</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- JSON Web Token (JJWT) for Token Validation -->
@@ -48,10 +59,10 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- Spring Cloud Gateway WebMVC -->
+        <!-- Reactive gateway supports both HTTP and WebSocket routing. -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-gateway-server-webmvc</artifactId>
+            <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>
         </dependency>
 
         <!-- Eureka Client -->

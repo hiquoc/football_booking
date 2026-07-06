@@ -1,7 +1,6 @@
 package com.project.user.service;
 
 import com.project.user.dto.LogoutRequest;
-import com.project.user.dto.RefreshTokenRequest;
 import com.project.user.dto.SendOtpRequest;
 import com.project.user.dto.TokenResponse;
 import com.project.user.dto.VerifyOtpRequest;
@@ -11,9 +10,7 @@ public interface AuthService {
 
     TokenResponse verifyOtp(VerifyOtpRequest request);
 
-    TokenResponse refreshToken(RefreshTokenRequest request);
-
-    TokenResponse refreshToken(RefreshTokenRequest request, String refreshTokenCookie);
+    TokenResponse refreshToken(String refreshTokenCookie);
 
     void logout(LogoutRequest request);
 

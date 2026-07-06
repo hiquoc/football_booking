@@ -62,6 +62,7 @@ public class DefaultPricingStrategy implements PricingStrategy {
             currentStartTime = segmentEndTime;
         }
 
-        return totalPrice.setScale(2, RoundingMode.HALF_UP);
+        // Prices are displayed and collected in whole thousands of VND.
+        return totalPrice.setScale(-3, RoundingMode.CEILING).setScale(2);
     }
 }

@@ -1,6 +1,7 @@
 package com.project.user.service.impl;
 
 import com.project.common.enums.UserType;
+import com.project.common.dto.PageResponse;
 import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
 import com.project.common.security.UserPrincipal;
@@ -12,6 +13,7 @@ import com.project.user.repository.UserRepository;
 import com.project.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -22,6 +24,12 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserDto> getUsers(Pageable pageable) {
+        return PageResponse.from(userRepository.findAll(pageable).map(userMapper::toDto));
+    }
 
     @Override
     public UserDto getUserById(UUID id) {
@@ -57,10 +65,6 @@ public class UserServiceImpl implements UserService {
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName());
         }
-        if (request.getAvatarUrl() != null) {
-            user.setAvatarUrl(request.getAvatarUrl());
-        }
-
         return userMapper.toDto(userRepository.save(user));
     }
 

@@ -15,32 +15,32 @@ spring:
   cloud:
     gateway:
       server:
-        webmvc:
+        webflux:
           routes:
-          - id: user-service-auth
-            uri: lb://user-service
-            predicates:
-              - Path=/api/v1/auth/**
-          - id: user-service-api
-            uri: lb://user-service
-            predicates:
-              - Path=/api/v1/users/**
-          - id: field-service-api
-            uri: lb://field-service
-            predicates:
-              - Path=/api/v1/fields/**, /api/v1/subfields/**
-          - id: booking-service-api
-            uri: lb://booking-service
-            predicates:
-              - Path=/api/v1/bookings/**
-          - id: notification-service-api
-            uri: lb://notification-service
-            predicates:
-              - Path=/api/v1/notifications/**
-          - id: notification-service-websocket
-            uri: lb://notification-service
-            predicates:
-              - Path=/ws, /ws/**
+            - id: user-service-auth
+              uri: lb://user-service
+              predicates:
+                - Path=/api/v1/auth/**
+            - id: user-service-api
+              uri: lb://user-service
+              predicates:
+                - Path=/api/v1/users/**
+            - id: field-service-api
+              uri: lb://field-service
+              predicates:
+                - Path=/api/v1/fields/**, /api/v1/sub-fields/**, /api/v1/field-types/**, /api/v1/reviews/**
+            - id: booking-service-api
+              uri: lb://booking-service
+              predicates:
+                - Path=/api/v1/bookings/**
+            - id: notification-service-api
+              uri: lb://notification-service
+              predicates:
+                - Path=/api/v1/notifications/**
+            - id: notification-service-websocket
+              uri: lb:ws://notification-service
+              predicates:
+                - Path=/ws, /ws/**
 
 
 jwt:

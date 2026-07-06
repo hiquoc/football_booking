@@ -6,6 +6,8 @@ spring:
     url: ${FIELD_DB_URL:jdbc:postgresql://localhost:5432/field_db}
     username: ${FIELD_DB_USERNAME:football}
     password: ${FIELD_DB_PASSWORD:football}
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev-migration
 
 cloudinary:
   cloud_name: ${CLOUDINARY_CLOUD_NAME:dev-cloudinary-cloud}

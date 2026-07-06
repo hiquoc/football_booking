@@ -1,6 +1,7 @@
 package com.project.user.config;
 
 import com.project.common.security.HeaderAuthenticationFilter;
+import com.project.common.security.IncomingRequestLogFilter;
 import com.project.user.security.oauth2.CustomOAuth2UserService;
 import com.project.user.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,11 @@ public class SecurityConfig {
         private final HeaderAuthenticationFilter headerAuthenticationFilter;
 
         @Bean
+        public IncomingRequestLogFilter incomingRequestLogFilter() {
+                return new IncomingRequestLogFilter("user-service");
+        }
+
+        @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
                                 .csrf(AbstractHttpConfigurer::disable)
@@ -35,6 +41,8 @@ public class SecurityConfig {
                                                 .userInfoEndpoint(userInfo -> userInfo
                                                                 .userService(customOAuth2UserService))
                                                 .successHandler(oAuth2AuthenticationSuccessHandler))
+                                .addFilterBefore(incomingRequestLogFilter(),
+                                                UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(headerAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class);
 

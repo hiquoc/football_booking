@@ -1,0 +1,28 @@
+CREATE TABLE notification (
+    id UUID PRIMARY KEY, user_id UUID NOT NULL, code VARCHAR(100) NOT NULL, title VARCHAR(255),
+    payload JSONB, is_read BOOLEAN NOT NULL, created_at TIMESTAMP NOT NULL, read_at TIMESTAMP
+);
+CREATE INDEX idx_notification_user_id ON notification(user_id);
+CREATE INDEX idx_notification_created_at ON notification(created_at);
+CREATE INDEX idx_notification_is_read ON notification(is_read);
+
+CREATE TABLE outbox_events (
+    id UUID PRIMARY KEY, aggregate_type VARCHAR(255) NOT NULL, aggregate_id VARCHAR(255) NOT NULL,
+    event_type VARCHAR(255) NOT NULL, topic VARCHAR(255) NOT NULL, event_key VARCHAR(255) NOT NULL,
+    payload OID NOT NULL, headers OID NOT NULL, status VARCHAR(255) NOT NULL, retry_count INTEGER NOT NULL,
+    next_retry_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL, published_at TIMESTAMPTZ, error_message OID
+);
+CREATE INDEX idx_outbox_status ON outbox_events(status);
+CREATE INDEX idx_outbox_next_retry_at ON outbox_events(next_retry_at);
+CREATE INDEX idx_outbox_created_at ON outbox_events(created_at);
+
+CREATE TABLE inbox_events (
+    id UUID PRIMARY KEY, event_id VARCHAR(255) NOT NULL, consumer_group VARCHAR(255) NOT NULL,
+    topic VARCHAR(255) NOT NULL, kafka_partition INTEGER NOT NULL, kafka_offset BIGINT NOT NULL,
+    payload_type VARCHAR(255) NOT NULL, payload OID NOT NULL, status VARCHAR(255) NOT NULL,
+    retry_count INTEGER NOT NULL, next_retry_at TIMESTAMPTZ NOT NULL, received_at TIMESTAMPTZ NOT NULL,
+    processed_at TIMESTAMPTZ, error_message OID,
+    CONSTRAINT uk_inbox_event_consumer UNIQUE (event_id, consumer_group)
+);
+CREATE INDEX idx_inbox_status ON inbox_events(status);
+CREATE INDEX idx_inbox_next_retry_at ON inbox_events(next_retry_at);

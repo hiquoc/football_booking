@@ -9,6 +9,7 @@ import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.dto.response.UnavailableSlotResponse;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.service.BookingService;
+import com.project.booking.repository.BookingRepository;
 import com.project.common.constants.GlobalConstants;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
@@ -57,6 +58,26 @@ class BookingControllerApiTest {
 
     @MockitoBean
     private BookingService bookingService;
+
+    @MockitoBean
+    private BookingRepository bookingRepository;
+
+    @Test
+    void internalConflictCheckReturnsRepositoryResult() throws Exception {
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        LocalDate endDate = startDate.plusDays(2);
+        when(bookingRepository.existsBySubFieldIdInAndBookingDateBetweenAndStatusIn(
+                org.mockito.ArgumentMatchers.anyCollection(), eq(startDate), eq(endDate),
+                org.mockito.ArgumentMatchers.anyCollection())).thenReturn(true);
+
+        mockMvc.perform(get("/api/v1/bookings/internal/conflicts")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET)
+                        .param("subFieldIds", SUB_FIELD_ID.toString())
+                        .param("startDate", startDate.toString())
+                        .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(true));
+    }
 
     @Test
     void createBookingWithClientHeaderReturnsCreated() throws Exception {

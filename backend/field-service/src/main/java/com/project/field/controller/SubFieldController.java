@@ -181,7 +181,7 @@ public class SubFieldController {
         return ApiResponse.success(fieldScheduleService.getClosures(id));
     }
 
-    @Operation(summary = "Create sub-field closures", description = "Creates a maintenance or temporary closure for each selected sub-field ID.")
+    @Operation(summary = "Create sub-field closures", description = "Creates a maintenance or temporary closure for each selected sub-field ID. The entire request is rejected when any selected sub-field has a pending or confirmed booking in the date range.")
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @PostMapping("/closures")
     public ApiResponse<List<FieldClosureDto>> createClosures(
@@ -192,7 +192,7 @@ public class SubFieldController {
                 fieldScheduleService.createClosures(currentUser.id(), currentUser.role(), request));
     }
 
-    @Operation(summary = "Update closure", description = "Updates a maintenance or temporary closure.")
+    @Operation(summary = "Update closure", description = "Updates a maintenance or temporary closure. The update is rejected when the sub-field has a pending or confirmed booking in the new date range.")
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @PutMapping("/closures/{closureId}")
     public ApiResponse<FieldClosureDto> updateClosure(

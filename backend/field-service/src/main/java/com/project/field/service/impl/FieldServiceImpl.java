@@ -6,8 +6,10 @@ import com.project.common.enums.UserType;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
+import com.project.common.security.UserPrincipal;
 import com.project.field.client.UserServiceClient;
 import com.project.field.dto.FieldDto;
+import com.project.field.dto.FieldCardDto;
 import com.project.field.dto.FieldImageDto;
 import com.project.field.dto.FieldImageOrderRequest;
 import com.project.field.dto.FieldRequest;
@@ -17,11 +19,14 @@ import com.project.field.entity.Field;
 import com.project.field.entity.FieldImage;
 import com.project.field.entity.FieldOperatingHours;
 import com.project.field.exceptions.FieldNotFoundException;
+import com.project.field.enums.FieldStatus;
 import com.project.field.kafka.FieldEventPublisher;
 import com.project.field.mapper.FieldMapper;
 import com.project.field.repository.FieldImageRepository;
 import com.project.field.repository.FieldOperatingHoursRepository;
 import com.project.field.repository.FieldRepository;
+import com.project.field.repository.FieldCardQueryRepository;
+import com.project.field.repository.SubFieldRepository;
 import com.project.field.service.CloudinaryService;
 import com.project.field.service.FieldService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.stream.Collectors;
 
@@ -39,8 +45,10 @@ import java.util.stream.Collectors;
 public class FieldServiceImpl implements FieldService {
 
     private final FieldRepository fieldRepository;
+    private final FieldCardQueryRepository fieldCardQueryRepository;
     private final FieldImageRepository fieldImageRepository;
     private final FieldOperatingHoursRepository fieldOperatingHoursRepository;
+    private final SubFieldRepository subFieldRepository;
     private final FieldMapper fieldMapper;
     private final UserServiceClient userServiceClient;
     private final CloudinaryService cloudinaryService;
@@ -61,10 +69,10 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional
-    public FieldDto update(UUID id,UUID ownerId, FieldRequest request) {
+    public FieldDto update(UUID id, UUID ownerId, FieldRequest request) {
         Field field = fieldRepository.findById(id)
                 .orElseThrow(() -> new FieldNotFoundException(id));
-        if(!field.getOwnerId().equals(ownerId)){
+        if (!field.getOwnerId().equals(ownerId)) {
             throw new ForbiddenException("You don't have permission to do this");
         }
         validateUpdateRequest(request, field);
@@ -87,10 +95,51 @@ public class FieldServiceImpl implements FieldService {
     }
 
     @Override
-    public PageResponse<FieldDto> getAll(Pageable pageable) {
-        List<Field> Fields = fieldRepository.findAll();
-        System.out.println(Fields);
-        return PageResponse.from(fieldRepository.findAll(pageable).map(fieldMapper::toDto));
+    @Transactional(readOnly = true)
+    public FieldDto getWithDetailsById(UUID id, UserPrincipal userPrincipal) {
+        Field field = fieldRepository.findWithDetailsById(id)
+                .orElseThrow(() -> new FieldNotFoundException(id));
+        if (!canViewField(field, userPrincipal)) {
+            throw new ForbiddenException("You don't have permission to do this");
+        }
+        field.setImages(fieldImageRepository.findByFieldIdAndImageUrlIsNotNull(id));
+        field.setSubFields(subFieldRepository.findByFieldId(id));
+        return fieldMapper.toDto(field);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<FieldDto> getByOwnerId(UUID ownerId, Pageable pageable) {
+        return PageResponse.from(fieldRepository.findByOwnerId(ownerId, pageable).map(fieldMapper::toDto));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<FieldDto> getAll(FieldStatus status, Pageable pageable) {
+        if (status != null) {
+            return PageResponse.from(fieldRepository.findByStatus(status, pageable).map(fieldMapper::toDto));
+        }
+        return PageResponse.from(fieldRepository
+                .findByStatusAndActiveTrue(FieldStatus.APPROVED, pageable)
+                .map(fieldMapper::toDto));
+    }
+
+    @Override
+    @Transactional
+    public FieldDto updateStatus(UUID id, FieldStatus status) {
+        Field field = fieldRepository.findById(id)
+                .orElseThrow(() -> new FieldNotFoundException(id));
+        field.setStatus(status);
+        return fieldMapper.toDto(fieldRepository.save(field));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<FieldCardDto> searchCards(String fieldType, String subFieldType, String district, String provinceCode,
+                                                  BigDecimal latitude, BigDecimal longitude, Double radiusKm, String sortBy, String direction,
+                                                  int page, int size) {
+        return PageResponse.from(fieldCardQueryRepository.search(fieldType, subFieldType, district, provinceCode,
+                latitude, longitude, radiusKm, sortBy, direction, page, size));
     }
 
     @Override
@@ -128,7 +177,11 @@ public class FieldServiceImpl implements FieldService {
         try {
             return addImages(fieldId, imageUrls);
         } catch (RuntimeException ex) {
-            imageUrls.forEach(cloudinaryService::deleteImage);
+            try {
+                cloudinaryService.deleteImages(imageUrls);
+            } catch (RuntimeException cleanupException) {
+                ex.addSuppressed(cleanupException);
+            }
             throw ex;
         }
     }
@@ -176,11 +229,24 @@ public class FieldServiceImpl implements FieldService {
 
     private int nextDisplayOrder(Field field) {
         return field.getImages() == null ? 0 : field.getImages().stream()
-                .map(FieldImage::getDisplayOrder)
-                .filter(Objects::nonNull)
-                .max(Integer::compareTo)
-                .map(order -> order + 1)
-                .orElse(0);
+                                               .map(FieldImage::getDisplayOrder)
+                                               .filter(Objects::nonNull)
+                                               .max(Integer::compareTo)
+                                               .map(order -> order + 1)
+                                               .orElse(0);
+    }
+
+    private boolean canViewField(Field field, UserPrincipal userPrincipal) {
+        if (field.getStatus() == FieldStatus.APPROVED) {
+            return true;
+        }
+        if (userPrincipal == null) {
+            return false;
+        }
+        if ("ADMIN".equals(userPrincipal.role())) {
+            return true;
+        }
+        return field.getOwnerId().equals(userPrincipal.id());
     }
 
     private List<FieldOperatingHours> upsertOperatingHours(Field field, FieldRequest request) {
@@ -246,6 +312,17 @@ public class FieldServiceImpl implements FieldService {
         if (request.getAddress() == null || request.getAddress().isBlank()) {
             throw new BadRequestException("Field address is required");
         }
+        requireLocationValue(request.getWard(), "Ward");
+        requireLocationValue(request.getWardCode(), "Ward code");
+        requireLocationValue(request.getProvince(), "Province");
+        requireLocationValue(request.getProvinceCode(), "Province code");
+        requireLocationValue(request.getLegacyWard(), "Legacy ward");
+        requireLocationValue(request.getLegacyWardCode(), "Legacy ward code");
+        requireLocationValue(request.getLegacyDistrict(), "Legacy district");
+        requireLocationValue(request.getLegacyProvince(), "Legacy province");
+        if (request.getLatitude() == null || request.getLongitude() == null) {
+            throw new BadRequestException("Field location must be selected on the map");
+        }
         if (request.getPhoneNumber() == null || request.getPhoneNumber().isBlank()) {
             throw new BadRequestException("Phone number is required");
         }
@@ -259,10 +336,30 @@ public class FieldServiceImpl implements FieldService {
         if (request.getAddress() != null && request.getAddress().isBlank()) {
             throw new BadRequestException("Field address must not be blank");
         }
+        rejectBlankLocationValue(request.getWard(), "Ward");
+        rejectBlankLocationValue(request.getWardCode(), "Ward code");
+        rejectBlankLocationValue(request.getProvince(), "Province");
+        rejectBlankLocationValue(request.getProvinceCode(), "Province code");
+        rejectBlankLocationValue(request.getLegacyWard(), "Legacy ward");
+        rejectBlankLocationValue(request.getLegacyWardCode(), "Legacy ward code");
+        rejectBlankLocationValue(request.getLegacyDistrict(), "Legacy district");
+        rejectBlankLocationValue(request.getLegacyProvince(), "Legacy province");
         if (request.getPhoneNumber() != null && request.getPhoneNumber().isBlank()) {
             throw new BadRequestException("Phone number must not be blank");
         }
         validateOperatingHours(request, false);
+    }
+
+    private void requireLocationValue(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new BadRequestException(label + " is required");
+        }
+    }
+
+    private void rejectBlankLocationValue(String value, String label) {
+        if (value != null && value.isBlank()) {
+            throw new BadRequestException(label + " must not be blank");
+        }
     }
 
     private void validateOperatingHours(FieldRequest request, boolean create) {
@@ -294,7 +391,9 @@ public class FieldServiceImpl implements FieldService {
     private void validateOperatingHours(OperatingHoursRequest request) {
         if (Boolean.TRUE.equals(request.getClosed())) {
             if (request.getOpenTime() != null || request.getCloseTime() != null) {
-                throw new BadRequestException("Closed days must not include open time or close time");
+//                throw new BadRequestException("Closed days must not include open time or close time");
+                request.setOpenTime(null);
+                request.setCloseTime(null);
             }
             return;
         }

@@ -88,8 +88,10 @@ public class NotificationServiceImpl implements NotificationService {
                 .filter(item -> item.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Notification not found"));
         if (!Boolean.TRUE.equals(notification.getIsRead())) {
+            LocalDateTime readAt = LocalDateTime.now();
+            notificationRepository.markAsRead(notificationId, userId, readAt);
             notification.setIsRead(true);
-            notification.setReadAt(LocalDateTime.now());
+            notification.setReadAt(readAt);
         }
         return notificationMapper.toResponse(notification);
     }
@@ -97,11 +99,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void markAllAsRead(UUID userId) {
-        notificationRepository.findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId)
-                .forEach(notification -> {
-                    notification.setIsRead(true);
-                    notification.setReadAt(LocalDateTime.now());
-                });
+        notificationRepository.markAllAsRead(userId, LocalDateTime.now());
     }
 
     @Override
@@ -112,7 +110,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private void send(NotificationChannel channel, NotificationRequest request, NotificationResponse response) {
         if (channel == NotificationChannel.IN_APP) {
-            messagingTemplate.convertAndSend("/topic/users/" + request.getUserId(), response);
+            messagingTemplate.convertAndSendToUser(request.getUserId().toString(), "/queue/notifications", response);
         }
         NotificationSender sender = senders.get(channel);
         if (sender == null) {

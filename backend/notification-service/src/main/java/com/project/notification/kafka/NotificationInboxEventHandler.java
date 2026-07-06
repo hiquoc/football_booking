@@ -74,8 +74,9 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.BOOKING_CREATED)
-                .title("Booking created")
-                .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName()))
+                .title("Đã tạo yêu cầu đặt sân")
+                .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName(),
+                        event.bookingDate(), event.startTime(), event.endTime(), event.totalAmount()))
                 .channels(List.of(NotificationChannel.IN_APP))
                 .build());
     }
@@ -85,21 +86,23 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.BOOKING_CONFIRMED)
-                .title("Booking confirmed")
-                .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName()))
+                .title("Đặt sân đã được xác nhận")
+                .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName(),
+                        event.bookingDate(), event.startTime(), event.endTime(), event.totalAmount()))
                 .channels(List.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL))
                 .build());
     }
 
     private void handleBookingCancelled(BookingCancelledEvent event) {
-        Map<String, Object> payload = bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName());
+        Map<String, Object> payload = bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(),
+                event.fieldName(), event.bookingDate(), event.startTime(), event.endTime(), null);
         payload.put("reason", event.reason());
         payload.put("cancelledBy", event.cancelledBy());
         notificationService.create(NotificationRequest.builder()
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.BOOKING_CANCELLED)
-                .title("Booking cancelled")
+                .title("Đặt sân đã bị hủy")
                 .payload(payload)
                 .channels(List.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL))
                 .build());
@@ -110,7 +113,7 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.PAYMENT_SUCCESS)
-                .title("Payment successful")
+                .title("Thanh toán thành công")
                 .payload(Map.of(
                         "paymentId", event.paymentId(),
                         "bookingId", event.bookingId(),
@@ -125,7 +128,7 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.PAYMENT_FAILED)
-                .title("Payment failed")
+                .title("Thanh toán thất bại")
                 .payload(Map.of(
                         "paymentId", event.paymentId(),
                         "bookingId", event.bookingId(),
@@ -136,12 +139,20 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .build());
     }
 
-    private Map<String, Object> bookingPayload(Object bookingId, String bookingCode, Object fieldId, String fieldName) {
+    private Map<String, Object> bookingPayload(Object bookingId, String bookingCode, Object subFieldId,
+                                                String fieldName, Object bookingDate, Object startTime,
+                                                Object endTime, Object totalAmount) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("bookingId", bookingId);
         payload.put("bookingCode", bookingCode);
-        payload.put("fieldId", fieldId);
+        payload.put("subFieldId", subFieldId);
         payload.put("fieldName", fieldName);
+        payload.put("bookingDate", bookingDate);
+        payload.put("startTime", startTime);
+        payload.put("endTime", endTime);
+        if (totalAmount != null) {
+            payload.put("totalAmount", totalAmount);
+        }
         return payload;
     }
 }

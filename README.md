@@ -34,6 +34,9 @@ The system is built on a microservices architecture, promoting separation of con
     -   Includes a scheduler to automatically expire unpaid, `PENDING` bookings.
 
 -   **Notification Service (`notification-service`):** A placeholder service designed to consume notification events from Kafka and send alerts, such as booking confirmations via email.
+    -   Delivers in-app notifications in real time over authenticated STOMP/WebSocket connections.
+    -   The browser obtains a 60-second WebSocket ticket through the Next.js BFF; access and refresh tokens remain HttpOnly.
+    -   WebSocket handshakes pass through the API gateway, which validates the ticket and relays trusted user headers to the notification service.
 
 ### Data Flow & Communication
 
@@ -61,6 +64,7 @@ The system is built on a microservices architecture, promoting separation of con
     -   A mock payment endpoint transitions the booking to `CONFIRMED`.
     -   A background scheduler automatically moves untended `PENDING` bookings to `EXPIRED`.
     -   Bookings can be cancelled by the client or the field owner.
+    -   A booking spanning multiple price periods is charged proportionally for each overlapping period; the final VND amount is rounded up to the nearest `1,000`.
 -   **Image & Review System:**
     -   Multi-file image uploads for fields managed via Cloudinary.
     -   Ability to re-order images and set a primary cover photo.
@@ -105,6 +109,7 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
 INTERNAL_GATEWAY_SECRET=dev-internal-gateway-secret
+NEXT_PUBLIC_GATEWAY_WS_URL=ws://localhost:8080/ws
 ```
 
 For production, create `backend/common/.env-prod.properties` and provide all required values. Use the same `INTERNAL_GATEWAY_SECRET` in the gateway and every downstream service:
@@ -202,6 +207,18 @@ Start each microservice in a separate terminal. It is recommended to start them 
     ```
 
 The system is now running. The API Gateway is accessible at `http://localhost:8080`.
+
+### Development demo data
+
+With the default `dev` profile, Flyway automatically loads a complete linked data set across all service databases. It includes users, venues, sub-fields, schedules, prices, images, reviews, closures, bookings, and notifications. Production only runs schema migrations and never loads demo rows.
+
+Use the development OTP `111111` with one of these phone numbers:
+
+| Role | Phone numbers |
+|------|---------------|
+| Admin | `0900000001` |
+| Owner | `0900000011`, `0900000012`, `0900000013` |
+| Client | `0900000021` through `0900000025` |
 
 ## API Documentation
 

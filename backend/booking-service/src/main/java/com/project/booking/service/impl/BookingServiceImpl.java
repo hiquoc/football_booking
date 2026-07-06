@@ -8,7 +8,7 @@ import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.dto.response.TimePriceRuleDto;
 import com.project.booking.dto.response.UnavailableSlotResponse;
 import com.project.booking.entity.Booking;
-import com.project.booking.config.BookingDatabaseConstraintInitializer;
+import com.project.booking.config.BookingDatabaseConstraints;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.exception.BookingNotCancellableException;
 import com.project.booking.exception.BookingNotFoundException;
@@ -242,6 +242,21 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional
+    public int completeFinishedBookings() {
+        LocalDateTime now = LocalDateTime.now();
+        int completedCount = bookingRepository.completeConfirmedBookings(
+                BookingStatus.CONFIRMED,
+                BookingStatus.COMPLETED,
+                now.toLocalDate(),
+                now.toLocalTime());
+        if (completedCount > 0) {
+            log.info("Completed {} confirmed bookings ending on or before {}", completedCount, now);
+        }
+        return completedCount;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> getMyBookings(UUID userId, Pageable pageable) {
         return PageResponse.from(bookingRepository.findByClientId(userId, pageable)
@@ -443,7 +458,7 @@ public class BookingServiceImpl implements BookingService {
         while (current != null) {
             String message = current.getMessage();
             if (message != null && message.contains(
-                    BookingDatabaseConstraintInitializer.ACTIVE_BOOKING_OVERLAP_CONSTRAINT)) {
+                    BookingDatabaseConstraints.ACTIVE_BOOKING_OVERLAP_CONSTRAINT)) {
                 return true;
             }
             if (current instanceof SQLException sqlException

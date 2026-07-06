@@ -5,6 +5,7 @@ import com.project.booking.entity.Booking;
 import com.project.common.enums.BookingCancelledBy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
@@ -16,10 +17,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
+
+        @Override
+        @EntityGraph(attributePaths = "subField")
+        Optional<Booking> findById(UUID id);
 
         @Query("""
                     SELECT COUNT(b) > 0
@@ -37,13 +43,21 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 LocalTime endTime,
                 Collection<BookingStatus> reservingStatuses);
 
+        boolean existsBySubFieldIdInAndBookingDateBetweenAndStatusIn(
+                Collection<UUID> subFieldIds,
+                LocalDate startDate,
+                LocalDate endDate,
+                Collection<BookingStatus> statuses);
+
         List<Booking> findBySubFieldIdAndBookingDateAndStatusInOrderByStartTimeAsc(
                         UUID subFieldId,
                         LocalDate bookingDate,
                         Collection<BookingStatus> reservingStatuses);
 
+        @EntityGraph(attributePaths = "subField")
         Page<Booking> findByClientId(UUID clientId, Pageable pageable);
 
+        @EntityGraph(attributePaths = "subField")
         Page<Booking> findByOwnerId(UUID ownerId, Pageable pageable);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -63,7 +77,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
                     UPDATE Booking b
-                    SET b.status = :cancelledStatus,
+                    SET b.status = :expiredStatus,
                         b.cancellationReason = :reason,
                         b.cancelledAt = :cancelledAt,
                         b.cancelledBy = :cancelledBy
@@ -75,7 +89,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("bookingId") UUID bookingId,
                 @Param("clientId") UUID clientId,
                 @Param("cancellableStatuses") Collection<BookingStatus> cancellableStatuses,
-                @Param("cancelledStatus") BookingStatus cancelledStatus,
+                @Param("expiredStatus") BookingStatus expiredStatus,
                 @Param("reason") String reason,
                 @Param("cancelledAt") LocalDateTime cancelledAt,
                 @Param("cancelledBy") BookingCancelledBy cancelledBy);
@@ -103,7 +117,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
                     UPDATE Booking b
-                    SET b.status = :expiredStatus,
+                    SET b.status = :cancelledStatus,
                         b.cancellationReason = :reason,
                         b.cancelledAt = :cancelledAt,
                         b.cancelledBy = :cancelledBy
@@ -112,9 +126,23 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 """)
         int expirePendingBookings(
                 @Param("pendingStatus") BookingStatus pendingStatus,
-                @Param("expiredStatus") BookingStatus expiredStatus,
+                @Param("cancelledStatus") BookingStatus cancelledStatus,
                 @Param("expiresBefore") LocalDateTime expiresBefore,
                 @Param("reason") String reason,
                 @Param("cancelledAt") LocalDateTime cancelledAt,
                 @Param("cancelledBy") BookingCancelledBy cancelledBy);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query("""
+                    UPDATE Booking b
+                    SET b.status = :completedStatus
+                    WHERE b.status = :confirmedStatus
+                      AND (b.bookingDate < :currentDate
+                           OR (b.bookingDate = :currentDate AND b.endTime <= :currentTime))
+                """)
+        int completeConfirmedBookings(
+                @Param("confirmedStatus") BookingStatus confirmedStatus,
+                @Param("completedStatus") BookingStatus completedStatus,
+                @Param("currentDate") LocalDate currentDate,
+                @Param("currentTime") LocalTime currentTime);
 }

@@ -1,10 +1,15 @@
 package com.project.user.service.impl;
 
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.project.common.constants.GlobalConstants;
 import com.project.common.enums.UserType;
 import com.project.common.exception.BadRequestException;
 import com.project.user.dto.LogoutRequest;
-import com.project.user.dto.RefreshTokenRequest;
 import com.project.user.dto.SendOtpRequest;
 import com.project.user.dto.TokenResponse;
 import com.project.user.dto.VerifyOtpRequest;
@@ -14,14 +19,9 @@ import com.project.user.repository.UserRepository;
 import com.project.user.service.AuthService;
 import com.project.user.service.RedisService;
 import com.project.user.util.JwtTokenProvider;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
-import java.util.UUID;
-import java.util.Random;
 
 @Slf4j
 @Service
@@ -123,15 +123,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public TokenResponse refreshToken(RefreshTokenRequest request) {
-        String token = request.getRefreshToken();
-        
-        if (!jwtTokenProvider.validateToken(token)) {
+    public TokenResponse refreshToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new BadRequestException("Refresh token cookie is missing");
+        }
+        if (!jwtTokenProvider.validateToken(token) || !jwtTokenProvider.isRefreshToken(token)) {
             throw new BadRequestException("Invalid or expired refresh token");
         }
 
-        UUID userId = jwtTokenProvider.getUserIdFromJWT(token);
-        String sessionKey = "user:sessions:" + userId;
+        UUID userId;
+        try {
+            userId = jwtTokenProvider.getUserIdFromRefreshToken(token);
+        } catch (RuntimeException exception) {
+            throw new BadRequestException("Invalid or expired refresh token");
+        }
 
         if (!redisService.isRefreshTokenValid(userId, token)) {
             throw new BadRequestException("Refresh token is revoked or expired");
@@ -140,20 +145,20 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
-        // Generate new access token
+        // Revoke the old refresh token (rotation)
+        redisService.removeRefreshToken(userId, token);
+
+        // Generate new access and refresh tokens
         String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name());
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+
+        // Track the new refresh token
+        redisService.trackRefreshToken(user.getId(), newRefreshToken, jwtTokenProvider.getRefreshExpirationInMs());
 
         return TokenResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(token) // Reuse same refresh token (no rotation)
+                .refreshToken(newRefreshToken)
                 .build();
-    }
-
-    @Override
-    public TokenResponse refreshToken(RefreshTokenRequest request, String refreshTokenCookie) {
-        RefreshTokenRequest resolvedRequest = new RefreshTokenRequest();
-        resolvedRequest.setRefreshToken(resolveRequiredRefreshToken(request, refreshTokenCookie));
-        return refreshToken(resolvedRequest);
     }
 
     @Override
@@ -175,20 +180,6 @@ public class AuthServiceImpl implements AuthService {
         LogoutRequest resolvedRequest = new LogoutRequest();
         resolvedRequest.setRefreshToken(token);
         logout(resolvedRequest);
-    }
-
-    private String resolveRequiredRefreshToken(RefreshTokenRequest request, String refreshTokenCookie) {
-        String token = resolveOptionalRefreshToken(request, refreshTokenCookie);
-        if (token == null) {
-            throw new BadRequestException("Refresh token is missing");
-        }
-        return token;
-    }
-
-    private String resolveOptionalRefreshToken(RefreshTokenRequest request, String refreshTokenCookie) {
-        return request != null && request.getRefreshToken() != null
-                ? request.getRefreshToken()
-                : refreshTokenCookie;
     }
 
     private String resolveOptionalRefreshToken(LogoutRequest request, String refreshTokenCookie) {

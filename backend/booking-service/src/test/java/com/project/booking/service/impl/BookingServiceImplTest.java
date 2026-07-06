@@ -291,6 +291,24 @@ class BookingServiceImplTest {
         assertEquals(20, timeoutMinutes);
     }
 
+    @Test
+    void completeFinishedBookingsOnlyTransitionsConfirmedBookings() {
+        when(bookingRepository.completeConfirmedBookings(
+                eq(BookingStatus.CONFIRMED),
+                eq(BookingStatus.COMPLETED),
+                any(LocalDate.class),
+                any(LocalTime.class))).thenReturn(4);
+
+        int completedCount = bookingService.completeFinishedBookings();
+
+        assertEquals(4, completedCount);
+        verify(bookingRepository).completeConfirmedBookings(
+                eq(BookingStatus.CONFIRMED),
+                eq(BookingStatus.COMPLETED),
+                any(LocalDate.class),
+                any(LocalTime.class));
+    }
+
     private SubFieldResponse activeSubField(UUID subFieldId) {
         return SubFieldResponse.builder()
                 .id(subFieldId)

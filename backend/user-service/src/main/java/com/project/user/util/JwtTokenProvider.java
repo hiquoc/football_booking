@@ -66,6 +66,19 @@ public class JwtTokenProvider {
         return UUID.fromString(claims.get("userId", String.class));
     }
 
+    public UUID getUserIdFromRefreshToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        if (!"refresh".equals(claims.get("type", String.class))) {
+            throw new IllegalArgumentException("Token is not a refresh token");
+        }
+        return UUID.fromString(claims.getSubject());
+    }
+
     public boolean validateToken(String authToken) {
         try {
             Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(authToken);

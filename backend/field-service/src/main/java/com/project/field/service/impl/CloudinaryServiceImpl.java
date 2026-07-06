@@ -3,6 +3,7 @@ package com.project.field.service.impl;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.project.common.exception.BadRequestException;
+import com.project.field.exceptions.ImageStorageException;
 import com.project.field.service.CloudinaryService;
 
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +37,7 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             return (String) uploadResult.get("url");
         } catch (IOException e) {
             log.error("Failed to upload image to Cloudinary", e);
-            throw new BadRequestException("Failed to upload image");
+            throw new ImageStorageException("Image storage provider failed to upload the image", e);
         }
     }
 
@@ -51,9 +54,14 @@ public class CloudinaryServiceImpl implements CloudinaryService {
                 uploadedUrls.add(uploadImage(file));
             }
             return uploadedUrls;
-        } catch (RuntimeException ex) {
-            uploadedUrls.forEach(this::deleteImage);
-            throw ex;
+        } catch (ImageStorageException uploadException) {
+            try {
+                deleteImages(uploadedUrls);
+            } catch (ImageStorageException cleanupException) {
+                uploadException.addSuppressed(cleanupException);
+                log.error("Failed to clean up partially uploaded images", cleanupException);
+            }
+            throw uploadException;
         }
     }
 
@@ -79,6 +87,29 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     }
 
     @Override
+    public void deleteImages(List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return;
+        }
+
+        List<String> publicIds = imageUrls.stream()
+                .map(this::extractPublicId)
+                .filter(publicId -> publicId != null && !publicId.isBlank())
+                .distinct()
+                .toList();
+        if (publicIds.isEmpty()) {
+            return;
+        }
+
+        try {
+            cloudinary.api().deleteResources(publicIds, ObjectUtils.asMap("invalidate", true));
+        } catch (Exception e) {
+            log.error("Failed to batch delete {} images from Cloudinary", publicIds.size(), e);
+            throw new ImageStorageException("Image storage provider failed to delete uploaded images", e);
+        }
+    }
+
+    @Override
     public String extractPublicId(String imageUrl) {
         if (imageUrl == null || imageUrl.isEmpty()) {
             return null;
@@ -93,5 +124,32 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             log.error("Error extracting public id from image url: {}", imageUrl, e);
         }
         return null;
+    }
+
+    @Override
+    public String sign(Map<String, Object> parameters) {
+        return cloudinary.apiSignRequest(parameters, cloudinary.config.apiSecret);
+    }
+
+    @Override
+    public boolean verifyUploadResult(String publicId, long version, String signature) {
+        String expected = sign(Map.of("public_id", publicId, "version", version));
+        return signature != null && MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Override public String apiKey() { return cloudinary.config.apiKey; }
+    @Override public String cloudName() { return cloudinary.config.cloudName; }
+    @Override public String uploadUrl() {
+        return "https://api.cloudinary.com/v1_1/" + cloudName() + "/image/upload";
+    }
+
+    @Override
+    public void deleteByPublicId(String publicId) {
+        try {
+            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
+        } catch (IOException e) {
+            throw new ImageStorageException("Image storage provider failed to delete the image", e);
+        }
     }
 }

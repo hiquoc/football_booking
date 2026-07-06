@@ -72,7 +72,7 @@ class NotificationServiceImplTest {
 
         assertThat(response.getUserId()).isEqualTo(userId);
         assertThat(response.getIsRead()).isFalse();
-        verify(messagingTemplate).convertAndSend(eq("/topic/users/" + userId), eq(response));
+        verify(messagingTemplate).convertAndSendToUser(eq(userId.toString()), eq("/queue/notifications"), eq(response));
         verify(inAppSender).send(org.mockito.ArgumentMatchers.any(NotificationRequest.class));
         verify(emailSender).send(org.mockito.ArgumentMatchers.any(NotificationRequest.class));
     }
@@ -100,15 +100,12 @@ class NotificationServiceImplTest {
 
         assertThat(response.getIsRead()).isTrue();
         assertThat(response.getReadAt()).isNotNull();
+        verify(notificationRepository).markAsRead(eq(notificationId), eq(userId), org.mockito.ArgumentMatchers.any(LocalDateTime.class));
     }
 
     @Test
     void markAllAsReadUpdatesUnreadNotificationsForUser() {
         UUID userId = UUID.randomUUID();
-        Notification first = Notification.builder().userId(userId).isRead(false).build();
-        Notification second = Notification.builder().userId(userId).isRead(false).build();
-        when(notificationRepository.findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId))
-                .thenReturn(List.of(first, second));
         NotificationServiceImpl service = new NotificationServiceImpl(
                 notificationRepository,
                 new NotificationMapper(),
@@ -117,9 +114,6 @@ class NotificationServiceImplTest {
 
         service.markAllAsRead(userId);
 
-        assertThat(first.getIsRead()).isTrue();
-        assertThat(second.getIsRead()).isTrue();
-        assertThat(first.getReadAt()).isNotNull();
-        assertThat(second.getReadAt()).isNotNull();
+        verify(notificationRepository).markAllAsRead(eq(userId), org.mockito.ArgumentMatchers.any(LocalDateTime.class));
     }
 }

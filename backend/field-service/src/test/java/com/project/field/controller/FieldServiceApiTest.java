@@ -13,6 +13,7 @@ import com.project.field.dto.*;
 import com.project.field.dto.response.SubFieldResponse;
 import com.project.field.service.FieldScheduleService;
 import com.project.field.service.FieldService;
+import com.project.field.service.FieldImageUploadService;
 import com.project.field.service.FieldTypeService;
 import com.project.field.service.ReviewService;
 import com.project.field.service.SubFieldService;
@@ -73,6 +74,9 @@ class FieldServiceApiTest {
     private FieldService fieldService;
 
     @MockitoBean
+    private FieldImageUploadService fieldImageUploadService;
+
+    @MockitoBean
     private SubFieldService subFieldService;
 
     @MockitoBean
@@ -83,6 +87,27 @@ class FieldServiceApiTest {
 
     @MockitoBean
     private ReviewService reviewService;
+
+    @Test
+    void fieldCardSearchFiltersByProvinceCode() throws Exception {
+        mockMvc.perform(get("/api/v1/fields/cards")
+                        .param("provinceCode", "79")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
+                .andExpect(status().isOk());
+
+        verify(fieldService).searchCards(
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq("79"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq("rating"),
+                eq("desc"),
+                eq(0),
+                eq(12));
+    }
 
     @Test
     void createFieldWithOwnerHeaderAcceptsWeeklyOperatingHours() throws Exception {
@@ -135,8 +160,8 @@ class FieldServiceApiTest {
 
     @Test
     void getFieldAndListFieldsArePublic() throws Exception {
-        when(fieldService.getById(FIELD_ID)).thenReturn(fieldDto());
-        when(fieldService.getAll(org.mockito.ArgumentMatchers.any())).thenReturn(PageResponse.<FieldDto>builder()
+        when(fieldService.getWithDetailsById(eq(FIELD_ID), org.mockito.ArgumentMatchers.isNull())).thenReturn(fieldDto());
+        when(fieldService.getAll(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any())).thenReturn(PageResponse.<FieldDto>builder()
                 .content(List.of(fieldDto()))
                 .page(0)
                 .size(20)
@@ -152,10 +177,111 @@ class FieldServiceApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(FIELD_ID.toString()));
 
+        when(fieldScheduleService.getFieldOperatingHours(FIELD_ID)).thenReturn(List.of(operatingHoursDto()));
+        when(reviewService.getByFieldId(FIELD_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/fields/{id}/details", FIELD_ID)
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.field.id").value(FIELD_ID.toString()));
+
         mockMvc.perform(get("/api/v1/fields")
                         .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].id").value(FIELD_ID.toString()));
+    }
+
+    @Test
+    void getFieldDetailsPassesAuthenticatedOwnerToService() throws Exception {
+        when(fieldService.getWithDetailsById(eq(FIELD_ID), org.mockito.ArgumentMatchers.any())).thenReturn(fieldDto());
+        when(fieldScheduleService.getFieldOperatingHours(FIELD_ID)).thenReturn(List.of(operatingHoursDto()));
+        when(reviewService.getByFieldId(FIELD_ID)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/fields/{id}/details", FIELD_ID)
+                        .headers(ownerHeaders()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.field.id").value(FIELD_ID.toString()));
+
+        verify(fieldService).getWithDetailsById(
+                eq(FIELD_ID),
+                org.mockito.ArgumentMatchers.argThat(user ->
+                        user != null && USER_ID.equals(user.id()) && "OWNER".equals(user.role())));
+    }
+
+    @Test
+    void getFieldByIdPassesAuthenticatedOwnerToService() throws Exception {
+        when(fieldService.getWithDetailsById(eq(FIELD_ID), org.mockito.ArgumentMatchers.any())).thenReturn(fieldDto());
+
+        mockMvc.perform(get("/api/v1/fields/{id}", FIELD_ID)
+                        .headers(ownerHeaders()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(FIELD_ID.toString()));
+
+        verify(fieldService).getWithDetailsById(
+                eq(FIELD_ID),
+                org.mockito.ArgumentMatchers.argThat(user ->
+                        user != null && USER_ID.equals(user.id()) && "OWNER".equals(user.role())));
+    }
+
+    @Test
+    void getOwnerFieldsReturnsOnlyTheAuthenticatedOwnersPage() throws Exception {
+        when(fieldService.getByOwnerId(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(PageResponse.<FieldDto>builder()
+                        .content(List.of(fieldDto()))
+                        .page(1)
+                        .size(5)
+                        .totalElements(6)
+                        .totalPages(2)
+                        .first(false)
+                        .last(true)
+                        .empty(false)
+                        .build());
+
+        mockMvc.perform(get("/api/v1/fields/owner?page=1&size=5&sort=createdAt,desc")
+                        .headers(ownerHeaders()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(FIELD_ID.toString()))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(5));
+
+        ArgumentCaptor<org.springframework.data.domain.Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(fieldService).getByOwnerId(eq(USER_ID), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(5);
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt")).isNotNull();
+    }
+
+    @Test
+    void getOwnerFieldsRejectsNonOwnerRole() throws Exception {
+        mockMvc.perform(get("/api/v1/fields/owner").headers(clientHeaders()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminCanUpdateFieldStatus() throws Exception {
+        FieldDto approved = fieldDto();
+        approved.setStatus(com.project.field.enums.FieldStatus.APPROVED);
+        when(fieldService.updateStatus(FIELD_ID, com.project.field.enums.FieldStatus.APPROVED))
+                .thenReturn(approved);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/fields/{id}/status", FIELD_ID)
+                        .headers(adminHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"APPROVED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+    }
+
+    @Test
+    void ownerCannotUpdateFieldStatus() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/fields/{id}/status", FIELD_ID)
+                        .headers(ownerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"APPROVED\"}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -315,18 +441,33 @@ class FieldServiceApiTest {
                 .isPrimary(false)
                 .displayOrder(0)
                 .build();
-        when(fieldService.uploadImages(eq(FIELD_ID), org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of(image));
+        UUID requestId = UUID.randomUUID();
+        ImageUploadSlotDto slot = new ImageUploadSlotDto(10L, "public-id", 123L, "signature",
+                "api-key", "cloud", "https://api.cloudinary.com/v1_1/cloud/image/upload", false);
+        when(fieldImageUploadService.issueSlots(eq(FIELD_ID), eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(ImageUploadSlotRequest.class))).thenReturn(List.of(slot));
+        when(fieldImageUploadService.confirmBatch(eq(FIELD_ID), eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(ImageUploadBatchConfirmRequest.class))).thenReturn(List.of(image));
         when(fieldService.updateImageOrder(eq(FIELD_ID), org.mockito.ArgumentMatchers.any(FieldImageOrderRequest.class)))
                 .thenReturn(List.of(image));
 
-        MockMultipartFile file = new MockMultipartFile(
-                "files", "field.jpg", MediaType.IMAGE_JPEG_VALUE, "fake-image".getBytes());
-
-        mockMvc.perform(multipart("/api/v1/fields/{fieldId}/images", FIELD_ID)
-                        .file(file)
-                        .headers(ownerHeaders()))
+        mockMvc.perform(post("/api/v1/fields/{fieldId}/images/upload-slots", FIELD_ID)
+                        .headers(ownerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"requestId\":\"" + requestId + "\",\"count\":1}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Images uploaded successfully"));
+                .andExpect(jsonPath("$.message").value("Upload slots issued successfully"))
+                .andExpect(jsonPath("$.data[0].publicId").value("public-id"));
+
+        mockMvc.perform(post("/api/v1/fields/{fieldId}/images/confirm", FIELD_ID)
+                        .headers(ownerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"uploads":[{"publicId":"public-id","secureUrl":"https://res.cloudinary.com/cloud/image/upload/v123/public-id.jpg",
+                                 "version":123,"signature":"result-signature","format":"jpg","width":100,"height":100,"bytes":1000}]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Image uploads confirmed successfully"));
 
         mockMvc.perform(put("/api/v1/fields/{fieldId}/images/order", FIELD_ID)
                         .headers(ownerHeaders())
@@ -446,6 +587,16 @@ class FieldServiceApiTest {
         return FieldRequest.builder()
                 .name("ABC Football Center")
                 .address("123 Nguyen Hue")
+                .ward("Phuong Sai Gon")
+                .wardCode("26743")
+                .province("Thanh pho Ho Chi Minh")
+                .provinceCode("79")
+                .legacyWard("Phuong Ben Nghe")
+                .legacyWardCode("26743")
+                .legacyDistrict("Quan 1")
+                .legacyProvince("Thanh pho Ho Chi Minh")
+                .latitude(new BigDecimal("10.776900"))
+                .longitude(new BigDecimal("106.700900"))
                 .phoneNumber("0862470050")
                 .email("abc@football.vn")
                 .active(true)
@@ -459,6 +610,16 @@ class FieldServiceApiTest {
                 .ownerId(USER_ID)
                 .name("ABC Football Center")
                 .address("123 Nguyen Hue")
+                .ward("Phuong Sai Gon")
+                .wardCode("26743")
+                .province("Thanh pho Ho Chi Minh")
+                .provinceCode("79")
+                .legacyWard("Phuong Ben Nghe")
+                .legacyWardCode("26743")
+                .legacyDistrict("Quan 1")
+                .legacyProvince("Thanh pho Ho Chi Minh")
+                .latitude(new BigDecimal("10.776900"))
+                .longitude(new BigDecimal("106.700900"))
                 .phoneNumber("0862470050")
                 .active(true)
                 .build();
