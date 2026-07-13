@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BookingDetailContent } from "@/components/bookings/booking-detail-content";
 
-export const metadata: Metadata = { title: "Chi tiết booking" };
+export const metadata: Metadata = { title: "Chi tiết lịch đặt" };
 export default async function BookingDetailPage({
   params,
 }: {

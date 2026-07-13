@@ -48,15 +48,17 @@ public class JwtHeaderRelayFilter implements WebFilter {
             UUID userId = UUID.fromString(String.valueOf(claims.get("userId")));
             String role = claims.get("role", String.class);
             String email = claims.getSubject();
+            String name = firstTextClaim(claims, "name", "fullName", "displayName");
             if (!StringUtils.hasText(role)) return chain.filter(exchange);
 
-            UserPrincipal principal = new UserPrincipal(userId, email, role);
+            UserPrincipal principal = new UserPrincipal(userId, email, role, name);
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
             ServerHttpRequest request = exchange.getRequest().mutate()
                     .header(GlobalConstants.HEADER_USER_ID, userId.toString())
                     .header(GlobalConstants.HEADER_USER_ROLE, role)
                     .header(GlobalConstants.HEADER_USER_EMAIL, email == null ? "" : email)
+                    .header(GlobalConstants.HEADER_USER_NAME, name == null ? "" : name)
                     .build();
             return chain.filter(exchange.mutate().request(request).build())
                     .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
@@ -72,6 +74,14 @@ public class JwtHeaderRelayFilter implements WebFilter {
         }
         if (exchange.getRequest().getPath().value().startsWith("/ws")) {
             return exchange.getRequest().getQueryParams().getFirst("ticket");
+        }
+        return null;
+    }
+
+    private String firstTextClaim(Claims claims, String... names) {
+        for (String name : names) {
+            String value = claims.get(name, String.class);
+            if (StringUtils.hasText(value)) return value;
         }
         return null;
     }

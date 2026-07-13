@@ -48,7 +48,8 @@ public class FieldCardQueryRepository {
             String sortBy,
             String direction,
             int page,
-            int size) {
+            int size,
+            UUID userId) {
         boolean hasLocation = latitude != null && longitude != null;
         if ((latitude == null) != (longitude == null)) {
             throw new BadRequestException("Latitude and longitude must be provided together");
@@ -86,6 +87,10 @@ public class FieldCardQueryRepository {
             where.append(" AND ").append(DISTANCE_SQL).append(" <= :radiusKm");
         }
 
+        String favoriteSelect = userId == null
+                ? "false"
+                : "EXISTS (SELECT 1 FROM field_favorites ff WHERE ff.field_id = f.id AND ff.user_id = :userId AND ff.deleted = false)";
+
         String selectSql = """
                 SELECT f.id, f.name, f.address, f.ward, f.province, f.latitude, f.longitude,
                        f.rating_average, f.total_reviews,
@@ -94,7 +99,7 @@ public class FieldCardQueryRepository {
                        (SELECT string_agg(DISTINCT ft.sport_type, ',' ORDER BY ft.sport_type)
                         FROM field_field_types fft JOIN field_types ft ON ft.id = fft.field_type_id
                         WHERE fft.field_id = f.id AND ft.deleted = false AND ft.active = true) AS field_types,
-                """ + distanceSelect + " AS distance_km FROM fields f " + where
+                """ + distanceSelect + " AS distance_km, " + favoriteSelect + " AS is_favorite FROM fields f " + where
                 + " ORDER BY " + sortColumn + " " + sortDirection + ", f.id ASC";
         String countSql = "SELECT count(*) FROM fields f " + where;
 
@@ -102,6 +107,7 @@ public class FieldCardQueryRepository {
         Query countQuery = entityManager.createNativeQuery(countSql);
         bind(dataQuery, fieldType, subFieldType, district, provinceCode, latitude, longitude, radiusKm, hasLocation);
         bind(countQuery, fieldType, subFieldType, district, provinceCode, latitude, longitude, radiusKm, hasLocation && radiusKm != null);
+        if (userId != null) dataQuery.setParameter("userId", userId);
         dataQuery.setFirstResult(safePage * safeSize);
         dataQuery.setMaxResults(safeSize);
 
@@ -140,6 +146,7 @@ public class FieldCardQueryRepository {
                 .primaryImageUrl((String) row[9])
                 .fieldTypes(types == null || types.isBlank() ? List.of() : Arrays.asList(types.split(",")))
                 .distanceKm(row[11] == null ? null : ((Number) row[11]).doubleValue())
+                .isFavorite((Boolean) row[12])
                 .build();
     }
 }

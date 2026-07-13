@@ -1,6 +1,7 @@
 package com.project.field.service.impl;
 
 import com.project.common.exception.BadRequestException;
+import com.project.common.cache.CacheNames;
 import com.project.field.dto.FieldTypeDto;
 import com.project.field.dto.FieldTypeRequest;
 import com.project.field.entity.FieldType;
@@ -9,6 +10,8 @@ import com.project.field.repository.FieldTypeRepository;
 import com.project.field.service.FieldTypeService;
 import com.project.field.exceptions.FieldTypeNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,6 +25,7 @@ public class FieldTypeServiceImpl implements FieldTypeService {
     private final FieldTypeMapper fieldTypeMapper;
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.FIELD_TYPES, allEntries = true)
     public FieldTypeDto create(FieldTypeRequest request) {
         validate(request);
         FieldType entity = fieldTypeMapper.toEntity(request);
@@ -29,6 +33,7 @@ public class FieldTypeServiceImpl implements FieldTypeService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.FIELD_TYPES, allEntries = true)
     public FieldTypeDto update(Long id, FieldTypeRequest request) {
         FieldType entity = fieldTypeRepository.findById(id)
                 .orElseThrow(() -> new FieldTypeNotFoundException(id));
@@ -41,11 +46,13 @@ public class FieldTypeServiceImpl implements FieldTypeService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.FIELD_TYPES, allEntries = true)
     public void delete(Long id) {
         fieldTypeRepository.deleteById(id);
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.FIELD_TYPES, key = "'lookup:field-types'", sync = true)
     public List<FieldTypeDto> getAll() {
         return fieldTypeRepository.findAll().stream()
                 .map(fieldTypeMapper::toDto)

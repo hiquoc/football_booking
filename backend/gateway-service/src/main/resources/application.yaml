@@ -12,6 +12,10 @@ spring:
     group:
       DEV: dev
       PROD: prod
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   cloud:
     gateway:
       server:
@@ -21,10 +25,18 @@ spring:
               uri: lb://user-service
               predicates:
                 - Path=/api/v1/auth/**
+            - id: field-service-user-favorites
+              uri: lb://field-service
+              predicates:
+                - Path=/api/v1/users/me/favorites,/api/v1/users/me/favorites/**
             - id: user-service-api
               uri: lb://user-service
               predicates:
                 - Path=/api/v1/users/**
+            - id: user-service-chat
+              uri: lb://user-service
+              predicates:
+                - Path=/api/chat
             - id: field-service-api
               uri: lb://field-service
               predicates:
@@ -32,11 +44,15 @@ spring:
             - id: booking-service-api
               uri: lb://booking-service
               predicates:
-                - Path=/api/v1/bookings/**
+                - Path=/api/v1/bookings/**,/api/v1/admin/booking-config
             - id: notification-service-api
               uri: lb://notification-service
               predicates:
                 - Path=/api/v1/notifications/**
+            - id: payment-service-api
+              uri: lb://payment-service
+              predicates:
+                - Path=/api/v1/payments/**
             - id: notification-service-websocket
               uri: lb:ws://notification-service
               predicates:
@@ -49,6 +65,125 @@ jwt:
 internal:
   gateway:
     secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+
+gateway:
+  rate-limits:
+    enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
+    fail-open-on-redis-error: ${GATEWAY_RATE_LIMIT_FAIL_OPEN:true}
+    max-body-bytes: ${GATEWAY_RATE_LIMIT_MAX_BODY_BYTES:16384}
+    policies:
+      AUTH_REQUEST_OTP:
+        replenish-rate: ${RL_AUTH_REQUEST_OTP_REPLENISH:1}
+        burst-capacity: ${RL_AUTH_REQUEST_OTP_BURST:5}
+      AUTH_VERIFY_OTP:
+        replenish-rate: ${RL_AUTH_VERIFY_OTP_REPLENISH:1}
+        burst-capacity: ${RL_AUTH_VERIFY_OTP_BURST:10}
+      AUTH_LOGIN:
+        replenish-rate: ${RL_AUTH_LOGIN_REPLENISH:1}
+        burst-capacity: ${RL_AUTH_LOGIN_BURST:10}
+      AUTH_REFRESH_TOKEN:
+        replenish-rate: ${RL_AUTH_REFRESH_TOKEN_REPLENISH:2}
+        burst-capacity: ${RL_AUTH_REFRESH_TOKEN_BURST:20}
+      UPLOAD_IMAGE:
+        replenish-rate: ${RL_UPLOAD_IMAGE_REPLENISH:1}
+        burst-capacity: ${RL_UPLOAD_IMAGE_BURST:10}
+      UPLOAD_COMPLETE:
+        replenish-rate: ${RL_UPLOAD_COMPLETE_REPLENISH:2}
+        burst-capacity: ${RL_UPLOAD_COMPLETE_BURST:20}
+      BOOKING_CREATE:
+        replenish-rate: ${RL_BOOKING_CREATE_REPLENISH:1}
+        burst-capacity: ${RL_BOOKING_CREATE_BURST:8}
+      BOOKING_CANCEL:
+        replenish-rate: ${RL_BOOKING_CANCEL_REPLENISH:1}
+        burst-capacity: ${RL_BOOKING_CANCEL_BURST:12}
+      SEARCH_FIELDS:
+        replenish-rate: ${RL_SEARCH_FIELDS_REPLENISH:10}
+        burst-capacity: ${RL_SEARCH_FIELDS_BURST:60}
+      FIELD_DETAILS:
+        replenish-rate: ${RL_FIELD_DETAILS_REPLENISH:20}
+        burst-capacity: ${RL_FIELD_DETAILS_BURST:100}
+      USER_ME:
+        replenish-rate: ${RL_USER_ME_REPLENISH:5}
+        burst-capacity: ${RL_USER_ME_BURST:30}
+      PROFILE_UPDATE:
+        replenish-rate: ${RL_PROFILE_UPDATE_REPLENISH:1}
+        burst-capacity: ${RL_PROFILE_UPDATE_BURST:5}
+      ADMIN_API:
+        replenish-rate: ${RL_ADMIN_API_REPLENISH:10}
+        burst-capacity: ${RL_ADMIN_API_BURST:60}
+    endpoints:
+      - id: auth-request-otp
+        policy: AUTH_REQUEST_OTP
+        methods: [POST]
+        paths: [/api/v1/auth/otp/send]
+        key-strategy: COMPOSITE
+        body-fields: [phone, email]
+      - id: auth-verify-otp
+        policy: AUTH_VERIFY_OTP
+        methods: [POST]
+        paths: [/api/v1/auth/otp/verify]
+        key-strategy: COMPOSITE
+        body-fields: [phone, email]
+      - id: auth-login
+        policy: AUTH_LOGIN
+        methods: [POST]
+        paths: [/api/v1/auth/login, /api/v1/auth/register]
+        key-strategy: COMPOSITE
+        body-fields: [phone, email]
+      - id: auth-refresh-token
+        policy: AUTH_REFRESH_TOKEN
+        methods: [POST]
+        paths: [/api/v1/auth/refresh]
+        key-strategy: IP
+      - id: upload-avatar
+        policy: UPLOAD_IMAGE
+        methods: [POST]
+        paths: [/api/v1/users/me/avatar/upload-slot]
+        key-strategy: USER_OR_IP
+      - id: upload-field-images
+        policy: UPLOAD_IMAGE
+        methods: [POST]
+        paths: [/api/v1/fields/*/images/upload-slots]
+        key-strategy: USER_OR_IP
+      - id: complete-upload
+        policy: UPLOAD_COMPLETE
+        methods: [POST]
+        paths: [/api/v1/users/me/avatar/confirm, /api/v1/fields/*/images/confirm]
+        key-strategy: USER_OR_IP
+      - id: booking-create
+        policy: BOOKING_CREATE
+        methods: [POST]
+        paths: [/api/v1/bookings]
+        key-strategy: USER_OR_IP
+      - id: booking-cancel
+        policy: BOOKING_CANCEL
+        methods: [POST]
+        paths: [/api/v1/bookings/*/cancel]
+        key-strategy: USER_OR_IP
+      - id: search-fields
+        policy: SEARCH_FIELDS
+        methods: [GET]
+        paths: [/api/v1/fields]
+        key-strategy: USER_OR_IP
+      - id: field-details
+        policy: FIELD_DETAILS
+        methods: [GET]
+        paths: [/api/v1/fields/*, /api/v1/fields/*/details]
+        key-strategy: USER_OR_IP
+      - id: user-me
+        policy: USER_ME
+        methods: [GET]
+        paths: [/api/v1/users/me]
+        key-strategy: USER_OR_IP
+      - id: profile-update
+        policy: PROFILE_UPDATE
+        methods: [PUT, PATCH]
+        paths: [/api/v1/users/me, /api/v1/profile]
+        key-strategy: USER_OR_IP
+      - id: admin-api
+        policy: ADMIN_API
+        paths: [/api/v1/admin/**]
+        key-strategy: USER_OR_IP
 
 eureka:
   client:

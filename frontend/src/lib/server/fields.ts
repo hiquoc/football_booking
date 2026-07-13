@@ -10,6 +10,7 @@ import type {
   FieldClosure,
   FieldImage,
   FieldInput,
+  FavoriteCheckResponse,
   ImageUploadSlot,
   CloudinaryUploadResult,
   OperatingHours,
@@ -44,9 +45,8 @@ export async function getFieldCards(
   });
   if (!query.has("sortBy")) query.set("sortBy", "rating");
   if (!query.has("direction")) query.set("direction", "desc");
-  return gatewayRequest<PageResponse<FieldCardData>>(
+  return sessionGatewayRequest<PageResponse<FieldCardData>>(
     `/api/v1/fields/cards?${query}`,
-    { next: { revalidate: 60 } },
   );
 }
 
@@ -62,9 +62,7 @@ export async function getFields(page = 0, size = 9, status?: FieldStatus) {
       `/api/v1/fields?${query}`,
     );
   }
-  return gatewayRequest<PageResponse<Field>>(`/api/v1/fields?${query}`, {
-    next: { revalidate: 60 },
-  });
+  return sessionGatewayRequest<PageResponse<Field>>(`/api/v1/fields?${query}`);
 }
 
 export async function getOwnerFields(page = 0, size = 10) {
@@ -269,4 +267,32 @@ export async function changeFieldImageOrder(
   );
   revalidateTag(fieldCacheTag(fieldId), "max");
   return images;
+}
+
+export function getFavoriteFields() {
+  return authenticatedGatewayRequest<Field[]>("/api/v1/users/me/favorites");
+}
+
+export async function addFavoriteField(fieldId: string) {
+  const field = await authenticatedGatewayRequest<Field>(
+    `/api/v1/users/me/favorites/${encodeURIComponent(fieldId)}`,
+    { method: "POST" },
+  );
+  revalidateTag(fieldCacheTag(fieldId), "max");
+  return field;
+}
+
+export async function removeFavoriteField(fieldId: string) {
+  const result = await authenticatedGatewayRequest<null>(
+    `/api/v1/users/me/favorites/${encodeURIComponent(fieldId)}`,
+    { method: "DELETE" },
+  );
+  revalidateTag(fieldCacheTag(fieldId), "max");
+  return result;
+}
+
+export function checkFavoriteField(fieldId: string) {
+  return authenticatedGatewayRequest<FavoriteCheckResponse>(
+    `/api/v1/users/me/favorites/check/${encodeURIComponent(fieldId)}`,
+  );
 }

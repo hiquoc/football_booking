@@ -52,4 +52,8 @@ public class User extends BaseEntity {
     @Builder.Default
     @Column(name = "status", length = 20, nullable = false)
     private String status = "ACTIVE"; // ACTIVE, BLOCKED, DELETED
+
+    @Builder.Default
+    @Column(name = "balance", nullable = false)
+    private Long balance = 0L;
 }

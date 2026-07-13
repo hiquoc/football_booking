@@ -20,7 +20,7 @@ class GatewayApplicationTests {
 	void contextLoads() {
 		var routeIds = routeLocator.getRoutes().map(route -> route.getId()).collectList().block();
 		assertThat(routeIds).contains(
-				"user-service-auth", "user-service-api", "field-service-api",
+				"user-service-auth", "field-service-user-favorites", "user-service-api", "user-service-chat", "field-service-api",
 				"booking-service-api", "notification-service-api",
 				"notification-service-websocket");
 	}

@@ -148,6 +148,7 @@ export async function getCurrentUser(): Promise<User | null> {
       avatarUrl: null,
       userType: "OWNER",
       status: "ACTIVE",
+      balance: 0,
     };
   }
   const accessToken = await getAccessToken();

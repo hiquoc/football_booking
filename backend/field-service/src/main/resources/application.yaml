@@ -31,6 +31,10 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
     validate-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   servlet:
     multipart:
       enabled: true

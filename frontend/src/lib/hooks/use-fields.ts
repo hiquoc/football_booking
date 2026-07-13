@@ -1,18 +1,22 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import {
+  addFavoriteField,
   fetchField,
   fetchFieldOperatingHours,
   fetchFields,
   fetchFieldCards,
   fetchFieldDetails,
+  fetchFavoriteFields,
+  removeFavoriteField,
   fetchSubFields,
   submitFieldReview,
   submitFieldStatus,
 } from "@/lib/client/fields";
 import { fieldQueryKeys } from "@/lib/query-keys";
-import type { Field, FieldCardFilters, FieldStatus, PageResponse } from "@/lib/api/types";
+import { useToast } from "@/components/providers/toast-provider";
+import type { Field, FieldCardData, FieldCardFilters, FieldDetails, FieldStatus, PageResponse } from "@/lib/api/types";
 
 export function useFields(page: number, size = 9, status?: FieldStatus) {
   return useQuery({
@@ -48,6 +52,64 @@ export function useFieldCards(
   return useQuery({
     queryKey: fieldQueryKeys.cards(page, size, filters),
     queryFn: () => fetchFieldCards(page, size, filters),
+  });
+}
+
+export function useFavoriteFields() {
+  return useQuery({
+    queryKey: fieldQueryKeys.favorites,
+    queryFn: fetchFavoriteFields,
+  });
+}
+
+export function useToggleFavoriteField(fieldId: string) {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+
+  type Snapshot = Array<[QueryKey, unknown]>;
+
+  return useMutation<Field | void, Error, boolean, Snapshot>({
+    mutationFn: (favorite: boolean) =>
+      favorite ? addFavoriteField(fieldId) : removeFavoriteField(fieldId),
+    onMutate: async (favorite) => {
+      await queryClient.cancelQueries({ queryKey: fieldQueryKeys.all });
+      const snapshot = queryClient.getQueriesData({ queryKey: fieldQueryKeys.all }) as Snapshot;
+
+      const patchField = <T extends { id: string; isFavorite?: boolean }>(item: T): T =>
+        item.id === fieldId ? { ...item, isFavorite: favorite } : item;
+
+      queryClient.setQueriesData<PageResponse<Field>>(
+        { queryKey: fieldQueryKeys.all },
+        (old) => old && Array.isArray(old.content)
+          ? { ...old, content: old.content.map(patchField) }
+          : old,
+      );
+      queryClient.setQueriesData<PageResponse<FieldCardData>>(
+        { queryKey: fieldQueryKeys.all },
+        (old) => old && Array.isArray(old.content)
+          ? { ...old, content: old.content.map(patchField) }
+          : old,
+      );
+      queryClient.setQueryData<Field>(fieldQueryKeys.detail(fieldId), (old) =>
+        old ? { ...old, isFavorite: favorite } : old,
+      );
+      queryClient.setQueryData<FieldDetails>(fieldQueryKeys.details(fieldId), (old) =>
+        old ? { ...old, field: { ...old.field, isFavorite: favorite } } : old,
+      );
+
+      return snapshot;
+    },
+    onError: (_error, _favorite, snapshot) => {
+      snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      showToast("Khong the cap nhat yeu thich. Vui long thu lai.", "error");
+    },
+    onSuccess: (_result, favorite) => {
+      showToast(
+        favorite ? "Da them san vao yeu thich." : "Da bo san khoi yeu thich.",
+        "success",
+      );
+      void queryClient.invalidateQueries({ queryKey: fieldQueryKeys.all });
+    },
   });
 }
 

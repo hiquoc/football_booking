@@ -1,0 +1,12 @@
+spring:
+  config:
+    import: optional:file:common/.env-dev.properties
+  datasource:
+    url: ${PAYMENT_DB_URL:jdbc:postgresql://localhost:5432/payment_db}
+    username: ${PAYMENT_DB_USERNAME:football}
+    password: ${PAYMENT_DB_PASSWORD:football}
+
+internal:
+  gateway:
+    enforce-secret: false
+    allow-docs-without-secret: true

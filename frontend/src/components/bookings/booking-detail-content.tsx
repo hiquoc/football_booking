@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/back-link";
-import { DataError, ListSkeleton } from "@/components/ui/data-state";
+import { DataError, DetailSkeleton } from "@/components/ui/data-state";
 import type { BookingDisplayStatus } from "@/lib/booking-format";
 import { bookingStatus, formatBookingDate } from "@/lib/booking-format";
 import { formatCurrency, formatTime } from "@/lib/field-format";
@@ -21,12 +21,12 @@ import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status"
 import { useBooking, useCancelBooking } from "@/lib/hooks/use-bookings";
 
 const statusDescriptions: Record<BookingDisplayStatus, string> = {
-  PENDING: "Booking đang giữ chỗ và chờ xác nhận thanh toán.",
+  PENDING: "Lịch đặt đang giữ chỗ và chờ xác nhận thanh toán.",
   CONFIRMED: "Lịch đặt đã được xác nhận thành công.",
   IN_PROGRESS: "Trận đấu đang diễn ra theo khung giờ đã đặt.",
   CANCELLED: "Lịch đặt đã bị hủy và không còn hiệu lực.",
   COMPLETED: "Lịch đặt đã hoàn thành.",
-  EXPIRED: "Booking đã hết thời gian thanh toán.",
+  EXPIRED: "Lịch đặt đã hết thời gian thanh toán.",
 };
 
 export function BookingDetailContent({
@@ -42,9 +42,9 @@ export function BookingDetailContent({
   const [reason, setReason] = useState("");
   const [showCancel, setShowCancel] = useState(false);
 
-  if (booking.isPending) return <ListSkeleton count={2} />;
+  if (booking.isPending) return <DetailSkeleton />;
   if (booking.isError)
-    return <DataError title="Không thể tải chi tiết booking" />;
+    return <DataError title="Không thể tải chi tiết lịch đặt" />;
 
   const data = booking.data;
   const displayStatus = derivedStatus ?? data.status;
@@ -172,7 +172,7 @@ export function BookingDetailContent({
             </button>
           ) : (
             <p className="mt-4 text-sm leading-6 text-slate-500">
-              Booking này không còn thao tác cần xử lý.
+              Lịch đặt này không còn thao tác cần xử lý.
             </p>
           )}
 

@@ -26,8 +26,8 @@ export function LogoutButton() {
         disabled={mutation.isPending || leaving}
         aria-label={leaving ? "Đang đăng xuất" : "Đăng xuất"}
         title="Đăng xuất"
-        className="grid size-10 place-items-center rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
-      >
+        className="grid size-10 place-items-center rounded-full border border-rose-200 text-rose-500 transition-colors duration-200 hover:bg-rose-500 hover:text-white disabled:opacity-50"
+        >
         <LogOut className="size-5" aria-hidden="true" />
       </button>
       {leaving ? (

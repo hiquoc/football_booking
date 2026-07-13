@@ -8,15 +8,17 @@ import type { District } from "vietnam-divisions-js/districts";
 import type { Province } from "vietnam-divisions-js/provinces";
 import { ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, LocateFixed, Search, X } from "lucide-react";
 import { useFieldCards } from "@/lib/hooks/use-fields";
-import type { FieldCardFilters } from "@/lib/api/types";
+import type { FieldCardFilters, User } from "@/lib/api/types";
 import { FieldCard } from "./field-card";
 
 export function FieldListContent({
   pageNumber,
   filters,
+  viewerRole,
 }: {
   pageNumber: number;
   filters: FieldCardFilters;
+  viewerRole: User["userType"] | null;
 }) {
   const { data, isPending, isError } = useFieldCards(pageNumber - 1, 9, filters);
   const [isFiltering, setIsFiltering] = useState(false);
@@ -49,7 +51,11 @@ export function FieldListContent({
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {data.content.map((field) => (
-              <FieldCard key={field.id} field={field} />
+              <FieldCard
+                key={field.id}
+                field={field}
+                canFavorite={viewerRole === "CLIENT"}
+              />
             ))}
           </div>
           <Pagination current={data.page + 1} total={data.totalPages} filters={filters} />

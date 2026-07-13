@@ -24,7 +24,7 @@ export function BookingListContent({
         title="Chưa có lịch đặt sân"
         description={
           owner
-            ? "Booking của khách hàng sẽ xuất hiện tại đây."
+            ? "Lịch đặt của khách hàng sẽ xuất hiện tại đây."
             : "Hãy chọn một sân phù hợp và bắt đầu trận đấu đầu tiên."
         }
       />
@@ -43,10 +43,10 @@ export function BookingListContent({
               <button
                 disabled={cancelMutation.isPending}
                 onClick={() => {
-                  if (window.confirm("Xác nhận hủy booking này?"))
+                  if (window.confirm("Xác nhận hủy lịch đặt này?"))
                     cancelMutation.mutate({
                       id: booking.id,
-                      reason: "Chủ sân hủy booking",
+                      reason: "Chủ sân hủy lịch đặt",
                     });
                 }}
                 className="action-button min-h-0 rounded-lg bg-rose-500 px-3 py-2 text-xs text-white hover:bg-rose-600"

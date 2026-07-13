@@ -1,5 +1,6 @@
 package com.project.booking.dto.request;
 
+import com.project.common.enums.PaymentMethod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
@@ -37,4 +38,8 @@ public class CreateBookingRequest {
     private LocalTime endTime;
 
     private String note;
+
+    @Builder.Default
+    @Schema(defaultValue = "STRIPE")
+    private PaymentMethod paymentMethod = PaymentMethod.STRIPE;
 }

@@ -55,10 +55,3 @@ export function cancelBooking(
     },
   );
 }
-
-export function confirmMockPayment(id: string) {
-  return authenticatedGatewayRequest<Booking>(
-    `/api/v1/bookings/${encodeURIComponent(id)}/mock-payment`,
-    { method: "PATCH" },
-  );
-}

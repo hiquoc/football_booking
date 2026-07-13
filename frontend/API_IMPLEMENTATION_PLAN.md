@@ -379,11 +379,18 @@ interface ReviewRequest {
 | POST | `/api/v1/bookings` | CLIENT | Create booking | `BookingCreatePage` |
 | PATCH | `/api/v1/bookings/cancel` | CLIENT | Cancel booking (by client) | `BookingDetailPage` |
 | PATCH | `/api/v1/bookings/owner/cancel` | OWNER | Cancel booking (by owner) | `OwnerBookingDetailPage` |
-| PATCH | `/api/v1/bookings/{bookingId}/mock-payment` | CLIENT | Confirm mock payment | `BookingPaymentPage` |
 | GET | `/api/v1/bookings/my` | CLIENT | Get my bookings (paginated) | `MyBookingsPage` |
 | GET | `/api/v1/bookings/owner` | OWNER | Get owner's bookings (paginated) | `OwnerBookingsPage` |
 | GET | `/api/v1/bookings/{bookingId}` | CLIENT | Get booking by ID | `BookingDetailPage` |
 | GET | `/api/v1/bookings/availability` | No | Check availability | `BookingCreatePage` (time slot picker) |
+
+## 5. Payment Service APIs (`/api/v1/payments`)
+
+| Method | Endpoint | Auth | Description | Frontend Page/Component |
+|--------|----------|------|-------------|------------------------|
+| POST | `/api/v1/payments/checkout` | CLIENT | Create Stripe Checkout Session | `BookingPaymentPage` |
+| GET | `/api/v1/payments/{bookingId}` | CLIENT | Get verified payment status | `BookingPaymentPage` |
+| POST | `/api/v1/payments/webhook` | Stripe signature | Process Stripe webhook | Stripe |
 
 **Query Parameters**:
 - `GET /availability`: `subFieldId` (UUID), `date` (ISO date)
@@ -524,7 +531,7 @@ interface PageResponse<T> {
 | My Bookings | `/bookings` | `GET /api/v1/bookings/my` |
 | Booking Detail | `/bookings/{id}` | `GET /api/v1/bookings/{bookingId}` |
 | Create Booking | `/fields/{id}/book` | `GET /api/v1/bookings/availability`, `POST /api/v1/bookings` |
-| Payment (Mock) | `/bookings/{id}/payment` | `PATCH /api/v1/bookings/{bookingId}/mock-payment` |
+| Payment | `/bookings/{id}/payment` | `POST /api/v1/payments/checkout`, `GET /api/v1/payments/{bookingId}` |
 | Profile | `/profile` | `GET /api/v1/users/me` |
 | Edit Profile | `/profile/edit` | `PATCH /api/v1/users/me` |
 

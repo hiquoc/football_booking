@@ -1,6 +1,7 @@
 package com.project.field.service.impl;
 
 import com.project.common.enums.SubFieldType;
+import com.project.common.cache.CacheNames;
 import com.project.common.exception.BadRequestException;
 import com.project.field.dto.SubFieldDto;
 import com.project.field.dto.SubFieldRequest;
@@ -20,6 +21,7 @@ import com.project.field.repository.FieldRepository;
 import com.project.field.repository.SubFieldRepository;
 import com.project.field.service.SubFieldService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,7 @@ public class SubFieldServiceImpl implements SubFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public SubFieldDto create(UUID fieldId, SubFieldRequest request) {
         Field field = fieldRepository.findById(fieldId)
                 .orElseThrow(() -> new FieldNotFoundException(fieldId));
@@ -78,6 +81,7 @@ public class SubFieldServiceImpl implements SubFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public SubFieldDto update(UUID id, SubFieldRequest request) {
         SubField subField = subFieldRepository.findById(id)
                 .orElseThrow(() -> new SubFieldNotFoundException(id));
@@ -140,6 +144,7 @@ public class SubFieldServiceImpl implements SubFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public void delete(UUID id) {
         SubField subField = subFieldRepository.findById(id)
                 .orElseThrow(() -> new SubFieldNotFoundException(id));

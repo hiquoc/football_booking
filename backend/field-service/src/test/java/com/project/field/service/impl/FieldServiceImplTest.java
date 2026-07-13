@@ -7,6 +7,7 @@ import com.project.field.entity.Field;
 import com.project.field.enums.FieldStatus;
 import com.project.field.mapper.FieldMapper;
 import com.project.field.repository.FieldCardQueryRepository;
+import com.project.field.repository.FieldFavoriteRepository;
 import com.project.field.repository.FieldImageRepository;
 import com.project.field.repository.FieldOperatingHoursRepository;
 import com.project.field.repository.FieldRepository;
@@ -47,6 +48,9 @@ class FieldServiceImplTest {
     private FieldImageRepository fieldImageRepository;
 
     @Mock
+    private FieldFavoriteRepository fieldFavoriteRepository;
+
+    @Mock
     private FieldOperatingHoursRepository fieldOperatingHoursRepository;
 
     @Mock
@@ -72,6 +76,7 @@ class FieldServiceImplTest {
                 fieldRepository,
                 fieldCardQueryRepository,
                 fieldImageRepository,
+                fieldFavoriteRepository,
                 fieldOperatingHoursRepository,
                 subFieldRepository,
                 fieldMapper,
@@ -86,11 +91,11 @@ class FieldServiceImplTest {
         when(fieldRepository.findWithDetailsById(FIELD_ID)).thenReturn(Optional.of(field));
         when(fieldImageRepository.findByFieldIdAndImageUrlIsNotNull(FIELD_ID)).thenReturn(List.of());
         when(subFieldRepository.findByFieldId(FIELD_ID)).thenReturn(List.of());
-        when(fieldMapper.toDto(any(Field.class))).thenReturn(FieldDto.builder().id(FIELD_ID).ownerId(OWNER_ID).status(FieldStatus.APPROVED).build());
+        when(fieldMapper.toDto(any(Field.class), org.mockito.ArgumentMatchers.eq(false))).thenReturn(FieldDto.builder().id(FIELD_ID).ownerId(OWNER_ID).status(FieldStatus.APPROVED).build());
 
         fieldService.getWithDetailsById(FIELD_ID, null);
 
-        verify(fieldMapper).toDto(field);
+        verify(fieldMapper).toDto(field, false);
     }
 
     @Test
@@ -99,11 +104,11 @@ class FieldServiceImplTest {
         when(fieldRepository.findWithDetailsById(FIELD_ID)).thenReturn(Optional.of(field));
         when(fieldImageRepository.findByFieldIdAndImageUrlIsNotNull(FIELD_ID)).thenReturn(List.of());
         when(subFieldRepository.findByFieldId(FIELD_ID)).thenReturn(List.of());
-        when(fieldMapper.toDto(any(Field.class))).thenReturn(FieldDto.builder().id(FIELD_ID).ownerId(OWNER_ID).status(FieldStatus.PENDING).build());
+        when(fieldMapper.toDto(any(Field.class), org.mockito.ArgumentMatchers.eq(false))).thenReturn(FieldDto.builder().id(FIELD_ID).ownerId(OWNER_ID).status(FieldStatus.PENDING).build());
 
         fieldService.getWithDetailsById(FIELD_ID, new UserPrincipal(OWNER_ID, "owner@example.com", "OWNER"));
 
-        verify(fieldMapper).toDto(field);
+        verify(fieldMapper).toDto(field, false);
     }
 
     @Test
@@ -112,11 +117,11 @@ class FieldServiceImplTest {
         when(fieldRepository.findWithDetailsById(FIELD_ID)).thenReturn(Optional.of(field));
         when(fieldImageRepository.findByFieldIdAndImageUrlIsNotNull(FIELD_ID)).thenReturn(List.of());
         when(subFieldRepository.findByFieldId(FIELD_ID)).thenReturn(List.of());
-        when(fieldMapper.toDto(any(Field.class))).thenReturn(FieldDto.builder().id(FIELD_ID).ownerId(OWNER_ID).status(FieldStatus.REJECTED).build());
+        when(fieldMapper.toDto(any(Field.class), org.mockito.ArgumentMatchers.eq(false))).thenReturn(FieldDto.builder().id(FIELD_ID).ownerId(OWNER_ID).status(FieldStatus.REJECTED).build());
 
         fieldService.getWithDetailsById(FIELD_ID, new UserPrincipal(OTHER_USER_ID, "admin@example.com", "ADMIN"));
 
-        verify(fieldMapper).toDto(field);
+        verify(fieldMapper).toDto(field, false);
     }
 
     @Test

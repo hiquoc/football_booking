@@ -24,4 +24,5 @@ public class FieldCardDto {
     private String primaryImageUrl;
     private List<String> fieldTypes;
     private Double distanceKm;
+    private Boolean isFavorite;
 }

@@ -2,6 +2,7 @@ package com.project.user.service.impl;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.project.common.cache.CacheNames;
 import com.project.common.exception.*;
 import com.project.user.dto.*;
 import com.project.user.entity.*;
@@ -9,6 +10,7 @@ import com.project.user.mapper.UserMapper;
 import com.project.user.repository.*;
 import com.project.user.service.AvatarUploadService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.net.URI;
@@ -39,6 +41,7 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
     }
 
     @Override @Transactional
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, key = "'user:' + #userId")
     public UserDto confirm(UUID userId, AvatarUploadConfirmRequest request) {
         AvatarUpload upload = uploads.findByUserIdAndPublicId(userId, request.publicId())
                 .orElseThrow(() -> new NotFoundException("Avatar upload placeholder not found"));

@@ -1,5 +1,6 @@
 package com.project.booking.kafka;
 
+import com.project.booking.cache.AvailabilityCacheService;
 import com.project.booking.entity.FieldOperatingHoursProjection;
 import com.project.booking.entity.SubFieldClosureProjection;
 import com.project.booking.entity.SubFieldOperatingHoursProjection;
@@ -56,6 +57,7 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
     private final FieldOperatingHoursProjectionRepository fieldOperatingHoursRepository;
     private final SubFieldOperatingHoursProjectionRepository subFieldOperatingHoursRepository;
     private final FieldClosureProjectionRepository closureRepository;
+    private final AvailabilityCacheService availabilityCacheService;
 
     @Override
     public boolean supports(String topic) {
@@ -88,14 +90,17 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
 
     private void onSubFieldCreated(SubFieldCreatedEvent event) {
         upsertSubField(event.subFieldId(), event);
+        availabilityCacheService.evictAll();
     }
 
     private void onSubFieldUpdated(SubFieldUpdatedEvent event) {
         upsertSubField(event.subFieldId(), event);
+        availabilityCacheService.evictAll();
     }
 
     private void onSubFieldDeleted(SubFieldDeletedEvent event) {
         subFieldRepository.deleteById(event.subFieldId());
+        availabilityCacheService.evictAll();
     }
 
     private void onFieldOperatingHoursUpdated(FieldOperatingHoursUpdatedEvent event) {
@@ -118,6 +123,7 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
                     return projection;
                 })
                 .toList());
+        availabilityCacheService.evictAll();
     }
 
     private void onSubFieldOperatingHoursUpdated(SubFieldOperatingHoursUpdatedEvent event) {
@@ -140,6 +146,7 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
                     return projection;
                 })
                 .toList());
+        availabilityCacheService.evictAll();
     }
 
     private void onClosureCreated(FieldClosureCreatedEvent event) {
@@ -149,14 +156,17 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
         closureRepository.saveAll(event.closures().stream()
                 .map(this::toClosureProjection)
                 .toList());
+        availabilityCacheService.evictAll();
     }
 
     private void onClosureUpdated(FieldClosureUpdatedEvent event) {
         upsertClosure(event.closureId(), event.subFieldId(), event.startDate(), event.endDate(), event.reason());
+        availabilityCacheService.evictAll();
     }
 
     private void onClosureDeleted(FieldClosureDeletedEvent event) {
         closureRepository.deleteById(event.closureId());
+        availabilityCacheService.evictAll();
     }
 
     private void upsertSubField(UUID id, SubFieldCreatedEvent event) {

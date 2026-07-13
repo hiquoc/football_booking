@@ -18,7 +18,9 @@ import { formatCurrency, formatEnum } from "@/lib/field-format";
 import { useAvailability, useCreateBooking } from "@/lib/hooks/use-bookings";
 import { useCurrentTime } from "@/lib/hooks/use-current-time";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
-import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
+import { useProfile } from "@/lib/hooks/use-profile";
+import { DataEmpty, DataError, FormSkeleton } from "@/components/ui/data-state";
+import type { PaymentMethod } from "@/lib/api/types";
 
 export function BookingForm({
   fieldId,
@@ -34,7 +36,9 @@ export function BookingForm({
   const [startTime, setStartTime] = useState("");
   const [duration, setDuration] = useState(90);
   const [note, setNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("STRIPE");
   const createMutation = useCreateBooking();
+  const profile = useProfile();
   const now = useCurrentTime();
 
   const activeSubFields = subFields.data?.filter((item) => item.active) ?? [];
@@ -76,7 +80,7 @@ export function BookingForm({
   const isCheckingAvailability =
     !now || availability.isPending || availability.isFetching;
 
-  if (field.isPending || subFields.isPending) return <ListSkeleton count={2} />;
+  if (field.isPending || subFields.isPending) return <FormSkeleton />;
   if (field.isError || subFields.isError)
     return <DataError title="Không thể tải thông tin đặt sân" />;
   if (!activeSubFields.length)
@@ -102,8 +106,9 @@ export function BookingForm({
         startTime: `${selectedStartTime}:00`,
         durationMinutes: effectiveDuration,
         note: note.trim() || undefined,
+        paymentMethod,
       });
-      window.location.assign(`/bookings/${booking.id}/payment`);
+      window.location.assign(paymentMethod === "STRIPE" ? `/bookings/${booking.id}/payment` : `/bookings/${booking.id}`);
     } catch {
       // React Query exposes the booking conflict below.
     }
@@ -238,9 +243,8 @@ export function BookingForm({
 
         <BookingStep number="5" title="Chọn giờ bắt đầu">
           {isCheckingAvailability ? (
-            <div className="flex h-24 items-center justify-center gap-2 rounded-2xl bg-slate-50 text-sm font-semibold text-slate-500">
-              <LoaderCircle className="size-4 animate-spin text-sky-600" />
-              Đang kiểm tra lịch trống...
+            <div className="grid h-24 animate-pulse grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Đang kiểm tra lịch trống">
+              {[0, 1, 2, 3].map((item) => <div key={item} className="rounded-xl bg-slate-100" />)}
             </div>
           ) : availability.isError ? (
             <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-700">
@@ -288,6 +292,31 @@ export function BookingForm({
             placeholder="Ví dụ: chuẩn bị bóng, áo bib..."
           />
         </Field>
+
+        <BookingStep number="6" title="Phương thức thanh toán">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("STRIPE")}
+              className={`rounded-2xl border p-4 text-left transition ${paymentMethod === "STRIPE" ? "border-sky-500 bg-sky-50 ring-2 ring-sky-500/10" : "border-slate-200 hover:border-sky-300"}`}
+            >
+              <strong className="block text-sm text-slate-900">Stripe</strong>
+              <span className="mt-1 block text-xs text-slate-500">
+                Thanh toán bằng thẻ hoặc ví hỗ trợ Stripe.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("ACCOUNT_BALANCE")}
+              className={`rounded-2xl border p-4 text-left transition ${paymentMethod === "ACCOUNT_BALANCE" ? "border-sky-500 bg-sky-50 ring-2 ring-sky-500/10" : "border-slate-200 hover:border-sky-300"}`}
+            >
+              <strong className="block text-sm text-slate-900">Số dư tài khoản</strong>
+              <span className="mt-1 block text-xs text-slate-500">
+                Hiện có {formatCurrency(profile.data?.balance ?? 0)}.
+              </span>
+            </button>
+          </div>
+        </BookingStep>
       </div>
 
       <aside className="h-fit rounded-[2rem] border border-sky-100 bg-sky-50 p-6 text-slate-900 lg:sticky lg:top-24">
@@ -330,6 +359,9 @@ export function BookingForm({
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-sky-600" />
           Dữ liệu lịch trống đã được tải trước. Hệ thống vẫn xác nhận lần cuối
           để tránh hai người đặt cùng một khung giờ.
+        </p>
+        <p className="mt-3 rounded-xl bg-white/70 p-3 text-xs leading-5 text-slate-500">
+          Tổng thanh toán cuối cùng có thể bao gồm phí đặt sân được cấu hình bởi hệ thống.
         </p>
         {createMutation.error ? (
           <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">

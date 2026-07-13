@@ -2,6 +2,7 @@ package com.project.booking.dto.response;
 
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.PaymentMethod;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,7 @@ public class BookingResponse {
     private Integer durationMinutes;
     private BigDecimal pricePerHour;
     private BigDecimal totalAmount;
+    private PaymentMethod paymentMethod;
     private BookingStatus status;
     private String note;
     private String cancellationReason;

@@ -11,7 +11,7 @@ export default function OwnerBookingsLoading() {
       <PageHeading
         eyebrow="Vận hành"
         title="Lịch đặt của khách"
-        description="Theo dõi các booking thuộc hệ thống sân của bạn."
+        description="Theo dõi các lịch đặt thuộc hệ thống sân của bạn."
       />
       <div className="mt-8">
         <ListSkeleton />

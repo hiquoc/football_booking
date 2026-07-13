@@ -75,6 +75,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("confirmedStatus") BookingStatus confirmedStatus);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query("UPDATE Booking b SET b.status = :confirmedStatus WHERE b.id = :bookingId AND b.status = :pendingStatus")
+        int confirmPendingBookingFromPayment(@Param("bookingId") UUID bookingId,
+                @Param("pendingStatus") BookingStatus pendingStatus,
+                @Param("confirmedStatus") BookingStatus confirmedStatus);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
                     UPDATE Booking b
                     SET b.status = :expiredStatus,

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ChatProvider } from "@/components/chat/chat-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { ToastProvider } from "@/components/providers/toast-provider";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
@@ -14,7 +16,11 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <ToastProvider>
+            <ChatProvider>{children}</ChatProvider>
+          </ToastProvider>
+        </QueryProvider>
       </body>
     </html>
   );

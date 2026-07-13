@@ -11,6 +11,7 @@ import com.project.field.mapper.FieldMapper;
 import com.project.field.mapper.FieldTypeMapper;
 import com.project.field.mapper.SubFieldMapper;
 import com.project.field.repository.FieldCardQueryRepository;
+import com.project.field.repository.FieldFavoriteRepository;
 import com.project.field.repository.FieldImageRepository;
 import com.project.field.repository.FieldOperatingHoursRepository;
 import com.project.field.repository.FieldRepository;
@@ -44,6 +45,7 @@ class FieldImageBatchOrderTest {
                 fieldRepository,
                 mock(FieldCardQueryRepository.class),
                 mock(FieldImageRepository.class),
+                mock(FieldFavoriteRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldRepository.class),
                 new FieldMapper(mock(FieldTypeMapper.class), mock(SubFieldMapper.class)),
@@ -74,6 +76,7 @@ class FieldImageBatchOrderTest {
                 fieldRepository,
                 mock(FieldCardQueryRepository.class),
                 imageRepository,
+                mock(FieldFavoriteRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldRepository.class),
                 new FieldMapper(mock(FieldTypeMapper.class), mock(SubFieldMapper.class)),
@@ -107,6 +110,7 @@ class FieldImageBatchOrderTest {
                 fieldRepository,
                 mock(FieldCardQueryRepository.class),
                 imageRepository,
+                mock(FieldFavoriteRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldRepository.class),
                 new FieldMapper(mock(FieldTypeMapper.class), mock(SubFieldMapper.class)),

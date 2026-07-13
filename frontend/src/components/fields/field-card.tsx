@@ -6,6 +6,7 @@ import { MapPin, Star } from "lucide-react";
 import { useState } from "react";
 import type { FieldCardData } from "@/lib/api/types";
 import { formatFieldAddress } from "@/lib/field-format";
+import { FavoriteButton } from "./favorite-button";
 
 const SPORT_NAMES = new Map<string, string>([
   ["FOOTBALL", "Bóng đá"],
@@ -22,7 +23,13 @@ const SPORT_NAMES = new Map<string, string>([
   ["OTHER", "Khác"],
 ]);
 
-export function FieldCard({ field }: { field: FieldCardData }) {
+export function FieldCard({
+  field,
+  canFavorite = false,
+}: {
+  field: FieldCardData;
+  canFavorite?: boolean;
+}) {
   const imageUrl = field.primaryImageUrl;
   const sportNames = field.fieldTypes.map((type) => SPORT_NAMES.get(type) ?? type)
   .sort((a,b)=>a==="Bóng đá" ? -1 : b==="Bóng đá" ? 1 : 0);
@@ -85,6 +92,11 @@ export function FieldCard({ field }: { field: FieldCardData }) {
             ) : null}
           </div>
         )}
+        {canFavorite ? (
+          <div className="absolute right-4 top-4 z-40">
+            <FavoriteButton fieldId={field.id} isFavorite={field.isFavorite} />
+          </div>
+        ) : null}
       </div>
       <div className="p-5">
         <div className="flex items-start justify-between gap-4">

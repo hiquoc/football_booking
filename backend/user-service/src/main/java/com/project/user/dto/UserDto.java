@@ -23,6 +23,7 @@ public class UserDto {
     private String socialProvider;
     private String socialProviderId;
     private String status;
+    private Long balance;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

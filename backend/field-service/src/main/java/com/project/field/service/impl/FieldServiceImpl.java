@@ -2,6 +2,8 @@ package com.project.field.service.impl;
 
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
+import com.project.common.cache.CacheKeys;
+import com.project.common.cache.CacheNames;
 import com.project.common.enums.UserType;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.ForbiddenException;
@@ -26,10 +28,13 @@ import com.project.field.repository.FieldImageRepository;
 import com.project.field.repository.FieldOperatingHoursRepository;
 import com.project.field.repository.FieldRepository;
 import com.project.field.repository.FieldCardQueryRepository;
+import com.project.field.repository.FieldFavoriteRepository;
 import com.project.field.repository.SubFieldRepository;
 import com.project.field.service.CloudinaryService;
 import com.project.field.service.FieldService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +52,7 @@ public class FieldServiceImpl implements FieldService {
     private final FieldRepository fieldRepository;
     private final FieldCardQueryRepository fieldCardQueryRepository;
     private final FieldImageRepository fieldImageRepository;
+    private final FieldFavoriteRepository fieldFavoriteRepository;
     private final FieldOperatingHoursRepository fieldOperatingHoursRepository;
     private final SubFieldRepository subFieldRepository;
     private final FieldMapper fieldMapper;
@@ -56,6 +62,7 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public FieldDto create(UUID ownerId, FieldRequest request) {
         validateCreateRequest(request);
         validate(ownerId);
@@ -69,6 +76,7 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public FieldDto update(UUID id, UUID ownerId, FieldRequest request) {
         Field field = fieldRepository.findById(id)
                 .orElseThrow(() -> new FieldNotFoundException(id));
@@ -88,6 +96,7 @@ public class FieldServiceImpl implements FieldService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.FIELD_DETAIL, key = "'field:' + #id + ':viewer:internal'", sync = true)
     public FieldDto getById(UUID id) {
         return fieldRepository.findById(id)
                 .map(fieldMapper::toDto)
@@ -96,6 +105,7 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.FIELD_DETAIL, key = CacheKeys.FIELD_DETAIL, sync = true)
     public FieldDto getWithDetailsById(UUID id, UserPrincipal userPrincipal) {
         Field field = fieldRepository.findWithDetailsById(id)
                 .orElseThrow(() -> new FieldNotFoundException(id));
@@ -104,7 +114,7 @@ public class FieldServiceImpl implements FieldService {
         }
         field.setImages(fieldImageRepository.findByFieldIdAndImageUrlIsNotNull(id));
         field.setSubFields(subFieldRepository.findByFieldId(id));
-        return fieldMapper.toDto(field);
+        return fieldMapper.toDto(field, isFavorite(userPrincipal, id));
     }
 
     @Override
@@ -115,17 +125,16 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<FieldDto> getAll(FieldStatus status, Pageable pageable) {
+    public PageResponse<FieldDto> getAll(FieldStatus status, Pageable pageable, UserPrincipal currentUser) {
         if (status != null) {
-            return PageResponse.from(fieldRepository.findByStatus(status, pageable).map(fieldMapper::toDto));
+            return toFavoriteAwarePage(fieldRepository.findByStatus(status, pageable), currentUser);
         }
-        return PageResponse.from(fieldRepository
-                .findByStatusAndActiveTrue(FieldStatus.APPROVED, pageable)
-                .map(fieldMapper::toDto));
+        return toFavoriteAwarePage(fieldRepository.findByStatusAndActiveTrue(FieldStatus.APPROVED, pageable), currentUser);
     }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public FieldDto updateStatus(UUID id, FieldStatus status) {
         Field field = fieldRepository.findById(id)
                 .orElseThrow(() -> new FieldNotFoundException(id));
@@ -135,15 +144,18 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.FIELD_SEARCH, key = CacheKeys.FIELD_SEARCH, sync = true)
     public PageResponse<FieldCardDto> searchCards(String fieldType, String subFieldType, String district, String provinceCode,
                                                   BigDecimal latitude, BigDecimal longitude, Double radiusKm, String sortBy, String direction,
-                                                  int page, int size) {
+                                                  int page, int size, UserPrincipal currentUser) {
         return PageResponse.from(fieldCardQueryRepository.search(fieldType, subFieldType, district, provinceCode,
-                latitude, longitude, radiusKm, sortBy, direction, page, size));
+                latitude, longitude, radiusKm, sortBy, direction, page, size,
+                currentUser != null && "CLIENT".equals(currentUser.role()) ? currentUser.id() : null));
     }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<FieldImageDto> addImages(
             UUID fieldId,
             List<String> imageUrls) {
@@ -172,6 +184,7 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<FieldImageDto> uploadImages(UUID fieldId, List<MultipartFile> files) {
         List<String> imageUrls = cloudinaryService.uploadImages(files);
         try {
@@ -188,12 +201,14 @@ public class FieldServiceImpl implements FieldService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public void deleteImage(Long imageId) {
         fieldImageRepository.deleteById(imageId);
     }
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<FieldImageDto> updateImageOrder(UUID fieldId, FieldImageOrderRequest request) {
         Field field = fieldRepository.findById(fieldId)
                 .orElseThrow(() -> new FieldNotFoundException(fieldId));
@@ -247,6 +262,25 @@ public class FieldServiceImpl implements FieldService {
             return true;
         }
         return field.getOwnerId().equals(userPrincipal.id());
+    }
+
+    private Boolean isFavorite(UserPrincipal userPrincipal, UUID fieldId) {
+        if (userPrincipal == null || userPrincipal.id() == null || !"CLIENT".equals(userPrincipal.role())) {
+            return false;
+        }
+        return fieldFavoriteRepository.existsByUserIdAndFieldId(userPrincipal.id(), fieldId);
+    }
+
+    private PageResponse<FieldDto> toFavoriteAwarePage(org.springframework.data.domain.Page<Field> fields,
+                                                       UserPrincipal currentUser) {
+        if (currentUser == null || currentUser.id() == null || !"CLIENT".equals(currentUser.role())) {
+            return PageResponse.from(fields.map(field -> fieldMapper.toDto(field, false)));
+        }
+        List<UUID> fieldIds = fields.getContent().stream().map(Field::getId).toList();
+        Set<UUID> favoriteIds = fieldIds.isEmpty()
+                ? Set.of()
+                : new HashSet<>(fieldFavoriteRepository.findFavoriteFieldIds(currentUser.id(), fieldIds));
+        return PageResponse.from(fields.map(field -> fieldMapper.toDto(field, favoriteIds.contains(field.getId()))));
     }
 
     private List<FieldOperatingHours> upsertOperatingHours(Field field, FieldRequest request) {

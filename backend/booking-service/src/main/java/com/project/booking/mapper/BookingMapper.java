@@ -21,6 +21,7 @@ public interface BookingMapper {
     @Mapping(target = "durationMinutes", source = "booking.durationMinutes")
     @Mapping(target = "pricePerHour",  source = "booking.pricePerHour")
     @Mapping(target = "totalAmount",   source = "booking.totalAmount")
+    @Mapping(target = "paymentMethod", source = "booking.paymentMethod")
     @Mapping(target = "status",        source = "booking.status")
     @Mapping(target = "note",          source = "booking.note")
     @Mapping(target = "cancellationReason", source = "booking.cancellationReason")

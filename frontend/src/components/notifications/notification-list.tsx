@@ -28,7 +28,7 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
     return (
       <DataEmpty
         title="Bạn chưa có thông báo"
-        description="Các cập nhật về booking và thanh toán sẽ xuất hiện tại đây."
+        description="Các cập nhật về lịch đặt và thanh toán sẽ xuất hiện tại đây."
       />
     );
   const hasUnread = notifications.data.content.some((item) => !item.isRead);

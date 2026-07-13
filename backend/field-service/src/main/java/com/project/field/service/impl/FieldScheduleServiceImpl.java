@@ -3,6 +3,7 @@ package com.project.field.service.impl;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
+import com.project.common.cache.CacheNames;
 import com.project.field.dto.FieldClosureDto;
 import com.project.field.client.BookingServiceClient;
 import com.project.field.dto.FieldClosureRequest;
@@ -23,6 +24,7 @@ import com.project.field.repository.SubFieldOperatingHoursRepository;
 import com.project.field.repository.SubFieldRepository;
 import com.project.field.service.FieldScheduleService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +63,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<OperatingHoursDto> replaceFieldOperatingHours(UUID fieldId, UUID currentUserId, String role,
             List<OperatingHoursRequest> requests) {
         Field field = requireField(fieldId);
@@ -102,6 +105,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<OperatingHoursDto> replaceSubFieldOperatingHours(UUID subFieldId, UUID currentUserId, String role,
             List<OperatingHoursRequest> requests) {
         SubField subField = requireSubField(subFieldId);
@@ -142,6 +146,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<FieldClosureDto> createClosures(UUID currentUserId, String role, FieldClosureRequest request) {
         validateClosure(request);
 
@@ -178,6 +183,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public FieldClosureDto updateClosure(UUID closureId, UUID currentUserId, String role, FieldClosureRequest request) {
         SubFieldClosure closure = fieldClosureRepository.findById(closureId)
                 .orElseThrow(() -> new NotFoundException("Field closure not found with id: " + closureId));
@@ -196,6 +202,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public void deleteClosure(UUID closureId, UUID currentUserId, String role) {
         SubFieldClosure closure = fieldClosureRepository.findById(closureId)
                 .orElseThrow(() -> new NotFoundException("Field closure not found with id: " + closureId));

@@ -1,6 +1,8 @@
 package com.project.user.service.impl;
 
 import com.project.common.enums.UserType;
+import com.project.common.cache.CacheKeys;
+import com.project.common.cache.CacheNames;
 import com.project.common.dto.PageResponse;
 import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
@@ -12,6 +14,8 @@ import com.project.user.mapper.UserMapper;
 import com.project.user.repository.UserRepository;
 import com.project.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,12 +36,14 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.USER_BY_ID, key = CacheKeys.USER, sync = true)
     public UserDto getUserById(UUID id) {
         User user = getUser(id);
         return userMapper.toDto(user);
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.USER_BY_ID, key = CacheKeys.USER_WITH_REQUESTER, sync = true)
     public UserDto getUserById(UUID id, UserPrincipal requester) {
         if (id.equals(requester.id())) {
             User user = getUser(id);
@@ -58,6 +64,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, key = "'user:' + #principal.id()")
     public UserDto updateUserProfile(UserPrincipal principal, UpdateProfileRequest request) {
         User user = userRepository.findById(principal.id())
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + principal.id()));
@@ -70,6 +77,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, key = "'user:' + #targetUserId")
     public UserDto changeUserRole(UUID targetUserId, UserType newRole) {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));

@@ -1,10 +1,50 @@
-version: '3.9'
+x-backend-environment: &backend-environment
+  APP_MODE: ${APP_MODE:-dev}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
+  INTERNAL_GATEWAY_SECRET: ${INTERNAL_GATEWAY_SECRET:-dev-internal-gateway-secret}
+  JWT_SECRET: ${JWT_SECRET:-ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==}
+  USER_DB_URL: ${USER_DB_URL:-jdbc:postgresql://postgres:5432/user_db}
+  USER_DB_USERNAME: ${USER_DB_USERNAME:-football}
+  USER_DB_PASSWORD: ${USER_DB_PASSWORD:-football}
+  FIELD_DB_URL: ${FIELD_DB_URL:-jdbc:postgresql://postgres:5432/field_db}
+  FIELD_DB_USERNAME: ${FIELD_DB_USERNAME:-football}
+  FIELD_DB_PASSWORD: ${FIELD_DB_PASSWORD:-football}
+  BOOKING_DB_URL: ${BOOKING_DB_URL:-jdbc:postgresql://postgres:5432/booking_db}
+  BOOKING_DB_USERNAME: ${BOOKING_DB_USERNAME:-football}
+  BOOKING_DB_PASSWORD: ${BOOKING_DB_PASSWORD:-football}
+  NOTIFICATION_DB_URL: ${NOTIFICATION_DB_URL:-jdbc:postgresql://postgres:5432/notification_db}
+  NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-football}
+  NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-football}
+  PAYMENT_DB_URL: ${PAYMENT_DB_URL:-jdbc:postgresql://postgres:5432/payment_db}
+  PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME:-football}
+  PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-football}
+  CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-dev-cloudinary-cloud}
+  CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-dev-cloudinary-key}
+  CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-dev-cloudinary-secret}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dev-google-client}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-dev-google-secret}
+  FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-dev-facebook-client}
+  FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-dev-facebook-secret}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  N8N_URL: ${N8N_URL:-http://localhost:5678/webhook/test}
+  N8N_KEY: ${N8N_KEY:-dev-n8n-key}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_replace_me}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_replace_me}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: Dockerfile
 
 services:
   postgres:
     image: postgres:16-alpine
-    profiles:
-      - database
     container_name: postgres
     restart: unless-stopped
     ports:
@@ -13,7 +53,7 @@ services:
       POSTGRES_USER: football
       POSTGRES_PASSWORD: football
       POSTGRES_DB: football
-      POSTGRES_MULTIPLE_DATABASES: user_db,field_db,booking_db,notification_db
+      POSTGRES_MULTIPLE_DATABASES: user_db,field_db,booking_db,notification_db,payment_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
@@ -23,21 +63,17 @@ services:
     container_name: kafka
     restart: unless-stopped
     ports:
-      - "9092:9092"
+      - "29092:29092"
     environment:
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
       KAFKA_NODE_ID: 1
-
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
-
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:29093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -49,5 +85,169 @@ services:
     ports:
       - "6379:6379"
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  discovery-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: discovery-service
+        ARTIFACT_ID: discovery
+    container_name: discovery-service
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      APP_MODE: ${APP_MODE:-dev}
+      EUREKA_HOSTNAME: discovery-service
+      EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
+
+  gateway-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: gateway-service
+        ARTIFACT_ID: gateway
+    container_name: gateway-service
+    restart: unless-stopped
+    depends_on:
+      - discovery-service
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *backend-environment
+
+  user-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: user-service
+        ARTIFACT_ID: user
+    container_name: user-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - discovery-service
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *backend-environment
+
+  field-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: field-service
+        ARTIFACT_ID: field
+    container_name: field-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - discovery-service
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *backend-environment
+
+  booking-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: booking-service
+        ARTIFACT_ID: booking
+    container_name: booking-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - discovery-service
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *backend-environment
+
+  notification-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: notification-service
+        ARTIFACT_ID: notification
+    container_name: notification-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - discovery-service
+      - mailpit
+    ports:
+      - "8084:8084"
+    environment:
+      <<: *backend-environment
+
+  payment-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: payment-service
+        ARTIFACT_ID: payment
+    container_name: payment-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - discovery-service
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *backend-environment
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+        NEXT_PUBLIC_GATEWAY_WS_URL: ws://localhost:8080/ws
+    container_name: frontend
+    restart: unless-stopped
+    depends_on:
+      - gateway-service
+    ports:
+      - "3000:3000"
+    environment:
+      API_BASE_URL: http://gateway-service:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_GATEWAY_WS_URL: ws://localhost:8080/ws
+
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    profiles:
+      - stripe
+    container_name: stripe-cli
+    restart: unless-stopped
+    environment:
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    volumes:
+      - stripe_cli_config:/root/.config/stripe
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if test -n "$$STRIPE_SECRET_KEY"; then API_KEY_ARGS="--api-key $$STRIPE_SECRET_KEY"; else API_KEY_ARGS=""; fi;
+        exec stripe listen $$API_KEY_ARGS --forward-to http://gateway-service:8080/api/v1/payments/webhook --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
+
 volumes:
   postgres_data:
+  stripe_cli_config:
+    name: stripe_cli_config

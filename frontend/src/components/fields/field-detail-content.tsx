@@ -14,6 +14,7 @@ import type { Field, SubField, User } from "@/lib/api/types";
 import { formatEnum, formatFieldAddress } from "@/lib/field-format";
 import { useFieldDetails } from "@/lib/hooks/use-fields";
 import { FieldContactCard } from "./field-contact-card";
+import { FavoriteButton } from "./favorite-button";
 import { FieldGallery } from "./field-gallery";
 import { OperatingHours } from "./operating-hours";
 import { ReviewForm } from "./review-form";
@@ -43,6 +44,7 @@ export function FieldDetailContent({
           <FieldDetailActions
             fieldId={fieldId}
             fieldOwnerId={field.ownerId}
+            isFavorite={field.isFavorite}
             viewerRole={viewerRole}
             viewerUserId={viewerUserId}
           />
@@ -88,11 +90,13 @@ export function FieldDetailContent({
 function FieldDetailActions({
   fieldId,
   fieldOwnerId,
+  isFavorite,
   viewerRole,
   viewerUserId,
 }: {
   fieldId: string;
   fieldOwnerId: string;
+  isFavorite?: boolean;
   viewerRole: User["userType"] | null;
   viewerUserId: string | null;
 }) {
@@ -109,6 +113,16 @@ function FieldDetailActions({
 
   if (viewerRole === "ADMIN") {
     return null;
+  }
+
+  if (viewerRole === "CLIENT") {
+    return (
+      <FavoriteButton
+        fieldId={fieldId}
+        isFavorite={isFavorite}
+        className="inline-grid size-11 place-items-center rounded-full border border-slate-200 bg-white text-xl shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-70"
+      />
+    );
   }
 
   return null;

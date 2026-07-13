@@ -106,7 +106,8 @@ class FieldServiceApiTest {
                 eq("rating"),
                 eq("desc"),
                 eq(0),
-                eq(12));
+                eq(12),
+                org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
@@ -161,7 +162,7 @@ class FieldServiceApiTest {
     @Test
     void getFieldAndListFieldsArePublic() throws Exception {
         when(fieldService.getWithDetailsById(eq(FIELD_ID), org.mockito.ArgumentMatchers.isNull())).thenReturn(fieldDto());
-        when(fieldService.getAll(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any())).thenReturn(PageResponse.<FieldDto>builder()
+        when(fieldService.getAll(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.isNull())).thenReturn(PageResponse.<FieldDto>builder()
                 .content(List.of(fieldDto()))
                 .page(0)
                 .size(20)

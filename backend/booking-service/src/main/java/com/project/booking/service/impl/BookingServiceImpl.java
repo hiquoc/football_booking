@@ -7,28 +7,36 @@ import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.dto.response.TimePriceRuleDto;
 import com.project.booking.dto.response.UnavailableSlotResponse;
+import com.project.booking.cache.AvailabilityCacheService;
 import com.project.booking.entity.Booking;
 import com.project.booking.config.BookingDatabaseConstraints;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.exception.BookingNotCancellableException;
 import com.project.booking.exception.BookingNotFoundException;
+import com.project.booking.kafka.BookingBalanceEventPublisher;
 import com.project.booking.kafka.BookingNotificationEventPublisher;
 import com.project.booking.mapper.BookingMapper;
+import com.project.booking.payment.BookingPaymentStrategyFactory;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
+import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.BookingService;
 import com.project.booking.service.ResolvedOperatingHours;
 import com.project.booking.service.SubFieldProjectionService;
 import com.project.booking.util.BookingCodeGenerator;
+import com.project.common.cache.CacheKeys;
+import com.project.common.cache.CacheNames;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.PaymentMethod;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -61,6 +69,7 @@ public class BookingServiceImpl implements BookingService {
     private static final String BOOKING_CONFLICT_MESSAGE = "The selected time slot is no longer available.";
     private static final String EXCLUSION_VIOLATION_SQL_STATE = "23P01";
     private static final String PAYMENT_TIMEOUT_REASON = "Payment timeout";
+    private static final String BOOKING_CANCEL_REFUND_REASON = "BOOKING_CANCEL_REFUND";
 
     private final BookingRepository bookingRepository;
     private final SubFieldProjectionService subFieldProjectionService;
@@ -68,9 +77,13 @@ public class BookingServiceImpl implements BookingService {
     private final PricingStrategy pricingStrategy;
     private final BookingMapper bookingMapper;
     private final BookingNotificationEventPublisher bookingNotificationEventPublisher;
+    private final BookingConfigService bookingConfigService;
+    private final BookingPaymentStrategyFactory paymentStrategyFactory;
+    private final BookingBalanceEventPublisher bookingBalanceEventPublisher;
+    private final AvailabilityCacheService availabilityCacheService;
 
-    @Value("${booking.payment-timeout-minutes:15}")
-    private int paymentTimeoutMinutes = 15;
+    @Value("${booking.payment-timeout-minutes:35}")
+    private int paymentTimeoutMinutes = 35;
 
     @Override
     @Transactional
@@ -82,7 +95,12 @@ public class BookingServiceImpl implements BookingService {
         validateBooking(subField, request);
 
         // VALIDATION: Calculate price
-        BigDecimal totalAmount = pricingStrategy.calculate(subField, request);
+        var config = bookingConfigService.getConfig();
+        PaymentMethod paymentMethod = request.getPaymentMethod() == null
+                ? PaymentMethod.STRIPE
+                : request.getPaymentMethod();
+        BigDecimal totalAmount = pricingStrategy.calculate(subField, request)
+                .add(BigDecimal.valueOf(config.getBookingFee()));
         Booking booking = Booking.builder()
                 .bookingCode(BookingCodeGenerator.generate())
                 .clientId(userId)
@@ -94,6 +112,7 @@ public class BookingServiceImpl implements BookingService {
                 .durationMinutes(request.getDurationMinutes())
                 .pricePerHour(resolveStartPrice(subField, request.getStartTime()))
                 .totalAmount(totalAmount)
+                .paymentMethod(paymentMethod)
                 .status(BookingStatus.PENDING)
                 .note(request.getNote())
                 .build();
@@ -109,7 +128,8 @@ public class BookingServiceImpl implements BookingService {
         }
         log.info("Booking created: code={}, clientId={}, subFieldId={}",
                 saved.getBookingCode(), userId, subField.getId());
-        bookingNotificationEventPublisher.publishBookingCreated(saved, subField, null);
+        availabilityCacheService.evict(saved.getSubFieldId(), saved.getBookingDate());
+        paymentStrategyFactory.get(saved.getPaymentMethod()).onBookingCreated(saved, subField);
 
         return bookingMapper.toResponse(saved, subField);
     }
@@ -146,6 +166,8 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking cancelled by client: id={}, clientId={}",
                 cancelled.getId(),
                 userId);
+        publishRefundIfEligible(cancelled);
+        availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
         bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
 
         return bookingMapper.toResponse(cancelled);
@@ -183,44 +205,11 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking cancelled by owner: id={}, ownerId={}",
                 cancelled.getId(),
                 ownerId);
+        publishRefundIfEligible(cancelled);
+        availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
         bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
 
         return bookingMapper.toResponse(cancelled);
-    }
-
-    @Override
-    @Transactional
-    public BookingResponse confirmMockPayment(UUID userId, UUID bookingId) {
-
-        int updatedRows = bookingRepository.confirmPendingBooking(
-                bookingId,
-                userId,
-                BookingStatus.PENDING,
-                BookingStatus.CONFIRMED);
-
-        if (updatedRows == 0) {
-            Booking current = bookingRepository.findById(bookingId)
-                    .orElseThrow(() -> new BookingNotFoundException(bookingId));
-
-            if (!current.getClientId().equals(userId)) {
-                throw new UnauthorizedException(
-                        "You are not authorised to pay for this booking");
-            }
-
-            throw new BadRequestException(
-                    "Only pending bookings can be confirmed. Current status: "
-                            + current.getStatus());
-        }
-
-        Booking confirmed = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BookingNotFoundException(bookingId));
-
-        log.info("Mock payment confirmed booking: id={}, clientId={}",
-                confirmed.getId(), userId);
-        bookingNotificationEventPublisher.publishBookingConfirmed(confirmed, null);
-        bookingNotificationEventPublisher.publishPaymentSuccess(confirmed, null);
-
-        return bookingMapper.toResponse(confirmed);
     }
 
     @Override
@@ -236,6 +225,7 @@ public class BookingServiceImpl implements BookingService {
                 now,
                 BookingCancelledBy.SYSTEM);
         if (expiredCount > 0) {
+            availabilityCacheService.evictAll();
             log.info("Expired {} pending bookings older than {}", expiredCount, expiresBefore);
         }
         return expiredCount;
@@ -251,6 +241,7 @@ public class BookingServiceImpl implements BookingService {
                 now.toLocalDate(),
                 now.toLocalTime());
         if (completedCount > 0) {
+            availabilityCacheService.evictAll();
             log.info("Completed {} confirmed bookings ending on or before {}", completedCount, now);
         }
         return completedCount;
@@ -285,6 +276,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.AVAILABILITY, key = CacheKeys.AVAILABILITY, sync = true)
     public AvailabilityResponse getAvailability(UUID subFieldId, LocalDate date) {
         validateBookingDateNotPast(date);
         subFieldProjectionService.getRequiredSubField(subFieldId);
@@ -308,6 +300,21 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ─── Private helpers ────────────────────────────────────────────────────────
+
+    private void publishRefundIfEligible(Booking booking) {
+        var config = bookingConfigService.getConfig();
+        if (!Boolean.TRUE.equals(config.getRefundEnabled()) || config.getBookingFee() <= 0) {
+            return;
+        }
+        LocalDateTime refundDeadline = LocalDateTime.of(booking.getBookingDate(), booking.getStartTime())
+                .minusHours(config.getRefundBeforeHours());
+        if (LocalDateTime.now().isBefore(refundDeadline)) {
+            bookingBalanceEventPublisher.publishRefundRequested(
+                    booking,
+                    config.getBookingFee(),
+                    BOOKING_CANCEL_REFUND_REASON);
+        }
+    }
 
     private void validateBooking(SubFieldResponse subField, CreateBookingRequest request) {
         // VALIDATION 1: Sub-field must be ACTIVE

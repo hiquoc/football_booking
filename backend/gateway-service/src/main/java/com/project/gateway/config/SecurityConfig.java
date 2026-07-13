@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .authorizeExchange(auth -> auth
                         .pathMatchers("/api/v1/auth/**").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/payments/webhook").permitAll()
                         .pathMatchers(HttpMethod.GET,
                                 "/api/v1/fields/**", "/api/v1/sub-fields/**",
                                 "/api/v1/field-types/**", "/api/v1/reviews/**",

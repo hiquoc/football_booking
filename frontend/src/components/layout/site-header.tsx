@@ -1,4 +1,4 @@
-import { MapPinned, CalendarRange, Building2, ShieldCheck } from "lucide-react";
+import { MapPinned, CalendarRange, Building2, ShieldCheck, Mail } from "lucide-react";
 import Link from "next/link";
 import { BrandMark } from "@/components/ui/brand-mark";
 import { getCurrentUser } from "@/lib/server/session";
@@ -21,6 +21,9 @@ export async function SiteHeader() {
         >
           <Link className="inline-flex items-center gap-1.5 transition hover:text-sky-600" href="/fields">
             <MapPinned className="size-4" /> Tìm sân
+          </Link>
+          <Link className="inline-flex items-center gap-1.5 transition hover:text-sky-600" href="/contact">
+            <Mail className="size-4" /> Liên hệ
           </Link>
           {user?.userType === "CLIENT" ? (
           <Link

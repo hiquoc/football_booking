@@ -62,6 +62,7 @@ export interface Field {
   status: FieldStatus;
   ratingAverage: number;
   totalReviews: number;
+  isFavorite?: boolean;
   createdAt: string;
   updatedAt: string;
   images: FieldImage[];
@@ -103,6 +104,7 @@ export interface FieldCardData {
   primaryImageUrl: string | null;
   fieldTypes: string[];
   distanceKm: number | null;
+  isFavorite?: boolean;
 }
 
 export interface FieldCardFilters {
@@ -191,9 +193,12 @@ export interface User {
   avatarUrl: string | null;
   userType: "CLIENT" | "OWNER" | "ADMIN";
   status: string;
+  balance: number;
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type PaymentMethod = "STRIPE" | "ACCOUNT_BALANCE";
 
 export type BookingStatus =
   | "PENDING"
@@ -216,6 +221,7 @@ export interface Booking {
   durationMinutes: number;
   pricePerHour: number;
   totalAmount: number;
+  paymentMethod?: PaymentMethod;
   status: BookingStatus;
   note: string | null;
   cancellationReason: string | null;
@@ -237,6 +243,7 @@ export interface CreateBookingInput {
   startTime: string;
   durationMinutes: number;
   note?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface Notification {
@@ -311,6 +318,19 @@ export interface UpdateProfileInput {
   fullName?: string;
 }
 
+export type PaymentStatus = "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED";
+export type PaymentProvider = "STRIPE";
+export interface Payment {
+  id: string; bookingId: string; provider: PaymentProvider; amount: number;
+  currency: string; status: PaymentStatus; failureReason: string | null;
+  expiresAt: string | null;
+  createdAt: string; updatedAt: string;
+}
+export interface CheckoutResponse { paymentId: string; checkoutUrl: string; }
+export interface CreateCheckoutInput {
+  bookingId: string; amount: number; currency: string; provider?: PaymentProvider;
+}
+
 export interface AvatarUploadSlot {
   publicId: string; timestamp: number; signature: string; apiKey: string;
   cloudName: string; uploadUrl: string; overwrite: false;
@@ -323,4 +343,8 @@ export interface BackendTokenResponse {
 
 export interface MutationSuccessResponse {
   success: boolean;
+}
+
+export interface FavoriteCheckResponse {
+  favorite: boolean;
 }

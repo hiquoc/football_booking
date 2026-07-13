@@ -12,6 +12,7 @@ public final class GlobalConstants {
     public static final String HEADER_USER_ID = "X-User-Id";
     public static final String HEADER_USER_ROLE = "X-User-Role";
     public static final String HEADER_USER_EMAIL = "X-User-Email";
+    public static final String HEADER_USER_NAME = "X-User-Name";
 
     // Redis OTP constants
     public static final String REDIS_KEY_OTP_CODE_PREFIX = "otp:code:";

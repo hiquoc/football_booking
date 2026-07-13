@@ -1,7 +1,7 @@
 export default function MainLoading() {
   return (
     <main className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8" aria-busy="true">
-      <p className="text-sm font-bold uppercase tracking-[0.18em] text-sky-600">Football Booking</p>
+      <p className="text-sm font-bold uppercase tracking-[0.18em] text-sky-600">Đặt sân bóng</p>
       <h1 className="mt-2 text-3xl font-black text-slate-950">Đang tải nội dung</h1>
       <p className="mt-2 text-sm text-slate-500">Thông tin cơ bản đã sẵn sàng. Dữ liệu mới nhất đang được tải về.</p>
       <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">

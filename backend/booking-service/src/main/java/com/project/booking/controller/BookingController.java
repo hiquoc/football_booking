@@ -195,20 +195,6 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success("Booking cancelled successfully", response));
     }
 
-    @Operation(
-        summary = "Mock payment confirmation",
-        description = "Mock payment endpoint that marks a pending booking as confirmed"
-    )
-    @PreAuthorize("hasRole('CLIENT')")
-    @PatchMapping("/{bookingId}/mock-payment")
-    public ResponseEntity<ApiResponse<BookingResponse>> confirmMockPayment(
-            @CurrentUser UserPrincipal user,
-            @PathVariable UUID bookingId) {
-
-        BookingResponse response = bookingService.confirmMockPayment(user.id(), bookingId);
-        return ResponseEntity.ok(ApiResponse.success("Payment confirmed successfully", response));
-    }
-
     @Operation(summary = "Get my bookings", description = "Returns paginated booking history for the authenticated client. Supports page, size, and sort query parameters.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(

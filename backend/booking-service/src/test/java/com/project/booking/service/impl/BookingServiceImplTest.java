@@ -1,21 +1,29 @@
 package com.project.booking.service.impl;
 
 import com.project.booking.dto.request.CreateBookingRequest;
+import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.dto.response.TimePriceRuleDto;
+import com.project.booking.cache.AvailabilityCacheService;
 import com.project.booking.entity.Booking;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.kafka.BookingNotificationEventPublisher;
 import com.project.booking.mapper.BookingMapper;
+import com.project.booking.entity.BookingConfig;
+import com.project.booking.kafka.BookingBalanceEventPublisher;
+import com.project.booking.payment.BookingPaymentStrategy;
+import com.project.booking.payment.BookingPaymentStrategyFactory;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
 import com.project.booking.service.ResolvedOperatingHours;
+import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.SubFieldProjectionService;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.PaymentMethod;
 import com.project.common.exception.BadRequestException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,8 +73,35 @@ class BookingServiceImplTest {
     @Mock
     private BookingNotificationEventPublisher bookingNotificationEventPublisher;
 
+    @Mock
+    private BookingConfigService bookingConfigService;
+
+    @Mock
+    private BookingPaymentStrategyFactory paymentStrategyFactory;
+
+    @Mock
+    private BookingBalanceEventPublisher bookingBalanceEventPublisher;
+
+    @Mock
+    private BookingPaymentStrategy bookingPaymentStrategy;
+
+    @Mock
+    private AvailabilityCacheService availabilityCacheService;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient().when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
+                .bookingFee(0L)
+                .refundBeforeHours(24)
+                .refundEnabled(true)
+                .build());
+        org.mockito.Mockito.lenient().when(paymentStrategyFactory.get(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(bookingPaymentStrategy);
+        org.mockito.Mockito.lenient().when(bookingPaymentStrategy.method()).thenReturn(PaymentMethod.STRIPE);
+    }
 
     @Test
     void createBookingDerivesEndTimeFromRequestedDuration() {
@@ -96,6 +132,44 @@ class BookingServiceImplTest {
         assertEquals(LocalTime.of(8, 30), savedBooking.getStartTime());
         assertEquals(LocalTime.of(10, 0), savedBooking.getEndTime());
         assertEquals(90, savedBooking.getDurationMinutes());
+    }
+
+    @Test
+    void createBookingAddsConfiguredFeeAndUsesRequestedPaymentStrategy() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .paymentMethod(PaymentMethod.ACCOUNT_BALANCE)
+                .build();
+
+        when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
+                .bookingFee(5000L)
+                .refundBeforeHours(24)
+                .refundEnabled(true)
+                .build());
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder().build());
+
+        bookingService.createBooking(userId, request);
+
+        ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).saveAndFlush(bookingCaptor.capture());
+        Booking savedBooking = bookingCaptor.getValue();
+        assertEquals(new BigDecimal("105000"), savedBooking.getTotalAmount());
+        assertEquals(PaymentMethod.ACCOUNT_BALANCE, savedBooking.getPaymentMethod());
+        verify(paymentStrategyFactory).get(PaymentMethod.ACCOUNT_BALANCE);
+        verify(bookingPaymentStrategy).onBookingCreated(savedBooking, subField);
     }
 
     @Test
@@ -233,43 +307,6 @@ class BookingServiceImplTest {
     }
 
     @Test
-    void confirmMockPaymentOnlyConfirmsPendingBookingForClient() {
-        UUID userId = UUID.randomUUID();
-        UUID bookingId = UUID.randomUUID();
-        Booking pendingBooking = Booking.builder()
-                .id(bookingId)
-                .clientId(userId)
-                .status(BookingStatus.PENDING)
-                .build();
-        Booking confirmedBooking = Booking.builder()
-                .id(bookingId)
-                .clientId(userId)
-                .status(BookingStatus.CONFIRMED)
-                .build();
-        BookingResponse mappedResponse = BookingResponse.builder()
-                .id(bookingId)
-                .status(BookingStatus.CONFIRMED)
-                .build();
-
-        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(confirmedBooking));
-        when(bookingRepository.confirmPendingBooking(
-                bookingId,
-                userId,
-                BookingStatus.PENDING,
-                BookingStatus.CONFIRMED)).thenReturn(1);
-        when(bookingMapper.toResponse(confirmedBooking)).thenReturn(mappedResponse);
-
-        BookingResponse response = bookingService.confirmMockPayment(userId, bookingId);
-
-        assertEquals(BookingStatus.CONFIRMED, response.getStatus());
-        verify(bookingRepository).confirmPendingBooking(
-                bookingId,
-                userId,
-                BookingStatus.PENDING,
-                BookingStatus.CONFIRMED);
-    }
-
-    @Test
     void expirePendingBookingsOnlyExpiresPendingBookingsOlderThanTimeout() {
         ReflectionTestUtils.setField(bookingService, "paymentTimeoutMinutes", 20);
         ArgumentCaptor<LocalDateTime> expiresBeforeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -307,6 +344,72 @@ class BookingServiceImplTest {
                 eq(BookingStatus.COMPLETED),
                 any(LocalDate.class),
                 any(LocalTime.class));
+    }
+
+    @Test
+    void cancelBookingPublishesBookingFeeRefundWhenEligible() {
+        UUID userId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        CancelBookingRequest request = CancelBookingRequest.builder()
+                .bookingId(bookingId)
+                .reason("Change of plans")
+                .build();
+        Booking cancelled = Booking.builder()
+                .id(bookingId)
+                .clientId(userId)
+                .bookingCode("BK-1")
+                .bookingDate(LocalDate.now().plusDays(3))
+                .startTime(LocalTime.of(8, 0))
+                .status(BookingStatus.CANCELLED)
+                .build();
+
+        when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
+                .bookingFee(5000L)
+                .refundBeforeHours(24)
+                .refundEnabled(true)
+                .build());
+        when(bookingRepository.cancelClientBooking(
+                eq(bookingId), eq(userId), anyCollection(), eq(BookingStatus.CANCELLED),
+                eq("Change of plans"), any(LocalDateTime.class), eq(BookingCancelledBy.CLIENT))).thenReturn(1);
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(cancelled));
+        when(bookingMapper.toResponse(cancelled)).thenReturn(BookingResponse.builder().build());
+
+        bookingService.cancelBooking(userId, request);
+
+        verify(bookingBalanceEventPublisher).publishRefundRequested(cancelled, 5000L, "BOOKING_CANCEL_REFUND");
+    }
+
+    @Test
+    void cancelBookingDoesNotRefundAfterConfiguredWindow() {
+        UUID userId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        CancelBookingRequest request = CancelBookingRequest.builder()
+                .bookingId(bookingId)
+                .reason("Late cancellation")
+                .build();
+        Booking cancelled = Booking.builder()
+                .id(bookingId)
+                .clientId(userId)
+                .bookingCode("BK-2")
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 0))
+                .status(BookingStatus.CANCELLED)
+                .build();
+
+        when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
+                .bookingFee(5000L)
+                .refundBeforeHours(48)
+                .refundEnabled(true)
+                .build());
+        when(bookingRepository.cancelClientBooking(
+                eq(bookingId), eq(userId), anyCollection(), eq(BookingStatus.CANCELLED),
+                eq("Late cancellation"), any(LocalDateTime.class), eq(BookingCancelledBy.CLIENT))).thenReturn(1);
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(cancelled));
+        when(bookingMapper.toResponse(cancelled)).thenReturn(BookingResponse.builder().build());
+
+        bookingService.cancelBooking(userId, request);
+
+        verify(bookingBalanceEventPublisher, never()).publishRefundRequested(any(), anyLong(), any());
     }
 
     private SubFieldResponse activeSubField(UUID subFieldId) {

@@ -6,6 +6,7 @@ export const fieldQueryKeys = {
   details: (id: string) => [...fieldQueryKeys.detail(id), "details"] as const,
   cards: (page: number, size = 9, filters: object = {}) =>
     [...fieldQueryKeys.all, "cards", { page, size, filters }] as const,
+  favorites: ["fields", "favorites"] as const,
   operatingHours: (id: string) =>
     [...fieldQueryKeys.detail(id), "operating-hours"] as const,
   subFields: (id: string) => ["sub-fields", id] as const,
@@ -21,6 +22,11 @@ export const bookingQueryKeys = {
   detail: (id: string) => [...bookingQueryKeys.all, id] as const,
   availability: (subFieldId: string, date: string) =>
     ["availability", subFieldId, date] as const,
+};
+
+export const paymentQueryKeys = {
+  all: ["payments"] as const,
+  byBooking: (bookingId: string) => [...paymentQueryKeys.all, bookingId] as const,
 };
 
 export const userQueryKeys = {

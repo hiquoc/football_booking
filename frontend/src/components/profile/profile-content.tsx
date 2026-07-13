@@ -11,7 +11,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useProfile, useUpdateProfile, useUploadAvatar } from "@/lib/hooks/use-profile";
-import { DataError, ListSkeleton } from "@/components/ui/data-state";
+import { DataError, ProfileSkeleton } from "@/components/ui/data-state";
 
 const roleNames = {
   CLIENT: "Người chơi",
@@ -22,7 +22,7 @@ const roleNames = {
 export function ProfileContent() {
   const profile = useProfile();
 
-  if (profile.isPending) return <ListSkeleton count={2} />;
+  if (profile.isPending) return <ProfileSkeleton />;
   if (profile.isError) return <DataError title="Không thể tải hồ sơ" />;
   return (
     <ProfileForm

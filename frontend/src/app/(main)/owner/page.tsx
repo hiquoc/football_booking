@@ -34,7 +34,7 @@ export default function OwnerPage() {
           <CalendarRange className="size-6 text-sky-400" />
           <h2 className="mt-5 text-xl font-black">Quản lý lịch đặt</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Xem booking mới nhất từ khách hàng.
+            Xem lịch đặt mới nhất từ khách hàng.
           </p>
           <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-sky-400">
             Mở danh sách <ArrowRight className="size-4" />

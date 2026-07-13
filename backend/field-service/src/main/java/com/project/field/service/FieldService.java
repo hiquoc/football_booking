@@ -21,11 +21,11 @@ public interface FieldService {
     FieldDto getById(UUID id);
     FieldDto getWithDetailsById(UUID id, UserPrincipal currentUser);
     PageResponse<FieldDto> getByOwnerId(UUID ownerId, Pageable pageable);
-    PageResponse<FieldDto> getAll(FieldStatus status, Pageable pageable);
+    PageResponse<FieldDto> getAll(FieldStatus status, Pageable pageable, UserPrincipal currentUser);
     FieldDto updateStatus(UUID id, FieldStatus status);
     PageResponse<FieldCardDto> searchCards(String fieldType, String subFieldType, String district, String provinceCode,
             BigDecimal latitude, BigDecimal longitude, Double radiusKm, String sortBy, String direction,
-            int page, int size);
+            int page, int size, UserPrincipal currentUser);
     List<FieldImageDto> addImages(UUID fieldId, List<String> imageUrls);
     List<FieldImageDto> uploadImages(UUID fieldId, List<MultipartFile> files);
     List<FieldImageDto> updateImageOrder(UUID fieldId, FieldImageOrderRequest request);

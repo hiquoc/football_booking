@@ -40,6 +40,19 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.add.type.headers: true
+    consumer:
+      client-id: user-service-balance-consumer
+      group-id: user-service-balance
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      enable-auto-commit: false
+      properties:
+        spring.json.trusted.packages: com.project.common.events.notification
+        spring.json.use.type.headers: true
+    listener:
+      ack-mode: record
+      missing-topics-fatal: false
   security:
     oauth2:
       client:
@@ -67,6 +80,14 @@ jwt:
 internal:
   gateway:
     secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+
+chat:
+  n8n:
+    url: ${N8N_URL}
+    key: ${N8N_KEY}
+    timeout: ${N8N_TIMEOUT:20s}
+    connect-timeout: ${N8N_CONNECT_TIMEOUT:5s}
+    max-retries: ${N8N_MAX_RETRIES:2}
 
 cloudinary:
   cloud_name: ${CLOUDINARY_CLOUD_NAME}

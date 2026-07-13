@@ -29,6 +29,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Spring WebClient for non-blocking outbound calls -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
         <!-- Spring Boot OAuth2 Client -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -18,6 +18,8 @@ spring:
       port: 6379
   kafka:
     bootstrap-servers: localhost:9092
+    consumer:
+      group-id: user-service-test
   security:
     oauth2:
       client:
@@ -44,6 +46,15 @@ internal:
   gateway:
     secret: test-internal-gateway-secret
     enforce-secret: true
+
+chat:
+  n8n:
+    url: http://localhost:5678/webhook/test
+    key: test-key
+    timeout: 1s
+    connect-timeout: 1s
+    max-retries: 0
+
 cloudinary:
   cloud_name: test-cloud
   api_key: test-key

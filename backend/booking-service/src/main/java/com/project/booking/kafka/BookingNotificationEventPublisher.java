@@ -6,7 +6,6 @@ import com.project.common.events.notification.BookingCancelledEvent;
 import com.project.common.events.notification.BookingConfirmedEvent;
 import com.project.common.events.notification.BookingCreatedEvent;
 import com.project.common.events.notification.NotificationEventTopics;
-import com.project.common.events.notification.PaymentSuccessEvent;
 import com.project.common.outbox.dto.OutboxSaveRequest;
 import com.project.common.outbox.service.OutboxService;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -73,18 +71,6 @@ public class BookingNotificationEventPublisher {
                         booking.getTotalAmount(),
                         Instant.now()));
         log.info("Stored booking confirmed notification outbox event: bookingId={}", booking.getId());
-    }
-
-    public void publishPaymentSuccess(Booking booking, String userEmail) {
-        save(booking, NotificationEventTopics.PAYMENT_SUCCESS, new PaymentSuccessEvent(
-                        UUID.randomUUID(),
-                        booking.getId(),
-                        booking.getBookingCode(),
-                        booking.getClientId(),
-                        userEmail,
-                        booking.getTotalAmount(),
-                        Instant.now()));
-        log.info("Stored payment success notification outbox event: bookingId={}", booking.getId());
     }
 
     private void save(Booking booking, String topic, Object payload) {

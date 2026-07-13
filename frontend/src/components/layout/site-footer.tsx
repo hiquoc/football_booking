@@ -10,6 +10,7 @@ export function SiteFooter() {
         </Link>
         <nav className="flex flex-wrap gap-4 text-sm font-bold text-slate-500">
           <Link href="/fields">Tìm sân</Link>
+          <Link href="/contact">Liên hệ</Link>
           <Link href="/bookings">Lịch đặt</Link>
           <Link href="/profile">Hồ sơ</Link>
         </nav>

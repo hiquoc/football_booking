@@ -40,10 +40,3 @@ export function submitCancellation(id: string, reason?: string, owner = false) {
     { method: "PATCH", ...jsonBody({ reason }) },
   );
 }
-
-export function submitMockPayment(id: string) {
-  return requestJson<Booking>(
-    `/api/bookings/${encodeURIComponent(id)}/payment`,
-    { method: "PATCH" },
-  );
-}

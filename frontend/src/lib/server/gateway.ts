@@ -2,7 +2,7 @@ import "server-only";
 
 import type { ApiResponse, ErrorResponse } from "@/lib/api/types";
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
+export const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
 
 export class ApiError extends Error {
   constructor(

@@ -58,6 +58,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
         String userIdStr = request.getHeader(GlobalConstants.HEADER_USER_ID);
         String userRole = request.getHeader(GlobalConstants.HEADER_USER_ROLE);
         String userEmail = request.getHeader(GlobalConstants.HEADER_USER_EMAIL);
+        String userName = request.getHeader(GlobalConstants.HEADER_USER_NAME);
 
         if (StringUtils.hasText(userIdStr) && StringUtils.hasText(userRole)) {
             try {
@@ -67,7 +68,8 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
                 UserPrincipal principal = new UserPrincipal(
                         userId,
                         StringUtils.hasText(userEmail) ? userEmail : null,
-                        userRole);
+                        userRole,
+                        StringUtils.hasText(userName) ? userName : null);
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         principal,

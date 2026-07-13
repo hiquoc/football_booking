@@ -40,15 +40,6 @@ public interface BookingService {
     BookingResponse cancelBookingByOwner(UUID ownerId, CancelBookingRequest request);
 
     /**
-     * Mock payment confirmation endpoint. Confirms a pending booking for now.
-     *
-     * @param userId    the authenticated client's ID
-     * @param bookingId the booking to confirm
-     * @return the updated booking response
-     */
-    BookingResponse confirmMockPayment(UUID userId, UUID bookingId);
-
-    /**
      * Expires pending bookings older than the configured payment timeout.
      *
      * @return number of bookings expired

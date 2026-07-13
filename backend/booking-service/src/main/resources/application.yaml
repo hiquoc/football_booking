@@ -64,7 +64,7 @@ eureka:
     prefer-ip-address: true
 
 booking:
-  payment-timeout-minutes: 15
+  payment-timeout-minutes: 35
   expiration-scheduler-fixed-delay-ms: 60000
   completion-scheduler-fixed-delay-ms: 300000
 

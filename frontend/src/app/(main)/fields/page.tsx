@@ -3,6 +3,7 @@ import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { MapPinned } from "lucide-react";
 import { FieldListContent } from "@/components/fields/field-list-content";
 import { prefetchFieldCards } from "@/lib/server/field-query-cache";
+import { getCurrentUser } from "@/lib/server/session";
 import type { FieldCardFilters } from "@/lib/api/types";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default async function FieldsPage({
   const pageNumber = parsePageNumber(single(params.page));
   const filters = parseFilters(params);
   const pageIndex = pageNumber - 1;
+  const user = await getCurrentUser();
   const queryClient = await prefetchFieldCards(pageIndex, 9, filters);
 
   return (
@@ -26,7 +28,11 @@ export default async function FieldsPage({
       <FieldsHero />
       <section className="mx-auto w-full max-w-[90rem] px-5 py-12 sm:px-8 sm:py-16">
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <FieldListContent pageNumber={pageNumber} filters={filters} />
+          <FieldListContent
+            pageNumber={pageNumber}
+            filters={filters}
+            viewerRole={user?.userType ?? null}
+          />
         </HydrationBoundary>
       </section>
     </div>

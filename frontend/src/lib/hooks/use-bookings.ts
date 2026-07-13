@@ -14,7 +14,6 @@ import {
   fetchOwnerBookings,
   submitBooking,
   submitCancellation,
-  submitMockPayment,
 } from "@/lib/client/bookings";
 import { bookingQueryKeys } from "@/lib/query-keys";
 
@@ -96,22 +95,10 @@ export function useCancelBooking(owner = false) {
       const snapshot = queryClient.getQueriesData({ queryKey: bookingQueryKeys.all });
       const update = (booking: Booking) => booking.id === id ? { ...booking, status: "CANCELLED" as const, cancellationReason: reason ?? null } : booking;
       queryClient.setQueryData<Booking>(bookingQueryKeys.detail(id), (old) => old ? update(old) : old);
-      queryClient.setQueriesData<PageResponse<Booking>>({ queryKey: bookingQueryKeys.all }, (old) => old ? { ...old, content: old.content.map(update) } : old);
+      queryClient.setQueriesData<PageResponse<Booking>>({ queryKey: bookingQueryKeys.all }, (old) => old ? { ...old, content: old.content?.map(update) } : old);
       return snapshot;
     },
     onError: (_error, _variables, snapshot) => snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data)),
-    onSuccess: (booking) => {
-      queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
-      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
-    },
-  });
-}
-
-export function useMockPayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: submitMockPayment,
-    retry: false,
     onSuccess: (booking) => {
       queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });

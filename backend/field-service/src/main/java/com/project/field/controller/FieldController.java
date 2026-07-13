@@ -215,9 +215,10 @@ public class FieldController {
             @RequestParam(defaultValue = "rating") String sortBy,
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(defaultValue = "12") int size,
+            @CurrentUser UserPrincipal currentUser) {
         return ApiResponse.success(fieldService.searchCards(fieldType, subFieldType, district, provinceCode,
-                latitude, longitude, radiusKm, sortBy, direction, page, size));
+                latitude, longitude, radiusKm, sortBy, direction, page, size, currentUser));
     }
 
     @Operation(
@@ -297,8 +298,9 @@ public class FieldController {
     public ApiResponse<PageResponse<FieldDto>> getAll(
             @RequestParam(required = false) FieldStatus status,
             @Parameter(hidden = true)
-            Pageable pageable) {
-        return ApiResponse.success(fieldService.getAll(status, pageable));
+            Pageable pageable,
+            @CurrentUser UserPrincipal currentUser) {
+        return ApiResponse.success(fieldService.getAll(status, pageable, currentUser));
     }
 
     @Operation(summary = "Update field approval status", description = "Allows an administrator to mark a field as pending, approved, or rejected.")

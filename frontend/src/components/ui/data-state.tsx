@@ -44,3 +44,53 @@ export function ListSkeleton({ count = 3 }: { count?: number }) {
     </div>
   );
 }
+
+export function DetailSkeleton() {
+  return (
+    <div className="animate-pulse" aria-busy="true" aria-label="Đang tải nội dung">
+      <div className="mb-5 h-5 w-32 rounded bg-slate-200" />
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white">
+          <div className="h-44 bg-slate-200" />
+          <div className="space-y-4 p-6 sm:p-8">
+            <div className="h-8 w-2/3 rounded bg-slate-200" />
+            <div className="h-5 w-1/2 rounded bg-slate-100" />
+            <div className="grid gap-4 pt-4 sm:grid-cols-2">
+              <div className="h-24 rounded-2xl bg-slate-100" />
+              <div className="h-24 rounded-2xl bg-slate-100" />
+            </div>
+          </div>
+        </div>
+        <div className="h-72 rounded-[2rem] bg-slate-200" />
+      </div>
+    </div>
+  );
+}
+
+export function FormSkeleton() {
+  return (
+    <div className="grid animate-pulse gap-7 lg:grid-cols-[minmax(0,1fr)_22rem]" aria-busy="true" aria-label="Đang tải biểu mẫu">
+      <div className="space-y-6 rounded-[2rem] border border-slate-200 bg-white p-6 sm:p-8">
+        <div className="h-8 w-1/2 rounded bg-slate-200" />
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="h-24 rounded-2xl bg-slate-100" />
+        ))}
+      </div>
+      <div className="h-80 rounded-[2rem] bg-slate-200" />
+    </div>
+  );
+}
+
+export function ProfileSkeleton() {
+  return (
+    <div className="grid animate-pulse gap-7 lg:grid-cols-[19rem_minmax(0,1fr)]" aria-busy="true" aria-label="Đang tải hồ sơ">
+      <div className="h-72 rounded-[2rem] bg-slate-200" />
+      <div className="space-y-5 rounded-[2rem] border border-slate-200 bg-white p-6 sm:p-8">
+        <div className="h-8 w-48 rounded bg-slate-200" />
+        <div className="h-16 rounded-2xl bg-slate-100" />
+        <div className="h-16 rounded-2xl bg-slate-100" />
+        <div className="h-28 rounded-2xl bg-slate-100" />
+      </div>
+    </div>
+  );
+}

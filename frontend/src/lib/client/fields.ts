@@ -4,6 +4,7 @@ import type {
   FieldCardFilters,
   FieldDetails,
   FieldStatus,
+  FavoriteCheckResponse,
   OperatingHours,
   PageResponse,
   Review,
@@ -74,4 +75,28 @@ export function submitFieldStatus(id: string, status: FieldStatus) {
     method: "PATCH",
     ...jsonBody({ status }),
   });
+}
+
+export function fetchFavoriteFields() {
+  return requestJson<Field[]>("/api/users/me/favorites");
+}
+
+export function addFavoriteField(fieldId: string) {
+  return requestJson<Field>(
+    `/api/users/me/favorites/${encodeURIComponent(fieldId)}`,
+    { method: "POST" },
+  );
+}
+
+export function removeFavoriteField(fieldId: string) {
+  return requestJson<void>(
+    `/api/users/me/favorites/${encodeURIComponent(fieldId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function checkFavoriteField(fieldId: string) {
+  return requestJson<FavoriteCheckResponse>(
+    `/api/users/me/favorites/check/${encodeURIComponent(fieldId)}`,
+  );
 }

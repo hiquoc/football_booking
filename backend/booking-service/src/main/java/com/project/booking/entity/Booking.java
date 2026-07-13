@@ -2,6 +2,7 @@ package com.project.booking.entity;
 
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.PaymentMethod;
 import com.project.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -64,6 +65,11 @@ public class Booking extends BaseEntity {
 
     @Column(name = "total_amount", precision = 10, scale = 2, nullable = false)
     private BigDecimal totalAmount;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 30, nullable = false)
+    private PaymentMethod paymentMethod = PaymentMethod.STRIPE;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

@@ -175,16 +175,6 @@ class BookingControllerApiTest {
     }
 
     @Test
-    void confirmMockPaymentWithClientHeaderReturnsOk() throws Exception {
-        when(bookingService.confirmMockPayment(USER_ID, BOOKING_ID)).thenReturn(bookingResponse());
-
-        mockMvc.perform(patch("/api/v1/bookings/{bookingId}/mock-payment", BOOKING_ID)
-                        .headers(clientHeaders()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Payment confirmed successfully"));
-    }
-
-    @Test
     void getMyBookingsWithClientHeaderReturnsList() throws Exception {
         when(bookingService.getMyBookings(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(bookingPageResponse());
