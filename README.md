@@ -1,7 +1,7 @@
 # Football Field Booking System
 [![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/hiquoc/football_booking)
 
-This repository contains the backend microservices for a comprehensive Football Field Booking platform. The system allows field owners to manage their venues, sub-fields, and pricing, while clients can search for available slots and make bookings.
+This repository contains a full-stack Football Field Booking platform. The system allows field owners to manage venues, sub-fields, schedules, pricing, images, and bookings, while clients can search available slots, book fields, pay online, and receive real-time notifications.
 
 ## Architecture
 
@@ -33,15 +33,26 @@ The system is built on a microservices architecture, promoting separation of con
     -   Implements pricing logic based on time-based rules.
     -   Includes a scheduler to automatically expire unpaid, `PENDING` bookings.
 
--   **Notification Service (`notification-service`):** A placeholder service designed to consume notification events from Kafka and send alerts, such as booking confirmations via email.
+-   **Payment Service (`payment-service`):** Owns payment sessions, provider integration, and booking payment projections.
+    -   Creates Stripe checkout sessions for card payments.
+    -   Handles provider webhook events idempotently.
+    -   Publishes payment result events consumed by the Booking Service.
+
+-   **Notification Service (`notification-service`):** Consumes notification events and delivers user-facing alerts.
+    -   Sends email notifications using HTML templates.
     -   Delivers in-app notifications in real time over authenticated STOMP/WebSocket connections.
     -   The browser obtains a 60-second WebSocket ticket through the Next.js BFF; access and refresh tokens remain HttpOnly.
     -   WebSocket handshakes pass through the API gateway, which validates the ticket and relays trusted user headers to the notification service.
 
+-   **Frontend (`frontend`):** A Next.js App Router application with a BFF layer.
+    -   Provides client, owner, and admin experiences.
+    -   Keeps access and refresh tokens in HttpOnly cookies.
+    -   Proxies browser requests through server-side route handlers to the API Gateway.
+
 ### Data Flow & Communication
 
--   **Synchronous:** Client -> Gateway -> Downstream Service (for user actions).
--   **Asynchronous (Event-Driven):** `Field Service` publishes data updates to Kafka. `Booking Service` consumes these events to update its internal database projections. This decouples the booking process from the field management process, enhancing performance and resilience.
+-   **Synchronous:** Browser -> Next.js BFF -> Gateway -> Downstream Service.
+-   **Asynchronous (Event-Driven):** Field, booking, payment, and notification workflows communicate through Kafka topics. The Booking Service keeps local projections of field data, and payment/notification events are processed with inbox/outbox-style handlers for idempotency and resilience.
 
 ## Key Features
 
@@ -61,22 +72,35 @@ The system is built on a microservices architecture, promoting separation of con
     -   Real-time availability checks for any given date.
 -   **Booking Workflow:**
     -   Bookings start in a `PENDING` state.
-    -   A mock payment endpoint transitions the booking to `CONFIRMED`.
+    -   Payments can be completed through Stripe checkout or user balance.
+    -   Payment events transition bookings to confirmed, failed, expired, or cancelled states.
     -   A background scheduler automatically moves untended `PENDING` bookings to `EXPIRED`.
     -   Bookings can be cancelled by the client or the field owner.
     -   A booking spanning multiple price periods is charged proportionally for each overlapping period; the final VND amount is rounded up to the nearest `1,000`.
+-   **Payments & Notifications:**
+    -   Stripe checkout session creation and webhook handling.
+    -   User balance deduction and refund event flow.
+    -   In-app, WebSocket, and email notification delivery.
 -   **Image & Review System:**
     -   Multi-file image uploads for fields managed via Cloudinary.
     -   Ability to re-order images and set a primary cover photo.
     -   Clients can submit ratings and comments for fields, which automatically updates the field's average rating.
+-   **Frontend Application:**
+    -   Search and field detail pages.
+    -   Booking and payment screens.
+    -   Owner field, schedule, image, closure, and booking management.
+    -   Admin field, field type, and user management.
 
 ## Technology Stack
 
+-   **Frontend:** Next.js 16, React 19, TypeScript, TanStack Query, Tailwind CSS
 -   **Backend:** Java 21, Spring Boot 3, Spring Cloud (Gateway, Eureka), Spring Data JPA, Spring Security, Spring Kafka
 -   **Databases:** PostgreSQL (per-service), Redis (for caching, OTP, and session tracking)
--   **Messaging:** Apache Kafka & Zookeeper
+-   **Messaging:** Apache Kafka
+-   **Payments:** Stripe Checkout and webhooks
 -   **Image Storage:** Cloudinary
--   **Build & Dependencies:** Maven
+-   **Build & Dependencies:** Maven, npm
+-   **Containerization:** Docker and Docker Compose
 -   **API Documentation:** OpenAPI 3 (Swagger UI)
 
 ## Getting Started
@@ -85,8 +109,9 @@ The system is built on a microservices architecture, promoting separation of con
 
 -   Java 21 SDK
 -   Apache Maven
+-   Node.js and npm
 -   Docker and Docker Compose
--   Docker and Docker Compose can start local PostgreSQL, Kafka, and Redis for development.
+-   Docker and Docker Compose can start the full local stack for development.
 
 ### 1. Environment Configuration
 
@@ -102,6 +127,7 @@ USER_DB_URL=jdbc:postgresql://localhost:5432/user_db
 FIELD_DB_URL=jdbc:postgresql://localhost:5432/field_db
 BOOKING_DB_URL=jdbc:postgresql://localhost:5432/booking_db
 NOTIFICATION_DB_URL=jdbc:postgresql://localhost:5432/notification_db
+PAYMENT_DB_URL=jdbc:postgresql://localhost:5432/payment_db
 *_DB_USERNAME=football
 *_DB_PASSWORD=football
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
@@ -109,6 +135,8 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
 INTERNAL_GATEWAY_SECRET=dev-internal-gateway-secret
+API_BASE_URL=http://localhost:8080
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_GATEWAY_WS_URL=ws://localhost:8080/ws
 ```
 
@@ -131,6 +159,10 @@ BOOKING_DB_PASSWORD=your_password
 NOTIFICATION_DB_URL=jdbc:postgresql://localhost:5432/notification_db
 NOTIFICATION_DB_USERNAME=your_username
 NOTIFICATION_DB_PASSWORD=your_password
+
+PAYMENT_DB_URL=jdbc:postgresql://localhost:5432/payment_db
+PAYMENT_DB_USERNAME=your_username
+PAYMENT_DB_PASSWORD=your_password
 
 # JWT Configuration
 JWT_SECRET=your_super_strong_base64_encoded_jwt_secret_key
@@ -156,20 +188,31 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
+
+# Stripe
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+
+# Frontend/BFF
+API_BASE_URL=http://localhost:8080
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_GATEWAY_WS_URL=wss://your-domain.example/ws
 ```
 
-### 2. Run Infrastructure
+### 2. Run With Docker Compose
 
-Start the local PostgreSQL, Kafka, and Redis containers using Docker Compose.
+Start the full local stack using Docker Compose.
 
 ```bash
 cd backend/
 docker-compose up -d
 ```
 
-### 3. Run Microservices
+The frontend is available at `http://localhost:3000`, and the API Gateway is available at `http://localhost:8080`.
 
-Start each microservice in a separate terminal. It is recommended to start them in the following order to ensure dependencies are available.
+### 3. Run Services Manually
+
+If you prefer running services outside Docker, start PostgreSQL, Kafka, Redis, and Mailpit first, then run each service in a separate terminal. It is recommended to start them in the following order to ensure dependencies are available.
 
 1.  **Discovery Service:**
     ```bash
@@ -200,13 +243,26 @@ Start each microservice in a separate terminal. It is recommended to start them 
     mvn spring-boot:run
     ```
 
-6.  **Gateway Service:**
+6.  **Payment Service:**
+    ```bash
+    cd backend/payment-service/
+    mvn spring-boot:run
+    ```
+
+7.  **Gateway Service:**
     ```bash
     cd backend/gateway-service/
     mvn spring-boot:run
     ```
 
-The system is now running. The API Gateway is accessible at `http://localhost:8080`.
+8.  **Frontend:**
+    ```bash
+    cd frontend/
+    npm install
+    npm run dev
+    ```
+
+The system is now running. The frontend is accessible at `http://localhost:3000`, and the API Gateway is accessible at `http://localhost:8080`.
 
 ### Development demo data
 
@@ -227,5 +283,23 @@ Each service exposes its own OpenAPI (Swagger) documentation. After starting the
 -   **User Service:** `http://localhost:8081/swagger-ui.html`
 -   **Field Service:** `http://localhost:8082/swagger-ui.html`
 -   **Booking Service:** `http://localhost:8083/swagger-ui.html`
+-   **Notification Service:** `http://localhost:8084/swagger-ui.html`
+-   **Payment Service:** `http://localhost:8085/swagger-ui.html`
 
 All API calls should be made through the Gateway at `http://localhost:8080`. The Swagger UIs for the individual services are useful for exploring the available endpoints.
+
+## Verification
+
+Before committing, run:
+
+```bash
+cd frontend
+npm run lint
+npm run typecheck
+npm test
+npm run build
+
+cd ../backend
+./mvnw test
+docker compose config
+```
