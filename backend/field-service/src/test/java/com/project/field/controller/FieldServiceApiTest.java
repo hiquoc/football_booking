@@ -99,7 +99,31 @@ class FieldServiceApiTest {
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
                 eq("79"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                eq("rating"),
+                eq("desc"),
+                eq(0),
+                eq(12),
+                org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
+    void fieldCardSearchFiltersByKeyword() throws Exception {
+        mockMvc.perform(get("/api/v1/fields/cards")
+                        .param("keyword", "ABC")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
+                .andExpect(status().isOk());
+
+        verify(fieldService).searchCards(
+                eq("ABC"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(),

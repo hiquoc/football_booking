@@ -108,6 +108,7 @@ export interface FieldCardData {
 }
 
 export interface FieldCardFilters {
+  keyword?: string;
   fieldType?: string;
   subFieldType?: string;
   district?: string;

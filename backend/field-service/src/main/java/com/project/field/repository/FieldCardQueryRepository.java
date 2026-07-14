@@ -38,6 +38,7 @@ public class FieldCardQueryRepository {
     private final EntityManager entityManager;
 
     public Page<FieldCardDto> search(
+            String keyword,
             String fieldType,
             String subFieldType,
             String district,
@@ -71,6 +72,9 @@ public class FieldCardQueryRepository {
         StringBuilder where = new StringBuilder("""
                 WHERE f.status = 'APPROVED' AND f.active = true AND f.deleted = false
                 """);
+        if (keyword != null && !keyword.isBlank()) {
+            where.append(" AND vietnamese_search_normalize(f.name) LIKE '%' || vietnamese_search_normalize(:keyword) || '%'");
+        }
         if (fieldType != null && !fieldType.isBlank()) {
             where.append(" AND EXISTS (SELECT 1 FROM field_field_types fft JOIN field_types ft ON ft.id = fft.field_type_id WHERE fft.field_id = f.id AND ft.deleted = false AND ft.active = true AND ft.sport_type = :fieldType)");
         }
@@ -105,8 +109,8 @@ public class FieldCardQueryRepository {
 
         Query dataQuery = entityManager.createNativeQuery(selectSql);
         Query countQuery = entityManager.createNativeQuery(countSql);
-        bind(dataQuery, fieldType, subFieldType, district, provinceCode, latitude, longitude, radiusKm, hasLocation);
-        bind(countQuery, fieldType, subFieldType, district, provinceCode, latitude, longitude, radiusKm, hasLocation && radiusKm != null);
+        bind(dataQuery, keyword, fieldType, subFieldType, district, provinceCode, latitude, longitude, radiusKm, hasLocation);
+        bind(countQuery, keyword, fieldType, subFieldType, district, provinceCode, latitude, longitude, radiusKm, hasLocation && radiusKm != null);
         if (userId != null) dataQuery.setParameter("userId", userId);
         dataQuery.setFirstResult(safePage * safeSize);
         dataQuery.setMaxResults(safeSize);
@@ -118,8 +122,9 @@ public class FieldCardQueryRepository {
         return new PageImpl<>(cards, PageRequest.of(safePage, safeSize), total);
     }
 
-    private void bind(Query query, String fieldType, String subFieldType, String district, String provinceCode,
+    private void bind(Query query, String keyword, String fieldType, String subFieldType, String district, String provinceCode,
             BigDecimal latitude, BigDecimal longitude, Double radiusKm, boolean bindLocation) {
+        if (keyword != null && !keyword.isBlank()) query.setParameter("keyword", keyword);
         if (fieldType != null && !fieldType.isBlank()) query.setParameter("fieldType", fieldType);
         if (subFieldType != null && !subFieldType.isBlank()) query.setParameter("subFieldType", subFieldType);
         if (district != null && !district.isBlank()) query.setParameter("district", district);

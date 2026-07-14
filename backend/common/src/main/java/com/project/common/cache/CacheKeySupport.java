@@ -13,7 +13,8 @@ public final class CacheKeySupport {
     private CacheKeySupport() {
     }
 
-    public static String fieldSearch(String fieldType,
+    public static String fieldSearch(String keyword,
+                                     String fieldType,
                                      String subFieldType,
                                      String district,
                                      String provinceCode,
@@ -29,6 +30,7 @@ public final class CacheKeySupport {
                 ? "anonymous"
                 : currentUser.role() + ":" + currentUser.id();
         StringJoiner joiner = new StringJoiner("|");
+        joiner.add(normalize(keyword));
         joiner.add(normalize(fieldType));
         joiner.add(normalize(subFieldType));
         joiner.add(normalize(district));

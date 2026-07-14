@@ -143,7 +143,7 @@ function FieldFilters({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const params = new URLSearchParams();
-    ["fieldType", "subFieldType", "district", "provinceCode", "latitude", "longitude", "radiusKm"].forEach((key) => {
+    ["keyword", "fieldType", "subFieldType", "district", "provinceCode", "latitude", "longitude", "radiusKm"].forEach((key) => {
       const value = String(form.get(key) ?? "").trim();
       if (value) params.set(key, value);
     });
@@ -195,6 +195,16 @@ function FieldFilters({
 
   return (
     <form onSubmit={submit} className="mb-10 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <label className="mb-4 block text-sm font-bold text-slate-700">
+        Tên sân
+        <input
+          name="keyword"
+          type="search"
+          defaultValue={filters.keyword ?? ""}
+          placeholder="Nhập tên sân"
+          className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-sky-500"
+        />
+      </label>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <FilterSelect name="fieldType" label="Môn thể thao" defaultValue={filters.fieldType} options={sports} />
         <FilterSelect name="subFieldType" label="Loại sân" defaultValue={filters.subFieldType} options={subFieldTypes} />

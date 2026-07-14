@@ -4,6 +4,7 @@ import { routeError } from "@/lib/server/route-response";
 import type { FieldCardFilters } from "@/lib/api/types";
 
 const filterKeys = [
+  "keyword",
   "fieldType",
   "subFieldType",
   "district",

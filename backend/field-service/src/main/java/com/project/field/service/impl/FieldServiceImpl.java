@@ -145,10 +145,10 @@ public class FieldServiceImpl implements FieldService {
     @Override
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = CacheNames.FIELD_SEARCH, key = CacheKeys.FIELD_SEARCH, sync = true)
-    public PageResponse<FieldCardDto> searchCards(String fieldType, String subFieldType, String district, String provinceCode,
+    public PageResponse<FieldCardDto> searchCards(String keyword, String fieldType, String subFieldType, String district, String provinceCode,
                                                   BigDecimal latitude, BigDecimal longitude, Double radiusKm, String sortBy, String direction,
                                                   int page, int size, UserPrincipal currentUser) {
-        return PageResponse.from(fieldCardQueryRepository.search(fieldType, subFieldType, district, provinceCode,
+        return PageResponse.from(fieldCardQueryRepository.search(keyword, fieldType, subFieldType, district, provinceCode,
                 latitude, longitude, radiusKm, sortBy, direction, page, size,
                 currentUser != null && "CLIENT".equals(currentUser.role()) ? currentUser.id() : null));
     }

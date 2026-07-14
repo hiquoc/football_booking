@@ -75,6 +75,7 @@ function parseFilters(
   const sortBy = value("sortBy");
   const direction = value("direction");
   return {
+    keyword: value("keyword"),
     fieldType: value("fieldType"),
     subFieldType: value("subFieldType"),
     district: value("district"),

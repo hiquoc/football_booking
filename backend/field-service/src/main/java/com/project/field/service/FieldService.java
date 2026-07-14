@@ -23,7 +23,7 @@ public interface FieldService {
     PageResponse<FieldDto> getByOwnerId(UUID ownerId, Pageable pageable);
     PageResponse<FieldDto> getAll(FieldStatus status, Pageable pageable, UserPrincipal currentUser);
     FieldDto updateStatus(UUID id, FieldStatus status);
-    PageResponse<FieldCardDto> searchCards(String fieldType, String subFieldType, String district, String provinceCode,
+    PageResponse<FieldCardDto> searchCards(String keyword, String fieldType, String subFieldType, String district, String provinceCode,
             BigDecimal latitude, BigDecimal longitude, Double radiusKm, String sortBy, String direction,
             int page, int size, UserPrincipal currentUser);
     List<FieldImageDto> addImages(UUID fieldId, List<String> imageUrls);

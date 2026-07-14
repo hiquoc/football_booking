@@ -205,6 +205,7 @@ public class FieldController {
     @Operation(summary = "Search compact field cards", description = "Optimized public search returning only card data and one primary image.")
     @GetMapping("/cards")
     public ApiResponse<PageResponse<FieldCardDto>> searchCards(
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String fieldType,
             @RequestParam(required = false) String subFieldType,
             @RequestParam(required = false) String district,
@@ -217,7 +218,7 @@ public class FieldController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @CurrentUser UserPrincipal currentUser) {
-        return ApiResponse.success(fieldService.searchCards(fieldType, subFieldType, district, provinceCode,
+        return ApiResponse.success(fieldService.searchCards(keyword, fieldType, subFieldType, district, provinceCode,
                 latitude, longitude, radiusKm, sortBy, direction, page, size, currentUser));
     }
 

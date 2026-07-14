@@ -17,9 +17,9 @@ class CacheKeySupportTest {
     void fieldSearchKeyIsStableForEquivalentParameters() {
         UserPrincipal user = new UserPrincipal(UUID.randomUUID(), "client@example.com", "CLIENT");
 
-        String first = CacheKeySupport.fieldSearch("FOOTBALL", "FIVE_A_SIDE", "District 1", "HCM",
+        String first = CacheKeySupport.fieldSearch("ABC", "FOOTBALL", "FIVE_A_SIDE", "District 1", "HCM",
                 new BigDecimal("10.123"), new BigDecimal("106.456"), 5.0, "rating", "DESC", 0, 20, user);
-        String second = CacheKeySupport.fieldSearch(" football ", "five_a_side", "district 1", "hcm",
+        String second = CacheKeySupport.fieldSearch(" abc ", " football ", "five_a_side", "district 1", "hcm",
                 new BigDecimal("10.123"), new BigDecimal("106.456"), 5.0, "rating", "desc", 0, 20, user);
 
         assertEquals(first, second);
@@ -28,9 +28,9 @@ class CacheKeySupportTest {
 
     @Test
     void fieldSearchKeyChangesWhenSearchParameterChanges() {
-        String first = CacheKeySupport.fieldSearch("FOOTBALL", null, null, null,
+        String first = CacheKeySupport.fieldSearch(null, "FOOTBALL", null, null, null,
                 null, null, null, null, null, 0, 20, null);
-        String second = CacheKeySupport.fieldSearch("TENNIS", null, null, null,
+        String second = CacheKeySupport.fieldSearch(null, "TENNIS", null, null, null,
                 null, null, null, null, null, 0, 20, null);
 
         assertNotEquals(first, second);

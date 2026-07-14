@@ -54,10 +54,6 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        if (!properties.isEnabled()) {
-            return chain.filter(exchange);
-        }
-
         return endpointMatcher.match(exchange)
                 .map(endpoint -> applyRateLimit(exchange, chain, endpoint))
                 .orElseGet(() -> chain.filter(exchange));
@@ -65,7 +61,7 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
 
     private Mono<Void> applyRateLimit(ServerWebExchange exchange, GatewayFilterChain chain, RateLimitProperties.Endpoint endpoint) {
         RateLimitProperties.Policy policy = properties.getPolicies().get(endpoint.getPolicy());
-        if (policy == null || !policy.isEnabled()) {
+        if (policy == null) {
             return chain.filter(exchange);
         }
 
