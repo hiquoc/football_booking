@@ -18,6 +18,7 @@ import com.project.booking.payment.BookingPaymentStrategyFactory;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
+import com.project.booking.repository.RecurringBookingRepository;
 import com.project.booking.service.ResolvedOperatingHours;
 import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.SubFieldProjectionService;
@@ -88,6 +89,9 @@ class BookingServiceImplTest {
     @Mock
     private AvailabilityCacheService availabilityCacheService;
 
+    @Mock
+    private RecurringBookingRepository recurringBookingRepository;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
 
@@ -101,6 +105,14 @@ class BookingServiceImplTest {
         org.mockito.Mockito.lenient().when(paymentStrategyFactory.get(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(bookingPaymentStrategy);
         org.mockito.Mockito.lenient().when(bookingPaymentStrategy.method()).thenReturn(PaymentMethod.STRIPE);
+        org.mockito.Mockito.lenient().when(recurringBookingRepository.findActiveConflictsForDate(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
     }
 
     @Test

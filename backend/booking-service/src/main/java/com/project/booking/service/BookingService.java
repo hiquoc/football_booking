@@ -21,6 +21,8 @@ public interface BookingService {
      */
     BookingResponse createBooking(UUID userId, CreateBookingRequest request);
 
+    BookingResponse createRecurringOccurrence(UUID userId, UUID recurringBookingId, CreateBookingRequest request);
+
     /**
      * Cancels an existing booking owned by the requesting client.
      *

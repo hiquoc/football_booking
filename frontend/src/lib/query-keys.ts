@@ -24,6 +24,16 @@ export const bookingQueryKeys = {
     ["availability", subFieldId, date] as const,
 };
 
+export const recurringBookingQueryKeys = {
+  all: ["recurring-bookings"] as const,
+  mine: (page: number, size = 10, status?: string) =>
+    [...recurringBookingQueryKeys.all, "mine", { page, size, status }] as const,
+  owner: (page: number, size = 10, status?: string) =>
+    [...recurringBookingQueryKeys.all, "owner", { page, size, status }] as const,
+  admin: (page: number, size = 10, status?: string) =>
+    [...recurringBookingQueryKeys.all, "admin", { page, size, status }] as const,
+};
+
 export const paymentQueryKeys = {
   all: ["payments"] as const,
   byBooking: (bookingId: string) => [...paymentQueryKeys.all, bookingId] as const,

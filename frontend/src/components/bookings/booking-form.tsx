@@ -16,6 +16,7 @@ import {
 } from "@/lib/booking-slots";
 import { formatCurrency, formatEnum } from "@/lib/field-format";
 import { useAvailability, useCreateBooking } from "@/lib/hooks/use-bookings";
+import { useCreateRecurringBooking } from "@/lib/hooks/use-recurring-bookings";
 import { useCurrentTime } from "@/lib/hooks/use-current-time";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
 import { useProfile } from "@/lib/hooks/use-profile";
@@ -37,7 +38,10 @@ export function BookingForm({
   const [duration, setDuration] = useState(90);
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("STRIPE");
+  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [recurringEndDate, setRecurringEndDate] = useState(initialDate);
   const createMutation = useCreateBooking();
+  const createRecurringMutation = useCreateRecurringBooking();
   const profile = useProfile();
   const now = useCurrentTime();
 
@@ -94,12 +98,36 @@ export function BookingForm({
   function resetTimeSelection() {
     setStartTime("");
     createMutation.reset();
+    createRecurringMutation.reset();
   }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!selectedSubField || !selectedStartTime) return;
     try {
+      if (recurringEnabled) {
+        const start = new Date(`${date}T${selectedStartTime}:00`);
+        const end = new Date(start.getTime() + effectiveDuration * 60_000);
+        const dayOfWeek = [
+          "SUNDAY",
+          "MONDAY",
+          "TUESDAY",
+          "WEDNESDAY",
+          "THURSDAY",
+          "FRIDAY",
+          "SATURDAY",
+        ][start.getDay()];
+        await createRecurringMutation.mutateAsync({
+          subFieldId: selectedSubField.id,
+          dayOfWeek,
+          startDate: date,
+          endDate: recurringEndDate < date ? date : recurringEndDate,
+          startTime: `${selectedStartTime}:00`,
+          endTime: end.toTimeString().slice(0, 8),
+        });
+        window.location.assign("/recurring-bookings");
+        return;
+      }
       const booking = await createMutation.mutateAsync({
         subFieldId: selectedSubField.id,
         bookingDate: date,
@@ -294,6 +322,33 @@ export function BookingForm({
         </Field>
 
         <BookingStep number="6" title="Phương thức thanh toán">
+          <label className="mb-4 flex items-start gap-3 rounded-2xl border border-slate-200 p-4">
+            <input
+              type="checkbox"
+              checked={recurringEnabled}
+              onChange={(event) => setRecurringEnabled(event.target.checked)}
+              className="mt-1 size-4"
+            />
+            <span>
+              <strong className="block text-sm text-slate-900">Recurring Booking</strong>
+              <span className="mt-1 block text-xs text-slate-500">
+                Reserve this same sub-field and time every week. Eligibility is checked when you submit.
+              </span>
+            </span>
+          </label>
+          {recurringEnabled ? (
+            <div className="mb-4">
+              <Field label="Ngày kết thúc lặp lại">
+                <input
+                  type="date"
+                  min={date}
+                  value={recurringEndDate < date ? date : recurringEndDate}
+                  onChange={(event) => setRecurringEndDate(event.target.value)}
+                  className="input-field"
+                />
+              </Field>
+            </div>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -363,23 +418,24 @@ export function BookingForm({
         <p className="mt-3 rounded-xl bg-white/70 p-3 text-xs leading-5 text-slate-500">
           Tổng thanh toán cuối cùng có thể bao gồm phí đặt sân được cấu hình bởi hệ thống.
         </p>
-        {createMutation.error ? (
+        {createMutation.error || createRecurringMutation.error ? (
           <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
-            {createMutation.error.message}
+            {(createMutation.error || createRecurringMutation.error)?.message}
           </p>
         ) : null}
         <button
           disabled={
             !selectedSubField ||
             !selectedStartTime ||
-            createMutation.isPending
+            createMutation.isPending ||
+            createRecurringMutation.isPending
           }
           className="action-button mt-6 w-full bg-sky-500 px-5 text-white hover:bg-sky-600"
         >
-          {createMutation.isPending ? (
+          {createMutation.isPending || createRecurringMutation.isPending ? (
             <LoaderCircle className="size-4 animate-spin" />
           ) : null}
-          Tiếp tục thanh toán
+          {recurringEnabled ? "Create recurring booking" : "Tiếp tục thanh toán"}
         </button>
       </aside>
     </form>

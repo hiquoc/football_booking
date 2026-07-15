@@ -45,4 +45,8 @@ public class SubFieldProjection {
 
     @Column(name = "booking_interval_minutes")
     private Integer bookingIntervalMinutes;
+
+    @Builder.Default
+    @Column(name = "has_recurring", nullable = false)
+    private Boolean hasRecurring = false;
 }

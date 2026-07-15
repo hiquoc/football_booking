@@ -88,4 +88,7 @@ public class Booking extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "cancelled_by", length = 20)
     private BookingCancelledBy cancelledBy;
+
+    @Column(name = "source_recurring_booking_id")
+    private UUID sourceRecurringBookingId;
 }

@@ -38,4 +38,5 @@ public class SubFieldResponse {
     private Integer maximumBookingDurationMinutes;
     /** Legacy field-service setting. Booking start validation is enforced by booking-service policy. */
     private Integer bookingIntervalMinutes;
+    private Boolean hasRecurring;
 }

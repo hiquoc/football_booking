@@ -67,6 +67,8 @@ booking:
   payment-timeout-minutes: 35
   expiration-scheduler-fixed-delay-ms: 60000
   completion-scheduler-fixed-delay-ms: 300000
+  recurring-scheduler-fixed-delay-ms: 43200000
+  recurring-generation-lead-days: 2
 
 internal:
   gateway:

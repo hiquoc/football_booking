@@ -247,6 +247,35 @@ export interface CreateBookingInput {
   paymentMethod?: PaymentMethod;
 }
 
+export type RecurringBookingStatus = "ACTIVE" | "PAUSED" | "CANCELLED";
+
+export interface RecurringBooking {
+  id: string;
+  userId: string;
+  fieldId: string;
+  fieldName: string | null;
+  subFieldId: string;
+  subFieldName: string | null;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  startDate: string;
+  endDate: string;
+  status: RecurringBookingStatus;
+  nextProcessAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecurringBookingInput {
+  subFieldId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface Notification {
   id: string;
   userId: string;

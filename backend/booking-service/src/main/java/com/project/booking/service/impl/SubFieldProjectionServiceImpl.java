@@ -47,6 +47,7 @@ public class SubFieldProjectionServiceImpl implements SubFieldProjectionService 
                 .minimumBookingDurationMinutes(projection.getMinimumBookingDurationMinutes())
                 .maximumBookingDurationMinutes(projection.getMaximumBookingDurationMinutes())
                 .bookingIntervalMinutes(projection.getBookingIntervalMinutes())
+                .hasRecurring(projection.getHasRecurring())
                 .timePriceRules(timePriceRuleRepository.findBySubFieldIdOrderByStartTimeAsc(projection.getId()).stream()
                         .map(rule -> TimePriceRuleDto.builder()
                                 .startTime(rule.getStartTime())

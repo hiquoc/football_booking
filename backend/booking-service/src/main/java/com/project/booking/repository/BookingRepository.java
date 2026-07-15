@@ -49,6 +49,20 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 LocalDate endDate,
                 Collection<BookingStatus> statuses);
 
+        @Query("""
+                    SELECT COUNT(b) > 0
+                    FROM Booking b
+                    WHERE b.clientId = :clientId
+                      AND b.subField.fieldId = :fieldId
+                      AND b.status = :status
+                """)
+        boolean existsCompletedBookingAtField(
+                @Param("clientId") UUID clientId,
+                @Param("fieldId") UUID fieldId,
+                @Param("status") BookingStatus status);
+
+        boolean existsBySourceRecurringBookingIdAndBookingDate(UUID sourceRecurringBookingId, LocalDate bookingDate);
+
         List<Booking> findBySubFieldIdAndBookingDateAndStatusInOrderByStartTimeAsc(
                         UUID subFieldId,
                         LocalDate bookingDate,
