@@ -42,6 +42,8 @@ export const paymentQueryKeys = {
 export const userQueryKeys = {
   all: ["users"] as const,
   me: ["user", "me"] as const,
+  mePrivate: ["user", "me", "private"] as const,
+  profile: (id: string) => [...userQueryKeys.all, "profile", id] as const,
   list: (page: number, size = 10) =>
     [...userQueryKeys.all, "list", { page, size }] as const,
 };
@@ -61,4 +63,13 @@ export const ownerFieldQueryKeys = {
     [...ownerFieldQueryKeys.all, "list", { page, size }] as const,
   closures: (fieldId: string, subFieldId: string) =>
     [...ownerFieldQueryKeys.all, fieldId, "closures", subFieldId] as const,
+};
+
+export const communityQueryKeys = {
+  all: ["community-posts"] as const,
+  list: (page: number, size = 10, filters: object = {}) =>
+    [...communityQueryKeys.all, "list", { page, size, filters }] as const,
+  detail: (id: string) => [...communityQueryKeys.all, id] as const,
+  reports: (page: number, size = 20, status?: string) =>
+    [...communityQueryKeys.all, "reports", { page, size, status }] as const,
 };

@@ -29,10 +29,19 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
 
     @Override @Transactional
     public AvatarUploadSlotDto issueSlot(UUID userId, AvatarUploadSlotRequest request) {
+        return issueSlot(userId, request, "avatars/");
+    }
+
+    @Override @Transactional
+    public AvatarUploadSlotDto issueTeamPhotoSlot(UUID userId, AvatarUploadSlotRequest request) {
+        return issueSlot(userId, request, "team-photos/");
+    }
+
+    private AvatarUploadSlotDto issueSlot(UUID userId, AvatarUploadSlotRequest request, String folder) {
         users.findForUpdateById(userId).orElseThrow(() -> new NotFoundException("User not found"));
         return uploads.findByUserIdAndRequestId(userId, request.requestId()).map(this::slot).orElseGet(() -> {
             String publicId;
-            do publicId = "avatars/" + UUID.randomUUID(); while (issuedIds.existsById(publicId));
+            do publicId = folder + UUID.randomUUID(); while (issuedIds.existsById(publicId));
             issuedIds.save(new IssuedAvatarPublicId(publicId, LocalDateTime.now()));
             return slot(uploads.save(AvatarUpload.builder().userId(userId).requestId(request.requestId())
                     .publicId(publicId).uploadTimestamp(Instant.now().getEpochSecond())
@@ -41,8 +50,18 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
     }
 
     @Override @Transactional
-    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, key = "'user:' + #userId")
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
     public UserDto confirm(UUID userId, AvatarUploadConfirmRequest request) {
+        return confirm(userId, request, false);
+    }
+
+    @Override @Transactional
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
+    public UserDto confirmTeamPhoto(UUID userId, AvatarUploadConfirmRequest request) {
+        return confirm(userId, request, true);
+    }
+
+    private UserDto confirm(UUID userId, AvatarUploadConfirmRequest request, boolean teamPhoto) {
         AvatarUpload upload = uploads.findByUserIdAndPublicId(userId, request.publicId())
                 .orElseThrow(() -> new NotFoundException("Avatar upload placeholder not found"));
         validate(request);
@@ -52,11 +71,17 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
                 throw new BadRequestException("This avatar upload was already confirmed with different metadata");
             return mapper.toDto(user);
         }
-        String oldPublicId = user.getAvatarPublicId();
+        String oldPublicId = teamPhoto ? user.getTeamPhotoPublicId() : user.getAvatarPublicId();
         upload.setSecureUrl(request.secureUrl()); upload.setAssetVersion(request.version());
         upload.setImageFormat(request.format().toLowerCase(Locale.ROOT)); upload.setWidth(request.width());
         upload.setHeight(request.height()); upload.setByteSize(request.bytes()); upload.setConfirmedAt(LocalDateTime.now());
-        user.setAvatarUrl(request.secureUrl()); user.setAvatarPublicId(request.publicId());
+        if (teamPhoto) {
+            user.setTeamPhotoUrl(request.secureUrl());
+            user.setTeamPhotoPublicId(request.publicId());
+        } else {
+            user.setAvatarUrl(request.secureUrl());
+            user.setAvatarPublicId(request.publicId());
+        }
         uploads.save(upload); users.save(user);
         if (oldPublicId != null && !oldPublicId.equals(request.publicId())) destroy(oldPublicId);
         return mapper.toDto(user);

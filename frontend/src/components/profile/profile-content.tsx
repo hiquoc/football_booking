@@ -1,193 +1,375 @@
 "use client";
 
 import { useState } from "react";
-import type { User } from "@/lib/api/types";
+import Image from "next/image";
+import type { PublicProfile, SkillLevel } from "@/lib/api/types";
 import {
   Camera,
+  Clock,
+  Edit3,
+  Handshake,
   LoaderCircle,
+  Medal,
   Phone,
   Save,
   ShieldCheck,
+  Shirt,
+  Trophy,
   UserRound,
+  X,
 } from "lucide-react";
-import { useProfile, useUpdateProfile, useUploadAvatar } from "@/lib/hooks/use-profile";
+import {
+  useProfile,
+  useUpdateProfile,
+  useUploadAvatar,
+  useUploadTeamPhoto,
+} from "@/lib/hooks/use-profile";
 import { DataError, ProfileSkeleton } from "@/components/ui/data-state";
 
-const roleNames = {
-  CLIENT: "Người chơi",
-  OWNER: "Chủ sân",
-  ADMIN: "Quản trị viên",
+const skillLabels: Record<SkillLevel, string> = {
+  VERY_WEAK: "Rất yếu",
+  WEAK: "Yếu",
+  AVERAGE: "Trung bình",
+  ABOVE_AVERAGE: "Khá",
+  GOOD: "Tốt",
+  VERY_GOOD: "Rất tốt",
+  SEMI_PRO: "Bán chuyên",
+  PRO: "Chuyên nghiệp",
 };
 
-export function ProfileContent() {
-  const profile = useProfile();
+const skillBadgeClasses: Record<SkillLevel, string> = {
+  VERY_WEAK: "bg-slate-100 text-slate-700 ring-slate-200",
+  WEAK: "bg-amber-50 text-amber-700 ring-amber-200",
+  AVERAGE: "bg-sky-50 text-sky-700 ring-sky-200",
+  ABOVE_AVERAGE: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+  GOOD: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  VERY_GOOD: "bg-teal-50 text-teal-700 ring-teal-200",
+  SEMI_PRO: "bg-violet-50 text-violet-700 ring-violet-200",
+  PRO: "bg-rose-50 text-rose-700 ring-rose-200",
+};
+
+const skillOptions = Object.keys(skillLabels) as SkillLevel[];
+
+export function ProfileContent({
+  userId,
+  isOwnProfile = true,
+}: {
+  userId?: string;
+  isOwnProfile?: boolean;
+}) {
+  const profile = useProfile(isOwnProfile ? undefined : userId);
 
   if (profile.isPending) return <ProfileSkeleton />;
   if (profile.isError) return <DataError title="Không thể tải hồ sơ" />;
+
   return (
-    <ProfileForm
-      key={profile.data.updatedAt ?? profile.data.id}
-      user={profile.data}
+    <ProfileView
+      key={`${profile.data.personal.id}:${profile.data.updatedAt ?? ""}`}
+      profile={profile.data}
+      isOwnProfile={isOwnProfile}
     />
   );
 }
 
-function ProfileForm({ user }: { user: User }) {
+function ProfileView({
+  profile,
+  isOwnProfile,
+}: {
+  profile: PublicProfile;
+  isOwnProfile: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [fullName, setFullName] = useState(profile.personal.fullName ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(profile.personal.phoneNumber ?? "");
+  const [bio, setBio] = useState(profile.personal.bio ?? "");
+  const [skillLevel, setSkillLevel] = useState<SkillLevel>(
+    profile.personal.skillLevel ?? "AVERAGE",
+  );
   const update = useUpdateProfile();
   const avatarUpload = useUploadAvatar();
-  const [fullName, setFullName] = useState(user.fullName ?? "");
-  const displayName = user.fullName || "Chưa cập nhật tên";
-  const initial = (user.fullName || user.phoneNumber).slice(0, 1).toUpperCase();
+  const teamPhotoUpload = useUploadTeamPhoto();
+
+  const displayName = profile.personal.fullName || "Chưa cập nhật tên";
+  const initial = (displayName || profile.personal.phoneNumber || "U").slice(0, 1).toUpperCase();
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    try {
-      await update.mutateAsync({
-        fullName: fullName.trim(),
-      });
-    } catch {
-      /* Mutation state renders the error. */
-    }
+    await update.mutateAsync({
+      fullName: fullName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      bio: bio.trim() || null,
+      skillLevel,
+    });
+    setEditing(false);
   }
 
   return (
-    <div className="grid gap-7 lg:grid-cols-[19rem_minmax(0,1fr)]">
-      <aside className="relative h-fit overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-6 text-slate-900 shadow-sm">
-        <div className="absolute -right-12 -top-12 size-36 rounded-full bg-sky-100/70 blur-2xl" />
-        {user.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt={`Ảnh đại diện của ${displayName}`}
-            className="relative grid size-20 place-items-center rounded-3xl object-cover object-center ring-4 ring-white shadow-md"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="relative grid size-20 place-items-center rounded-3xl bg-sky-100 text-2xl font-black text-sky-700 ring-4 ring-white shadow-md"
-            aria-label={`Chữ cái đại diện của ${displayName}`}
-            role="img"
-          >
-            {/* Optional: Add first letter of name here if image fails */}
-            {displayName?.charAt(0).toUpperCase()}
-          </div>
-        )}
-
-        <h2 className="mt-5 text-xl font-black">
-          {displayName}
-        </h2>
-        <p className="mt-1 text-sm font-medium text-slate-500">
-          {roleNames[user.userType]}
-        </p>
-        <div className="mt-6 space-y-3 border-t border-slate-100 pt-5 text-sm text-slate-500">
-          <p className="flex items-center gap-2">
-            <Phone className="size-4" /> {user.phoneNumber}
-          </p>
-          <p className="flex items-center gap-2">
-            <ShieldCheck className="size-4" />{" "}
-            {user.status === "ACTIVE"
-              ? "Tài khoản đang hoạt động"
-              : user.status}
-          </p>
-        </div>
-      </aside>
-      <form
-        onSubmit={submit}
-        className="rounded-[2rem] border border-slate-200/80 bg-white p-6 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.28)] sm:p-8"
-      >
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-sky-100 text-sky-700">
-            <UserRound className="size-5" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-black text-slate-950">
-              Thông tin cá nhân
-            </h1>
-            <p className="text-sm text-slate-500">
-              Cập nhật tên và ảnh đại diện của bạn.
-            </p>
-          </div>
-        </div>
-        <div className="mt-7 space-y-5 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 sm:p-5">
-          <Field label="Họ và tên" htmlFor="fullName">
-            <input
-              id="fullName"
-              className="input-field"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-              minLength={2}
-              maxLength={100}
-              placeholder="Nguyễn Văn A"
-            />
-          </Field>
-          <Field label="Số điện thoại" htmlFor="phoneNumber">
-            <input
-              id="phoneNumber"
-              className="input-field cursor-not-allowed text-slate-400"
-              value={user.phoneNumber}
-              disabled
-            />
-          </Field>
-          <Field label="Ảnh đại diện" htmlFor="avatar">
-            <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-sky-200 bg-white p-4 sm:flex-row sm:items-center">
-              <span
-                className="grid size-16 shrink-0 place-items-center rounded-2xl bg-sky-100 bg-cover bg-center text-xl font-black text-sky-700"
-                style={user.avatarUrl ? { backgroundImage: `url(${user.avatarUrl})` } : undefined}
-              >
-                {user.avatarUrl ? null : initial}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-slate-800">Chọn ảnh hồ sơ mới</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">JPG, PNG hoặc WebP. Ảnh vuông sẽ hiển thị đẹp nhất.</p>
-              </div>
-              <label
-                htmlFor="avatar"
-                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full bg-sky-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-sky-700"
-              >
-                {avatarUpload.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Camera className="size-4" />}
-                {avatarUpload.isPending ? "Đang tải..." : "Chọn ảnh"}
-              </label>
-              <input
-                id="avatar"
-                className="sr-only"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={avatarUpload.isPending}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) avatarUpload.mutate(file);
-                }}
+    <div className="space-y-7">
+      <section className="grid gap-7 lg:grid-cols-[20rem_minmax(0,1fr)]">
+        <aside className="h-fit overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+          <div className="relative h-36 bg-emerald-700">
+            {profile.personal.teamPhotoUrl ? (
+              <Image
+                src={profile.personal.teamPhotoUrl}
+                alt={`Ảnh đội của ${displayName}`}
+                fill
+                sizes="(min-width: 1024px) 20rem, 100vw"
+                className="object-cover"
               />
+            ) : (
+              <div className="field-pattern h-full w-full bg-emerald-700" />
+            )}
+            {isOwnProfile && editing ? (
+              <ImageUploadButton
+                id="teamPhoto"
+                label="Ảnh đội"
+                pending={teamPhotoUpload.isPending}
+                onFile={(file) => teamPhotoUpload.mutate(file)}
+                className="absolute right-4 top-4"
+              />
+            ) : null}
+          </div>
+          <div className="px-6 pb-6">
+            <div className="-mt-12 flex items-end justify-between gap-4">
+              <div className="relative grid size-28 place-items-center overflow-hidden rounded-[1.5rem] bg-slate-100 text-3xl font-black text-slate-700 ring-4 ring-white">
+                {profile.personal.avatarUrl ? (
+                  <Image
+                    src={profile.personal.avatarUrl}
+                    alt={`Ảnh đại diện của ${displayName}`}
+                    fill
+                    sizes="7rem"
+                    className="object-cover"
+                  />
+                ) : (
+                  initial
+                )}
+              </div>
+              {isOwnProfile && editing ? (
+                <ImageUploadButton
+                  id="avatar"
+                  label="Ảnh hồ sơ"
+                  pending={avatarUpload.isPending}
+                  onFile={(file) => avatarUpload.mutate(file)}
+                />
+              ) : null}
             </div>
-          </Field>
-        </div>
-        {update.isSuccess ? (
-          <p className="mt-5 rounded-xl bg-sky-50 p-3 text-sm font-semibold text-sky-700">
-            Đã cập nhật hồ sơ.
-          </p>
-        ) : null}
-        {update.error ? (
-          <p className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
-            {update.error.message}
-          </p>
-        ) : null}
-        {avatarUpload.error ? (
-          <p className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
-            {avatarUpload.error.message}
-          </p>
-        ) : null}
-        <button
-          disabled={update.isPending}
-          className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-slate-950 px-6 py-3 text-sm font-black text-white disabled:opacity-60"
-        >
-          {update.isPending ? (
-            <LoaderCircle className="size-4 animate-spin" />
+
+            <div className="mt-5">
+              <h2 className="text-2xl font-black text-slate-950">{displayName}</h2>
+              <SkillBadge skillLevel={profile.personal.skillLevel ?? "AVERAGE"} />
+            </div>
+
+            <div className="mt-6 space-y-3 border-t border-slate-100 pt-5 text-sm text-slate-600">
+              <p className="flex items-center gap-2">
+                <Phone className="size-4 text-slate-400" />
+                {profile.personal.phoneNumber || "Chưa cập nhật"}
+              </p>
+              <p className="flex items-center gap-2">
+                <ShieldCheck className="size-4 text-slate-400" />
+                Hồ sơ cầu thủ
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+                <UserRound className="size-5" />
+              </span>
+              <h1 className="text-2xl font-black text-slate-950">Hồ sơ cầu thủ</h1>
+            </div>
+            {isOwnProfile ? (
+              <button
+                type="button"
+                onClick={() => setEditing((value) => !value)}
+                className="action-button border border-slate-200 bg-white text-slate-800"
+              >
+                {editing ? <X className="size-4" /> : <Edit3 className="size-4" />}
+                {editing ? "Đóng" : "Edit Profile"}
+              </button>
+            ) : null}
+          </div>
+
+          {isOwnProfile && editing ? (
+            <form onSubmit={submit} className="mt-7 grid gap-5">
+              <Field label="Họ và tên" htmlFor="fullName">
+                <input
+                  id="fullName"
+                  className="input-field"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  minLength={2}
+                  maxLength={100}
+                />
+              </Field>
+              <Field label="Số điện thoại" htmlFor="phoneNumber">
+                <input
+                  id="phoneNumber"
+                  className="input-field"
+                  value={phoneNumber}
+                  onChange={(event) => setPhoneNumber(event.target.value)}
+                  maxLength={20}
+                />
+              </Field>
+              <Field label="Trình độ" htmlFor="skillLevel">
+                <select
+                  id="skillLevel"
+                  className="input-field"
+                  value={skillLevel}
+                  onChange={(event) => setSkillLevel(event.target.value as SkillLevel)}
+                >
+                  {skillOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {skillLabels[option]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Bio" htmlFor="bio">
+                <textarea
+                  id="bio"
+                  className="input-field min-h-32 resize-y"
+                  value={bio}
+                  onChange={(event) => setBio(event.target.value)}
+                  maxLength={500}
+                />
+              </Field>
+              <StatusMessages
+                updateError={update.error?.message}
+                avatarError={avatarUpload.error?.message}
+                teamPhotoError={teamPhotoUpload.error?.message}
+                success={update.isSuccess}
+              />
+              <button
+                disabled={update.isPending}
+                className="action-button w-fit bg-slate-950 px-6 text-white disabled:opacity-60"
+              >
+                {update.isPending ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : (
+                  <Save className="size-4" />
+                )}
+                Lưu thay đổi
+              </button>
+            </form>
           ) : (
-            <Save className="size-4" />
-          )}{" "}
-          Lưu thay đổi
-        </button>
-      </form>
+            <div className="mt-7 rounded-2xl border border-slate-100 bg-slate-50 p-5">
+              <p className="text-sm font-bold text-slate-500">Bio</p>
+              <p className="mt-2 whitespace-pre-line text-slate-800">
+                {profile.personal.bio || "Chưa cập nhật"}
+              </p>
+            </div>
+          )}
+        </section>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <MetricCard label="Matches" value={profile.statistics.totalMatches} icon={<Medal className="size-5" />} />
+        <MetricCard label="Wins" value={profile.statistics.wins} icon={<Trophy className="size-5" />} />
+        <MetricCard label="Draws" value={profile.statistics.draws} icon={<Handshake className="size-5" />} />
+        <MetricCard label="Losses" value={profile.statistics.losses} icon={<X className="size-5" />} />
+        <MetricCard label="Win Rate" value={formatPercent(profile.statistics.winRate)} icon={<ShieldCheck className="size-5" />} />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <MetricCard label="No Cancel" value={formatPercent(profile.reputation.noCancelRate)} icon={<ShieldCheck className="size-5" />} />
+        <MetricCard label="On Time" value={formatPercent(profile.reputation.onTimeRate)} icon={<Clock className="size-5" />} />
+        <MetricCard label="Fair Play" value={formatPercent(profile.reputation.fairPlayRate)} icon={<Shirt className="size-5" />} />
+      </section>
     </div>
+  );
+}
+
+function SkillBadge({ skillLevel }: { skillLevel: SkillLevel }) {
+  return (
+    <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-black ring-1 ${skillBadgeClasses[skillLevel]}`}>
+      {skillLabels[skillLevel]}
+    </span>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-bold text-slate-500">{label}</span>
+        <span className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-600">
+          {icon}
+        </span>
+      </div>
+      <p className="mt-4 text-3xl font-black text-slate-950">{value}</p>
+    </article>
+  );
+}
+
+function ImageUploadButton({
+  id,
+  label,
+  pending,
+  onFile,
+  className = "",
+}: {
+  id: string;
+  label: string;
+  pending: boolean;
+  onFile: (file: File) => void;
+  className?: string;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className={`action-button cursor-pointer bg-slate-950 px-4 text-white ${className}`}
+    >
+      {pending ? <LoaderCircle className="size-4 animate-spin" /> : <Camera className="size-4" />}
+      {label}
+      <input
+        id={id}
+        className="sr-only"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        disabled={pending}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onFile(file);
+        }}
+      />
+    </label>
+  );
+}
+
+function StatusMessages({
+  updateError,
+  avatarError,
+  teamPhotoError,
+  success,
+}: {
+  updateError?: string;
+  avatarError?: string;
+  teamPhotoError?: string;
+  success: boolean;
+}) {
+  const error = updateError ?? avatarError ?? teamPhotoError;
+  return (
+    <>
+      {success ? (
+        <p className="rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">
+          Đã cập nhật hồ sơ.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>
+      ) : null}
+    </>
   );
 }
 
@@ -208,4 +390,8 @@ function Field({
       {children}
     </div>
   );
+}
+
+function formatPercent(value: number) {
+  return `${Number(value ?? 0).toFixed(1).replace(/\.0$/, "")}%`;
 }

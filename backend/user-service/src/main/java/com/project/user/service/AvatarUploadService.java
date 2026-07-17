@@ -4,6 +4,8 @@ import com.project.user.dto.UserDto;
 import java.util.UUID;
 public interface AvatarUploadService {
     AvatarUploadSlotDto issueSlot(UUID userId, AvatarUploadSlotRequest request);
+    AvatarUploadSlotDto issueTeamPhotoSlot(UUID userId, AvatarUploadSlotRequest request);
     UserDto confirm(UUID userId, AvatarUploadConfirmRequest request);
+    UserDto confirmTeamPhoto(UUID userId, AvatarUploadConfirmRequest request);
     void cleanupStaleUploads();
 }

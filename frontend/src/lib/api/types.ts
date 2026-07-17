@@ -192,9 +192,55 @@ export interface User {
   email: string | null;
   fullName: string | null;
   avatarUrl: string | null;
+  bio?: string | null;
+  teamPhotoUrl?: string | null;
+  skillLevel?: SkillLevel;
+  totalMatches?: number;
+  wins?: number;
+  draws?: number;
+  losses?: number;
+  noCancelRate?: number;
+  onTimeRate?: number;
+  fairPlayRate?: number;
   userType: "CLIENT" | "OWNER" | "ADMIN";
   status: string;
   balance: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type SkillLevel =
+  | "VERY_WEAK"
+  | "WEAK"
+  | "AVERAGE"
+  | "ABOVE_AVERAGE"
+  | "GOOD"
+  | "VERY_GOOD"
+  | "SEMI_PRO"
+  | "PRO";
+
+export interface PublicProfile {
+  personal: {
+    id: string;
+    fullName: string | null;
+    avatarUrl: string | null;
+    phoneNumber: string | null;
+    bio: string | null;
+    teamPhotoUrl: string | null;
+    skillLevel: SkillLevel;
+  };
+  statistics: {
+    totalMatches: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    winRate: number;
+  };
+  reputation: {
+    noCancelRate: number;
+    onTimeRate: number;
+    fairPlayRate: number;
+  };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -346,6 +392,9 @@ export interface FieldClosure {
 
 export interface UpdateProfileInput {
   fullName?: string;
+  phoneNumber?: string;
+  bio?: string | null;
+  skillLevel?: SkillLevel;
 }
 
 export type PaymentStatus = "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED";
@@ -377,4 +426,144 @@ export interface MutationSuccessResponse {
 
 export interface FavoriteCheckResponse {
   favorite: boolean;
+}
+
+export type CommunityPostType = "LOOKING_OPPONENT" | "LOOKING_PLAYER";
+export type CommunityPostStatus = "OPEN" | "MATCHED" | "FULL" | "CLOSED" | "CANCELLED" | "HIDDEN";
+export type CommunityApplicationStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
+export type CommunityReportReason = "SPAM" | "INAPPROPRIATE_CONTENT" | "HARASSMENT" | "FAKE_INFORMATION" | "SCAM" | "OTHER";
+export type CommunityReportStatus = "PENDING" | "REVIEWED";
+export type CommunityModerationAction =
+  | "NO_ACTION"
+  | "HIDE_POST"
+  | "RESTORE_POST"
+  | "ISSUE_WARNING"
+  | "TEMPORARY_POSTING_BAN"
+  | "PERMANENT_POSTING_BAN";
+
+export interface CommunityApplication {
+  id: string;
+  postId: string;
+  applicantId: string;
+  status: CommunityApplicationStatus;
+  message: string | null;
+  applicantDisplayName: string | null;
+  applicantAvatarUrl: string | null;
+  applicantTeamPhotoUrl: string | null;
+  applicantSkillLevel: SkillLevel | string | null;
+  decidedAt: string | null;
+  withdrawnAt: string | null;
+  createdAt: string;
+}
+
+export interface CommunityPost {
+  id: string;
+  bookingId: string;
+  ownerId: string;
+  postType: CommunityPostType;
+  status: CommunityPostStatus;
+  title: string;
+  description: string | null;
+  skillLevel: SkillLevel | string;
+  contactPhone: string;
+  playersNeeded: number | null;
+  acceptedPlayersCount: number;
+  bookingCode: string;
+  fieldId: string | null;
+  fieldOwnerId: string | null;
+  fieldName: string | null;
+  subFieldId: string;
+  subFieldName: string | null;
+  fieldType: string | null;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  ownerDisplayName: string | null;
+  ownerAvatarUrl: string | null;
+  ownerTeamPhotoUrl: string | null;
+  locationText: string | null;
+  matchedApplicationId: string | null;
+  closedAt: string | null;
+  hiddenAt: string | null;
+  hiddenReason: string | null;
+  ownerUnderModeration: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+  applications: CommunityApplication[] | null;
+}
+
+export interface CommunityReport {
+  id: string;
+  postId: string;
+  reporterId: string;
+  reason: CommunityReportReason;
+  description: string | null;
+  status: CommunityReportStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  post: CommunityPost | null;
+}
+
+export interface CommunityViolation {
+  id: string;
+  userId: string;
+  reason: string;
+  action: CommunityModerationAction;
+  expireAt: string | null;
+  status: "ACTIVE" | "EXPIRED" | "PERMANENT";
+  sourcePostId: string | null;
+  createdAt: string;
+}
+
+export interface CommunityModerationHistory {
+  id: string;
+  targetUserId: string;
+  targetPostId: string | null;
+  moderatorId: string;
+  action: string;
+  reason: string;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface AdminModerationInput {
+  action: CommunityModerationAction;
+  targetUserId?: string;
+  targetPostId?: string;
+  reason: string;
+  note?: string;
+  expireAt?: string;
+}
+
+export interface CommunityPostFilters {
+  postType?: CommunityPostType;
+  skillLevel?: SkillLevel | string;
+  date?: string;
+  fieldType?: string;
+  district?: string;
+  status?: CommunityPostStatus;
+  keyword?: string;
+  sortBy?: "newest" | "upcoming";
+}
+
+export interface CreateCommunityPostInput {
+  bookingId: string;
+  postType: CommunityPostType;
+  title: string;
+  description?: string;
+  skillLevel: SkillLevel | string;
+  contactPhone: string;
+  playersNeeded?: number;
+  ownerDisplayName?: string | null;
+  ownerAvatarUrl?: string | null;
+  ownerTeamPhotoUrl?: string | null;
+}
+
+export interface UpdateCommunityPostInput {
+  title: string;
+  description?: string;
+  skillLevel: SkillLevel | string;
+  contactPhone: string;
+  playersNeeded?: number;
 }

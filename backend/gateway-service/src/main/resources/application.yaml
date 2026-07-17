@@ -44,7 +44,7 @@ spring:
             - id: booking-service-api
               uri: lb://booking-service
               predicates:
-                - Path=/api/v1/bookings/**,/api/v1/admin/booking-config
+                - Path=/api/v1/bookings/**,/api/v1/community-posts/**,/api/v1/admin/community-moderation/**,/api/v1/admin/booking-config
             - id: notification-service-api
               uri: lb://notification-service
               predicates:
@@ -96,6 +96,9 @@ gateway:
       BOOKING_CANCEL:
         replenish-rate: ${RL_BOOKING_CANCEL_REPLENISH:1}
         burst-capacity: ${RL_BOOKING_CANCEL_BURST:12}
+      COMMUNITY_WRITE:
+        replenish-rate: ${RL_COMMUNITY_WRITE_REPLENISH:2}
+        burst-capacity: ${RL_COMMUNITY_WRITE_BURST:20}
       SEARCH_FIELDS:
         replenish-rate: ${RL_SEARCH_FIELDS_REPLENISH:10}
         burst-capacity: ${RL_SEARCH_FIELDS_BURST:60}
@@ -159,6 +162,11 @@ gateway:
         policy: BOOKING_CANCEL
         methods: [POST]
         paths: [/api/v1/bookings/*/cancel]
+        key-strategy: USER_OR_IP
+      - id: community-write
+        policy: COMMUNITY_WRITE
+        methods: [POST, PUT, PATCH]
+        paths: [/api/v1/community-posts, /api/v1/community-posts/**]
         key-strategy: USER_OR_IP
       - id: search-fields
         policy: SEARCH_FIELDS

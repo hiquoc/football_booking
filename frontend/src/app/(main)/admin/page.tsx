@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, MapPinned, Shapes, Users } from "lucide-react";
+import { ArrowRight, MapPinned, Shapes, Users, ShieldAlert } from "lucide-react";
 import { BackLink } from "@/components/ui/back-link";
 import { PageHeading } from "@/components/ui/page-heading";
 const cards = [
@@ -21,6 +21,12 @@ const cards = [
     description: "Kiểm tra các địa điểm đang chờ duyệt.",
     icon: MapPinned,
   },
+  {
+    href: "/admin/community-moderation",
+    title: "Kiểm duyệt cộng đồng",
+    description: "Xử lý báo cáo, ẩn bài và quản lý vi phạm đăng bài.",
+    icon: ShieldAlert,
+  },
 ];
 export default function AdminPage() {
   return (
@@ -33,7 +39,7 @@ export default function AdminPage() {
         title="Bảng điều khiển"
         description="Cấu hình danh mục và kiểm soát hoạt động của nền tảng."
       />
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
+      <div className="mt-8 grid gap-4 md:grid-cols-4">
         {cards.map(({ href, title, description, icon: Icon }) => (
           <Link
             key={href}

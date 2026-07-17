@@ -7,6 +7,7 @@ import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.dto.response.TimePriceRuleDto;
 import com.project.booking.cache.AvailabilityCacheService;
+import com.project.booking.community.service.CommunityPostMaintenanceService;
 import com.project.booking.entity.Booking;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.kafka.BookingNotificationEventPublisher;
@@ -91,6 +92,9 @@ class BookingServiceImplTest {
 
     @Mock
     private RecurringBookingRepository recurringBookingRepository;
+
+    @Mock
+    private CommunityPostMaintenanceService communityPostMaintenanceService;
 
     @InjectMocks
     private BookingServiceImpl bookingService;

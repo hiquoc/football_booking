@@ -9,6 +9,7 @@ import com.project.common.exception.NotFoundException;
 import com.project.common.security.UserPrincipal;
 import com.project.user.dto.UpdateProfileRequest;
 import com.project.user.dto.UserDto;
+import com.project.user.dto.PublicProfileDto;
 import com.project.user.entity.User;
 import com.project.user.mapper.UserMapper;
 import com.project.user.repository.UserRepository;
@@ -56,6 +57,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.USER_BY_ID, key = "'profile:' + #id", sync = true)
+    public PublicProfileDto getPublicProfile(UUID id) {
+        return userMapper.toPublicProfileDto(getUser(id));
+    }
+
+    @Override
     public UserDto getUserByPhone(String phone) {
         User user = userRepository.findByPhoneNumber(phone)
                 .orElseThrow(() -> new NotFoundException("User not found with phone number: " + phone));
@@ -64,7 +72,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, key = "'user:' + #principal.id()")
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
     public UserDto updateUserProfile(UserPrincipal principal, UpdateProfileRequest request) {
         User user = userRepository.findById(principal.id())
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + principal.id()));
@@ -72,12 +80,21 @@ public class UserServiceImpl implements UserService {
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName());
         }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+            user.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getBio() != null) {
+            user.setBio(request.getBio().isBlank() ? null : request.getBio());
+        }
+        if (request.getSkillLevel() != null) {
+            user.setSkillLevel(request.getSkillLevel());
+        }
         return userMapper.toDto(userRepository.save(user));
     }
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, key = "'user:' + #targetUserId")
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
     public UserDto changeUserRole(UUID targetUserId, UserType newRole) {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));

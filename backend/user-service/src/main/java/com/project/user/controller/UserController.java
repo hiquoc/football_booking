@@ -6,6 +6,7 @@ import com.project.common.enums.UserType;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import com.project.user.dto.ChangeRoleRequest;
+import com.project.user.dto.PublicProfileDto;
 import com.project.user.dto.UpdateProfileRequest;
 import com.project.user.dto.UserDto;
 import com.project.user.service.UserService;
@@ -79,6 +80,24 @@ public class UserController {
         return ApiResponse.success("Profile retrieved successfully", userService.getUserById(user.id()));
     }
 
+    @Operation(summary = "Get my enhanced profile", description = "Returns editable profile data plus read-only statistics and reputation for the current user")
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/me/profile")
+    public ApiResponse<PublicProfileDto> getMyEnhancedProfile(@CurrentUser UserPrincipal user) {
+        return ApiResponse.success("Profile retrieved successfully", userService.getPublicProfile(user.id()));
+    }
+
+    @Operation(summary = "Update my enhanced profile",
+            description = "Updates editable profile fields. Statistics and reputation are read-only.")
+    @PreAuthorize("isAuthenticated()")
+    @PatchMapping("/me/profile")
+    public ApiResponse<PublicProfileDto> updateMyEnhancedProfile(
+            @CurrentUser UserPrincipal user,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        userService.updateUserProfile(user, request);
+        return ApiResponse.success("Profile updated successfully", userService.getPublicProfile(user.id()));
+    }
+
     @Operation(summary = "Get user by ID", description = "Returns the profile of any user by their ID")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile retrieved",
@@ -103,6 +122,13 @@ public class UserController {
     @GetMapping("/{id}")
     public ApiResponse<UserDto> getUserProfile(@PathVariable UUID id, @CurrentUser UserPrincipal requester) {
         return ApiResponse.success("Profile retrieved successfully", userService.getUserById(id, requester));
+    }
+
+    @Operation(summary = "Get public profile", description = "Returns public player profile data for challenge and match decisions")
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}/profile")
+    public ApiResponse<PublicProfileDto> getPublicProfile(@PathVariable UUID id) {
+        return ApiResponse.success("Profile retrieved successfully", userService.getPublicProfile(id));
     }
 
     @Operation(summary = "Update my profile",
@@ -141,12 +167,28 @@ public class UserController {
         return ApiResponse.success("Avatar upload slot issued", avatarUploadService.issueSlot(user.id(), request));
     }
 
+    @Operation(summary = "Request a signed Cloudinary team photo upload slot")
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/me/team-photo/upload-slot")
+    public ApiResponse<AvatarUploadSlotDto> requestTeamPhotoUpload(
+            @CurrentUser UserPrincipal user, @Valid @RequestBody AvatarUploadSlotRequest request) {
+        return ApiResponse.success("Team photo upload slot issued", avatarUploadService.issueTeamPhotoSlot(user.id(), request));
+    }
+
     @Operation(summary = "Confirm a direct Cloudinary avatar upload")
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/me/avatar/confirm")
     public ApiResponse<UserDto> confirmAvatarUpload(
             @CurrentUser UserPrincipal user, @Valid @RequestBody AvatarUploadConfirmRequest request) {
         return ApiResponse.success("Avatar updated successfully", avatarUploadService.confirm(user.id(), request));
+    }
+
+    @Operation(summary = "Confirm a direct Cloudinary team photo upload")
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/me/team-photo/confirm")
+    public ApiResponse<UserDto> confirmTeamPhotoUpload(
+            @CurrentUser UserPrincipal user, @Valid @RequestBody AvatarUploadConfirmRequest request) {
+        return ApiResponse.success("Team photo updated successfully", avatarUploadService.confirmTeamPhoto(user.id(), request));
     }
 
     @Operation(summary = "Change user role (Admin only)",

@@ -1,6 +1,7 @@
 package com.project.booking.service.impl;
 
 import com.project.booking.cache.AvailabilityCacheService;
+import com.project.booking.community.service.CommunityPostMaintenanceService;
 import com.project.booking.config.BookingDatabaseConstraints;
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
@@ -84,6 +85,7 @@ public class BookingServiceImpl implements BookingService {
     private final BookingBalanceEventPublisher bookingBalanceEventPublisher;
     private final AvailabilityCacheService availabilityCacheService;
     private final RecurringBookingRepository recurringBookingRepository;
+    private final CommunityPostMaintenanceService communityPostMaintenanceService;
 
     @Value("${booking.payment-timeout-minutes:35}")
     private int paymentTimeoutMinutes = 35;
@@ -166,6 +168,7 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking cancelled by client: id={}, clientId={}", cancelled.getId(), userId);
         publishRefundIfEligible(cancelled);
         availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
+        communityPostMaintenanceService.cancelOpenPostForBooking(cancelled.getId());
         bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
         return bookingMapper.toResponse(cancelled);
     }
@@ -191,6 +194,7 @@ public class BookingServiceImpl implements BookingService {
         log.info("Booking cancelled by owner: id={}, ownerId={}", cancelled.getId(), ownerId);
         publishRefundIfEligible(cancelled);
         availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
+        communityPostMaintenanceService.cancelOpenPostForBooking(cancelled.getId());
         bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
         return bookingMapper.toResponse(cancelled);
     }

@@ -19,7 +19,7 @@ import { useAvailability, useCreateBooking } from "@/lib/hooks/use-bookings";
 import { useCreateRecurringBooking } from "@/lib/hooks/use-recurring-bookings";
 import { useCurrentTime } from "@/lib/hooks/use-current-time";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
-import { useProfile } from "@/lib/hooks/use-profile";
+import { useCurrentUser } from "@/lib/hooks/use-profile";
 import { DataEmpty, DataError, FormSkeleton } from "@/components/ui/data-state";
 import type { PaymentMethod } from "@/lib/api/types";
 
@@ -42,7 +42,7 @@ export function BookingForm({
   const [recurringEndDate, setRecurringEndDate] = useState(initialDate);
   const createMutation = useCreateBooking();
   const createRecurringMutation = useCreateRecurringBooking();
-  const profile = useProfile();
+  const currentUser = useCurrentUser();
   const now = useCurrentTime();
 
   const activeSubFields = subFields.data?.filter((item) => item.active) ?? [];
@@ -367,7 +367,7 @@ export function BookingForm({
             >
               <strong className="block text-sm text-slate-900">Số dư tài khoản</strong>
               <span className="mt-1 block text-xs text-slate-500">
-                Hiện có {formatCurrency(profile.data?.balance ?? 0)}.
+                Hiện có {formatCurrency(currentUser.data?.balance ?? 0)}.
               </span>
             </button>
           </div>

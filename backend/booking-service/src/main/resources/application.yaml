@@ -70,6 +70,12 @@ booking:
   recurring-scheduler-fixed-delay-ms: 43200000
   recurring-generation-lead-days: 2
 
+community:
+  post-close-scheduler-fixed-delay-ms: 60000
+  moderation:
+    permanent-ban-threshold: 3
+    expiration-scheduler-fixed-delay-ms: 300000
+
 internal:
   gateway:
     secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}

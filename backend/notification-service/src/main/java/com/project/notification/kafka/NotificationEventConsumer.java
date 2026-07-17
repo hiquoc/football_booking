@@ -3,6 +3,7 @@ package com.project.notification.kafka;
 import com.project.common.events.notification.BookingCancelledEvent;
 import com.project.common.events.notification.BookingConfirmedEvent;
 import com.project.common.events.notification.BookingCreatedEvent;
+import com.project.common.events.notification.CommunityNotificationEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PaymentFailedEvent;
 import com.project.common.events.notification.PaymentSuccessEvent;
@@ -52,6 +53,11 @@ public class NotificationEventConsumer {
 
     @KafkaListener(topics = NotificationEventTopics.PAYMENT_FAILED, groupId = "${spring.kafka.consumer.group-id}")
     public void onPaymentFailed(ConsumerRecord<String, PaymentFailedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = NotificationEventTopics.COMMUNITY_NOTIFICATION, groupId = "${spring.kafka.consumer.group-id}")
+    public void onCommunityNotification(ConsumerRecord<String, CommunityNotificationEvent> record) {
         inboxService.receive(record, consumerGroup);
     }
 }

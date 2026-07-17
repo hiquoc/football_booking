@@ -1,11 +1,13 @@
 package com.project.user.dto;
 
 import com.project.common.enums.UserType;
+import com.project.user.enums.SkillLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
@@ -19,6 +21,16 @@ public class UserDto {
     private String email;
     private String fullName;
     private String avatarUrl;
+    private String bio;
+    private String teamPhotoUrl;
+    private SkillLevel skillLevel;
+    private Integer totalMatches;
+    private Integer wins;
+    private Integer draws;
+    private Integer losses;
+    private BigDecimal noCancelRate;
+    private BigDecimal onTimeRate;
+    private BigDecimal fairPlayRate;
     private UserType userType;
     private String socialProvider;
     private String socialProviderId;

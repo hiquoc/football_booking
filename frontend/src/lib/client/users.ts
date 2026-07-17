@@ -1,14 +1,23 @@
 import type {
-  PageResponse,
-  UpdateProfileInput,
-  User,
   AvatarUploadSlot,
   CloudinaryUploadResult,
+  PageResponse,
+  PublicProfile,
+  UpdateProfileInput,
+  User,
 } from "@/lib/api/types";
 import { jsonBody, requestJson } from "./http";
 
 export function fetchMyProfile() {
-  return requestJson<User>("/api/profile");
+  return requestJson<PublicProfile>("/api/profile");
+}
+
+export function fetchCurrentUser() {
+  return requestJson<User>("/api/users/me");
+}
+
+export function fetchPublicProfile(id: string) {
+  return requestJson<PublicProfile>(`/api/users/${encodeURIComponent(id)}/profile`);
 }
 
 export function fetchUsers(page: number, size = 10) {
@@ -17,24 +26,40 @@ export function fetchUsers(page: number, size = 10) {
 }
 
 export function submitProfileUpdate(input: UpdateProfileInput) {
-  return requestJson<User>("/api/profile", {
+  return requestJson<PublicProfile>("/api/profile", {
     method: "PATCH",
     ...jsonBody(input),
   });
 }
 
-export async function submitAvatar(file: File) {
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Chỉ hỗ trợ ảnh JPEG, PNG và WEBP");
-  const slot = await requestJson<AvatarUploadSlot>("/api/profile/avatar/upload-slot", {
-    method: "POST", ...jsonBody({ requestId: crypto.randomUUID() }),
+export function submitAvatar(file: File) {
+  return submitProfileImage(file, "/api/profile/avatar/upload-slot", "/api/profile/avatar/confirm");
+}
+
+export function submitTeamPhoto(file: File) {
+  return submitProfileImage(file, "/api/profile/team-photo/upload-slot", "/api/profile/team-photo/confirm");
+}
+
+async function submitProfileImage(file: File, slotUrl: string, confirmUrl: string) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("Chỉ hỗ trợ ảnh JPEG, PNG và WEBP");
+  }
+  const slot = await requestJson<AvatarUploadSlot>(slotUrl, {
+    method: "POST",
+    ...jsonBody({ requestId: crypto.randomUUID() }),
   });
   const data = new FormData();
-  data.set("file", file); data.set("api_key", slot.apiKey); data.set("timestamp", String(slot.timestamp));
-  data.set("public_id", slot.publicId); data.set("signature", slot.signature); data.set("overwrite", "false");
+  data.set("file", file);
+  data.set("api_key", slot.apiKey);
+  data.set("timestamp", String(slot.timestamp));
+  data.set("public_id", slot.publicId);
+  data.set("signature", slot.signature);
+  data.set("overwrite", "false");
   const response = await fetch(slot.uploadUrl, { method: "POST", body: data });
   if (!response.ok) throw new Error("Cloudinary từ chối tải ảnh lên");
-  return requestJson<User>("/api/profile/avatar/confirm", {
-    method: "POST", ...jsonBody((await response.json()) as CloudinaryUploadResult),
+  return requestJson<User>(confirmUrl, {
+    method: "POST",
+    ...jsonBody((await response.json()) as CloudinaryUploadResult),
   });
 }
 

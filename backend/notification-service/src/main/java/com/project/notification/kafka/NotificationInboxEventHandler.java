@@ -3,6 +3,7 @@ package com.project.notification.kafka;
 import com.project.common.events.notification.BookingCancelledEvent;
 import com.project.common.events.notification.BookingConfirmedEvent;
 import com.project.common.events.notification.BookingCreatedEvent;
+import com.project.common.events.notification.CommunityNotificationEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PaymentFailedEvent;
 import com.project.common.events.notification.PaymentSuccessEvent;
@@ -35,7 +36,8 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
             NotificationEventTopics.BOOKING_CONFIRMED,
             NotificationEventTopics.BOOKING_CANCELLED,
             NotificationEventTopics.PAYMENT_SUCCESS,
-            NotificationEventTopics.PAYMENT_FAILED);
+            NotificationEventTopics.PAYMENT_FAILED,
+            NotificationEventTopics.COMMUNITY_NOTIFICATION);
 
     private final InboxService inboxService;
     private final NotificationService notificationService;
@@ -61,6 +63,8 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                     handlePaymentSuccess(inboxService.payload(event, PaymentSuccessEvent.class));
             case NotificationEventTopics.PAYMENT_FAILED ->
                     handlePaymentFailed(inboxService.payload(event, PaymentFailedEvent.class));
+            case NotificationEventTopics.COMMUNITY_NOTIFICATION ->
+                    handleCommunityNotification(inboxService.payload(event, CommunityNotificationEvent.class));
             default -> throw new IllegalStateException("Unsupported topic " + event.getTopic());
         }
     }
@@ -136,6 +140,17 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                         "amount", event.amount(),
                         "reason", event.reason()))
                 .channels(List.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL))
+                .build());
+    }
+
+    private void handleCommunityNotification(CommunityNotificationEvent event) {
+        notificationService.create(NotificationRequest.builder()
+                .userId(event.userId())
+                .recipientEmail(event.userEmail())
+                .code(NotificationCode.valueOf(event.code()))
+                .title(event.title())
+                .payload(event.payload())
+                .channels(List.of(NotificationChannel.IN_APP))
                 .build());
     }
 
