@@ -4,29 +4,48 @@ import com.project.common.outbox.entity.OutboxEvent;
 import com.project.common.outbox.service.OutboxProcessingService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OutboxScheduler {
 
     private final OutboxProcessingService processingService;
     private final MeterRegistry meterRegistry;
+    private final ExecutorService outboxPublisherExecutor;
+
+    public OutboxScheduler(
+            OutboxProcessingService processingService,
+            MeterRegistry meterRegistry,
+            @Qualifier("outboxPublisherExecutor") ExecutorService outboxPublisherExecutor) {
+        this.processingService = processingService;
+        this.meterRegistry = meterRegistry;
+        this.outboxPublisherExecutor = outboxPublisherExecutor;
+    }
 
     @Scheduled(fixedDelayString = "${outbox.poll-interval:5000}")
     public void publishPendingEvents() {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
             List<OutboxEvent> events = processingService.claimBatch();
-            for (OutboxEvent event : events) {
-                publish(event);
+            if (events.isEmpty()) {
+                return;
             }
+            CompletableFuture<?>[] futures = events.stream()
+                    .map(event -> CompletableFuture.runAsync(() -> publish(event), outboxPublisherExecutor)
+                            .exceptionally(ex -> {
+                                log.error("Unexpected failure while processing outbox event: eventId={}", event.getId(), ex);
+                                return null;
+                            }))
+                    .toArray(CompletableFuture[]::new);
+            CompletableFuture.allOf(futures).join();
         } finally {
             sample.stop(meterRegistry.timer("outbox.scheduler.duration"));
         }

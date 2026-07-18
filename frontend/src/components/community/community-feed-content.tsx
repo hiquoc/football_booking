@@ -79,6 +79,16 @@ export function CommunityFeedContent({
                     <span className="inline-flex items-center gap-2"><Trophy className="size-4" /> Đang tìm đối thủ</span>
                   )}
                 </div>
+                {post.postType === "LOOKING_OPPONENT" && post.ownerStatistics ? (
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 text-xs font-bold text-slate-600 sm:grid-cols-3">
+                    <span>Matches: {post.ownerStatistics.totalMatches}</span>
+                    <span>Win: {formatPercent(post.ownerStatistics.winRate)}</span>
+                    <span>On time: {formatPercent(post.ownerStatistics.onTimeRate)}</span>
+                    <span>No cancel: {formatPercent(post.ownerStatistics.noCancelRate)}</span>
+                    <span>Fair play: {formatPercent(post.ownerStatistics.fairPlayRate)}</span>
+                    <span>Bookings: {post.ownerStatistics.completedBookingCount}</span>
+                  </div>
+                ) : null}
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Link href={`/community/${post.id}`} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">
                     Xem chi tiết
@@ -171,4 +181,8 @@ function State({ title }: { title: string }) {
 
 function FeedSkeleton() {
   return <div className="grid gap-5 lg:grid-cols-2">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-64 animate-pulse rounded-lg bg-slate-200" />)}</div>;
+}
+
+function formatPercent(value: number) {
+  return `${Number(value ?? 0).toFixed(1).replace(/\.0$/, "")}%`;
 }

@@ -17,4 +17,5 @@ public class ProfileStatisticsDto {
     private int draws;
     private int losses;
     private BigDecimal winRate;
+    private int completedBookingCount;
 }

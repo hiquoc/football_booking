@@ -4,11 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.booking.config.SecurityConfig;
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
+import com.project.booking.dto.request.UpsertMatchResultRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.dto.response.UnavailableSlotResponse;
+import com.project.booking.enums.WinningTeam;
 import com.project.booking.exception.BookingConflictException;
+import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.BookingService;
+import com.project.booking.service.MatchResultService;
 import com.project.booking.repository.BookingRepository;
 import com.project.common.constants.GlobalConstants;
 import com.project.common.dto.PageResponse;
@@ -38,6 +42,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -58,6 +63,12 @@ class BookingControllerApiTest {
 
     @MockitoBean
     private BookingService bookingService;
+
+    @MockitoBean
+    private BookingConfigService bookingConfigService;
+
+    @MockitoBean
+    private MatchResultService matchResultService;
 
     @MockitoBean
     private BookingRepository bookingRepository;
@@ -186,12 +197,37 @@ class BookingControllerApiTest {
 
     @Test
     void getOwnerBookingsWithOwnerHeaderReturnsList() throws Exception {
-        when(bookingService.getOwnerBookings(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+        when(bookingService.getOwnerBookings(eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
                 .thenReturn(bookingPageResponse());
 
-        mockMvc.perform(get("/api/v1/bookings/owner").headers(ownerHeaders()))
+        mockMvc.perform(get("/api/v1/bookings/owner")
+                        .headers(ownerHeaders())
+                        .param("bookingDate", LocalDate.now().plusDays(3).toString())
+                        .param("subFieldId", SUB_FIELD_ID.toString())
+                        .param("status", "PENDING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].id").value(BOOKING_ID.toString()));
+    }
+
+    @Test
+    void ownerUpsertMatchResultReturnsBooking() throws Exception {
+        UpsertMatchResultRequest request = new UpsertMatchResultRequest();
+        request.setWinningTeam(WinningTeam.TEAM_A);
+        request.setTeamAPercentage(70);
+        request.setTeamBPercentage(30);
+        when(matchResultService.upsert(eq(USER_ID), eq(BOOKING_ID), org.mockito.ArgumentMatchers.any(UpsertMatchResultRequest.class)))
+                .thenReturn(bookingResponse());
+
+        mockMvc.perform(put("/api/v1/bookings/owner/{bookingId}/match-result", BOOKING_ID)
+                        .headers(ownerHeaders())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Match result saved successfully"));
     }
 
     @Test

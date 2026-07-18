@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,39 +27,40 @@ class BookingConfigServiceImplTest {
 
     @Test
     void loadCachesActiveConfigurationInMemory() {
-        BookingConfig config = config(0L, 24, true);
+        BookingConfig config = config(5000L, 1000L, 24, true);
         when(repository.findByActiveTrue()).thenReturn(Optional.of(config));
 
         service.load();
 
-        assertEquals(0L, service.getConfig().getBookingFee());
+        assertEquals(5000L, service.getConfig().getFirstBookingFee());
+        assertEquals(1000L, service.getConfig().getNotFirstBookingFee());
         assertEquals(24, service.getConfig().getRefundBeforeHours());
     }
 
     @Test
-    void updatePersistsConfigurationAndReplacesCachedReference() {
-        BookingConfig initial = config(0L, 24, true);
-        BookingConfig loadedForUpdate = config(0L, 24, true);
+    void updatePersistsConfiguration() {
+        BookingConfig initial = config(5000L, 1000L, 24, true);
+        BookingConfig loadedForUpdate = config(5000L, 1000L, 24, true);
         when(repository.findByActiveTrue())
                 .thenReturn(Optional.of(initial))
                 .thenReturn(Optional.of(loadedForUpdate));
         when(repository.saveAndFlush(loadedForUpdate)).thenReturn(loadedForUpdate);
 
         service.load();
-        BookingConfig cachedBeforeUpdate = service.getConfig();
 
-        service.update(new BookingConfigRequest(5000L, 12, false));
+        service.update(new BookingConfigRequest(6000L, 2000L, 12, false));
 
-        assertNotSame(cachedBeforeUpdate, service.getConfig());
-        assertEquals(5000L, service.getConfig().getBookingFee());
+        assertEquals(6000L, service.getConfig().getFirstBookingFee());
+        assertEquals(2000L, service.getConfig().getNotFirstBookingFee());
         assertEquals(12, service.getConfig().getRefundBeforeHours());
         assertEquals(false, service.getConfig().getRefundEnabled());
     }
 
-    private BookingConfig config(long bookingFee, int refundBeforeHours, boolean refundEnabled) {
+    private BookingConfig config(long firstBookingFee, long notFirstBookingFee, int refundBeforeHours, boolean refundEnabled) {
         return BookingConfig.builder()
                 .id(UUID.randomUUID())
-                .bookingFee(bookingFee)
+                .firstBookingFee(firstBookingFee)
+                .notFirstBookingFee(notFirstBookingFee)
                 .refundBeforeHours(refundBeforeHours)
                 .refundEnabled(refundEnabled)
                 .active(true)

@@ -28,8 +28,11 @@ public class BookingConfig {
     @UuidGenerator
     private UUID id;
 
-    @Column(name = "booking_fee", nullable = false)
-    private Long bookingFee;
+    @Column(name = "first_booking_fee", nullable = false)
+    private Long firstBookingFee;
+
+    @Column(name = "not_first_booking_fee", nullable = false)
+    private Long notFirstBookingFee;
 
     @Column(name = "refund_before_hours", nullable = false)
     private Integer refundBeforeHours;

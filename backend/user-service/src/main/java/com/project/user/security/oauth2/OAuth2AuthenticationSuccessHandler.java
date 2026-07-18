@@ -27,7 +27,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         CustomOAuth2User oAuth2User = (CustomOAuth2User) authentication.getPrincipal();
         User user = oAuth2User.getUser();
 
-        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name());
+        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name(),
+                user.getCompletedBookingCount());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
         // Track session in Redis (Max 5 sessions per user)

@@ -87,7 +87,7 @@ class AuthServiceImplTest {
         when(jwtTokenProvider.getUserIdFromRefreshToken(OLD_REFRESH_TOKEN)).thenReturn(USER_ID);
         when(redisService.isRefreshTokenValid(USER_ID, OLD_REFRESH_TOKEN)).thenReturn(true);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
-        when(jwtTokenProvider.generateToken(USER_ID, null, "CLIENT")).thenReturn(ACCESS_TOKEN);
+        when(jwtTokenProvider.generateToken(USER_ID, null, "CLIENT", 0)).thenReturn(ACCESS_TOKEN);
         when(jwtTokenProvider.generateRefreshToken(USER_ID)).thenReturn(NEW_REFRESH_TOKEN);
         when(jwtTokenProvider.getRefreshExpirationInMs()).thenReturn(REFRESH_EXPIRATION_MS);
 
@@ -166,7 +166,7 @@ class AuthServiceImplTest {
         when(jwtTokenProvider.getUserIdFromRefreshToken(OLD_REFRESH_TOKEN)).thenReturn(USER_ID);
         when(redisService.isRefreshTokenValid(USER_ID, OLD_REFRESH_TOKEN)).thenReturn(true);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
-        when(jwtTokenProvider.generateToken(USER_ID, null, "CLIENT")).thenReturn(ACCESS_TOKEN);
+        when(jwtTokenProvider.generateToken(USER_ID, null, "CLIENT", 0)).thenReturn(ACCESS_TOKEN);
         when(jwtTokenProvider.generateRefreshToken(USER_ID)).thenReturn(NEW_REFRESH_TOKEN);
         when(jwtTokenProvider.getRefreshExpirationInMs()).thenReturn(REFRESH_EXPIRATION_MS);
 

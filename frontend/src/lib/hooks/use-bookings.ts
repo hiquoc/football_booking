@@ -6,16 +6,39 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { Booking, CreateBookingInput, PageResponse } from "@/lib/api/types";
+import type { Booking, CreateBookingInput, MatchResultInput, PageResponse } from "@/lib/api/types";
 import {
   fetchAvailability,
   fetchBooking,
+  fetchBookingConfig,
   fetchMyBookings,
   fetchOwnerBookings,
   submitBooking,
   submitCancellation,
+  submitMatchResult,
 } from "@/lib/client/bookings";
 import { bookingQueryKeys } from "@/lib/query-keys";
+import { userQueryKeys } from "@/lib/query-keys";
+
+function incrementCompletedBookingCount(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.setQueryData(userQueryKeys.mePrivate, (old: unknown) => {
+    if (!old || typeof old !== "object") return old;
+    const user = old as { completedBookingCount?: number };
+    return {
+      ...user,
+      completedBookingCount: (user.completedBookingCount ?? 0) + 1,
+    };
+  });
+}
+
+export function useBookingConfig() {
+  return useQuery({
+    queryKey: bookingQueryKeys.config,
+    queryFn: fetchBookingConfig,
+    staleTime: 31_536_000_000,
+    gcTime: 31_536_000_000,
+  });
+}
 
 export function useMyBookings(page: number, size = 10) {
   return useQuery({
@@ -24,27 +47,44 @@ export function useMyBookings(page: number, size = 10) {
   });
 }
 
-export function useOwnerBookings(page: number, size = 10) {
+export function useOwnerBookings(
+  page: number,
+  size = 10,
+  filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
+) {
   return useQuery({
-    queryKey: bookingQueryKeys.owner(page, size),
-    queryFn: () => fetchOwnerBookings(page, size),
+    queryKey: bookingQueryKeys.owner(page, size, filters),
+    queryFn: () => fetchOwnerBookings(page, size, filters),
   });
 }
 
-export function useBookingList(page: number, owner = false, size = 10) {
+export function useBookingList(
+  page: number,
+  owner = false,
+  size = 10,
+  filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
+) {
   return useQuery({
     queryKey: owner
-      ? bookingQueryKeys.owner(page, size)
+      ? bookingQueryKeys.owner(page, size, filters)
       : bookingQueryKeys.mine(page, size),
     queryFn: () =>
-      owner ? fetchOwnerBookings(page, size) : fetchMyBookings(page, size),
+      owner ? fetchOwnerBookings(page, size, filters) : fetchMyBookings(page, size),
   });
 }
 
 export function useBooking(id: string) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: bookingQueryKeys.detail(id),
     queryFn: () => fetchBooking(id),
+    select: (booking) => {
+      const previous = queryClient.getQueryData<Booking>(bookingQueryKeys.detail(id));
+      if (booking.status === "COMPLETED" && previous?.status && previous.status !== "COMPLETED") {
+        incrementCompletedBookingCount(queryClient);
+      }
+      return booking;
+    },
   });
 }
 
@@ -102,6 +142,20 @@ export function useCancelBooking(owner = false) {
     onSuccess: (booking) => {
       queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+    },
+  });
+}
+
+export function useSubmitMatchResult() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, input }: { bookingId: string; input: MatchResultInput }) =>
+      submitMatchResult(bookingId, input),
+    retry: false,
+    onSuccess: (booking) => {
+      queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
     },
   });
 }

@@ -35,9 +35,11 @@ export function PaymentContent({ bookingId, returned }: { bookingId: string; ret
   if (data.status !== "PENDING") return <Result icon={<CheckCircle2 />} title="Lịch đặt sân đã được xác nhận"
       message="Lịch đặt này không còn khoản thanh toán đang chờ." onDone={() => router.push(`/bookings/${data.id}`)} />;
 
+  const bookingPrice = Number(data.bookingPrice ?? data.platformBookingFee ?? 0);
+
   async function pay() {
     try {
-      const result = await checkout.mutateAsync({ bookingId: data.id, amount: Number(data.totalAmount), currency: "VND", provider: "STRIPE" });
+      const result = await checkout.mutateAsync({ bookingId: data.id, amount: bookingPrice, currency: "VND", provider: "STRIPE" });
       window.location.assign(result.checkoutUrl);
     } catch { /* Mutation state renders the error. */ }
   }
@@ -47,7 +49,9 @@ export function PaymentContent({ bookingId, returned }: { bookingId: string; ret
     <h1 className="mt-5 text-3xl font-black text-slate-950">Thanh toán lịch đặt</h1>
     <p className="mt-2 text-sm text-slate-500">Thanh toán an toàn qua Stripe Test Mode cho lịch đặt {data.bookingCode}</p>
     <div className="mt-7 rounded-2xl bg-slate-50 p-5"><div className="flex justify-between text-sm">
-      <span className="text-slate-500">{data.fieldName} · {data.subFieldName}</span><strong>{formatCurrency(Number(data.totalAmount))}</strong>
+      <span className="text-slate-500">{data.fieldName} · {data.subFieldName}</span><strong>{formatCurrency(Number(data.subFieldPrice ?? data.totalAmount))}</strong>
+    </div><div className="mt-3 flex justify-between text-sm">
+      <span className="text-slate-500">Phí giữ lịch</span><strong>{formatCurrency(bookingPrice)}</strong>
     </div><div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4 text-sm">
       <span className="font-semibold text-slate-500">Thời gian thanh toán còn lại</span>
       <strong className={expired ? "text-rose-600" : "tabular-nums text-sky-700"}>{formatRemaining(remainingSeconds)}</strong>
@@ -56,7 +60,7 @@ export function PaymentContent({ bookingId, returned }: { bookingId: string; ret
       Kết quả thanh toán chỉ được xác nhận sau khi hệ thống nhận kết quả hợp lệ từ Stripe.</p>
     {checkout.error ? <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">Không thể tạo phiên thanh toán. Vui lòng thử lại sau.</p> : null}
     <button onClick={pay} disabled={checkout.isPending || expired} className="action-button mt-6 w-full bg-sky-500 px-5 text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50">
-      {checkout.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} {expired ? "Đã hết thời gian thanh toán" : `Thanh toán ${formatCurrency(Number(data.totalAmount))}`}
+      {checkout.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} {expired ? "Đã hết thời gian thanh toán" : `Thanh toán ${formatCurrency(bookingPrice)}`}
     </button>
   </div>;
 }

@@ -110,7 +110,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 5. Generate JWT tokens
-        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name());
+        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name(),
+                user.getCompletedBookingCount());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
         // 6. Track session in Redis (Max 5 sessions per user)
@@ -149,7 +150,8 @@ public class AuthServiceImpl implements AuthService {
         redisService.removeRefreshToken(userId, token);
 
         // Generate new access and refresh tokens
-        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name());
+        String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name(),
+                user.getCompletedBookingCount());
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
         // Track the new refresh token

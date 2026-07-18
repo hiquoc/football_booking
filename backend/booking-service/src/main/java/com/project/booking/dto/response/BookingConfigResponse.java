@@ -5,7 +5,8 @@ import java.util.UUID;
 
 public record BookingConfigResponse(
         UUID id,
-        Long bookingFee,
+        Long firstBookingFee,
+        Long notFirstBookingFee,
         Integer refundBeforeHours,
         Boolean refundEnabled,
         LocalDateTime createdAt,

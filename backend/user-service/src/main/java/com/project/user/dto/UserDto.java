@@ -36,6 +36,7 @@ public class UserDto {
     private String socialProviderId;
     private String status;
     private Long balance;
+    private Integer completedBookingCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

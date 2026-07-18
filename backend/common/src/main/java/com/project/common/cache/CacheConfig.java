@@ -41,7 +41,8 @@ public class CacheConfig {
                         CacheNames.FIELD_DETAIL, defaults.entryTtl(Duration.ofMinutes(15)),
                         CacheNames.FIELD_SEARCH, defaults.entryTtl(Duration.ofMinutes(5)),
                         CacheNames.FIELD_TYPES, defaults.entryTtl(Duration.ofHours(12)),
-                        CacheNames.AVAILABILITY, defaults.entryTtl(Duration.ofMinutes(2))))
+                        CacheNames.AVAILABILITY, defaults.entryTtl(Duration.ofMinutes(2)),
+                        CacheNames.BOOKING_CONFIG, defaults.entryTtl(Duration.ofDays(356))))
                 .transactionAware()
                 .build();
     }

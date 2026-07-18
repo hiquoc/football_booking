@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import com.project.common.enums.BookingStatus;
 
 public interface BookingService {
 
@@ -69,7 +70,7 @@ public interface BookingService {
      * @param ownerId the authenticated owner's ID
      * @return page of bookings for that owner
      */
-    PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, Pageable pageable);
+    PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable);
 
     /**
      * Returns a booking by ID.

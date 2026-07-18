@@ -15,4 +15,5 @@ public class JwtClaimsDto {
     private UUID userId;
     private String email;
     private String role;
+    private Integer completedBookingCount;
 }

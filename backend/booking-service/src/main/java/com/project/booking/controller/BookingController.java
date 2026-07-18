@@ -2,8 +2,11 @@ package com.project.booking.controller;
 
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
+import com.project.booking.dto.request.UpsertMatchResultRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
+import com.project.booking.dto.response.BookingConfigResponse;
 import com.project.booking.dto.response.BookingResponse;
+import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.BookingService;
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
@@ -41,6 +44,8 @@ import com.project.common.enums.BookingStatus;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final BookingConfigService bookingConfigService;
+    private final com.project.booking.service.MatchResultService matchResultService;
     private final BookingRepository bookingRepository;
 
     @Operation(summary = "Check booking conflicts", description = "Internal endpoint used before creating or updating field closures.")
@@ -53,6 +58,12 @@ public class BookingController {
                 subFieldIds, startDate, endDate,
                 List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
         return ApiResponse.success(conflicts);
+    }
+
+    @Operation(summary = "Get booking configuration", description = "Returns public booking configuration used for booking fee estimates.")
+    @GetMapping("/config")
+    public ApiResponse<BookingConfigResponse> getBookingConfig() {
+        return ApiResponse.success(bookingConfigService.getCurrent());
     }
 
     @Operation(
@@ -266,11 +277,24 @@ public class BookingController {
     @GetMapping("/owner")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getOwnerBookings(
             @Parameter(hidden = true) @CurrentUser UserPrincipal user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bookingDate,
+            @RequestParam(required = false) UUID subFieldId,
+            @RequestParam(required = false) BookingStatus status,
             @Parameter(hidden = true)
             Pageable pageable) {
 
-        PageResponse<BookingResponse> bookings = bookingService.getOwnerBookings(user.id(), pageable);
+        PageResponse<BookingResponse> bookings = bookingService.getOwnerBookings(user.id(), bookingDate, subFieldId, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(bookings));
+    }
+
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/owner/{bookingId}/match-result")
+    public ResponseEntity<ApiResponse<BookingResponse>> upsertMatchResult(
+            @PathVariable UUID bookingId,
+            @CurrentUser UserPrincipal user,
+            @Valid @RequestBody UpsertMatchResultRequest request) {
+        BookingResponse response = matchResultService.upsert(user.id(), bookingId, request);
+        return ResponseEntity.ok(ApiResponse.success("Match result saved successfully", response));
     }
 
     @Operation(summary = "Get booking by ID", description = "Returns the detail of a single booking")

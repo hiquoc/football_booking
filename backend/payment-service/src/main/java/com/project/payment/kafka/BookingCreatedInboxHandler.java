@@ -17,6 +17,10 @@ public class BookingCreatedInboxHandler implements InboxEventHandler {
         BookingPaymentProjection projection = repository.findById(event.bookingId())
                 .orElseGet(() -> BookingPaymentProjection.builder().bookingId(event.bookingId()).build());
         projection.setBookingCode(event.bookingCode()); projection.setUserId(event.userId());
-        projection.setUserEmail(event.userEmail()); projection.setTotalAmount(event.totalAmount()); repository.save(projection);
+        projection.setUserEmail(event.userEmail()); projection.setTotalAmount(event.totalAmount());
+        projection.setSubFieldPrice(event.subFieldPrice() == null ? event.totalAmount() : event.subFieldPrice());
+        projection.setBookingPrice(event.bookingPrice() == null ? 0L : event.bookingPrice());
+        projection.setPlatformBookingFee(event.platformBookingFee() == null ? projection.getBookingPrice() : event.platformBookingFee());
+        repository.save(projection);
     }
 }

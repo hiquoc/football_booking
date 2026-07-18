@@ -18,7 +18,8 @@ export default function RootLayout({
       <body>
         <QueryProvider>
           <ToastProvider>
-            <ChatProvider>{children}</ChatProvider>
+            {/* <ChatProvider>{children}</ChatProvider> */}
+            {children}
           </ToastProvider>
         </QueryProvider>
       </body>

@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { PublicProfile, SkillLevel } from "@/lib/api/types";
 import {
   Camera,
+  CalendarDays,
   Clock,
   Edit3,
   Handshake,
@@ -271,6 +272,10 @@ function ProfileView({
         <MetricCard label="Draws" value={profile.statistics.draws} icon={<Handshake className="size-5" />} />
         <MetricCard label="Losses" value={profile.statistics.losses} icon={<X className="size-5" />} />
         <MetricCard label="Win Rate" value={formatPercent(profile.statistics.winRate)} icon={<ShieldCheck className="size-5" />} />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-1">
+        <MetricCard label="Completed Bookings" value={profile.statistics.completedBookingCount} icon={<CalendarDays className="size-5" />} />
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">

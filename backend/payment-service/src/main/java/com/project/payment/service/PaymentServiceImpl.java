@@ -24,17 +24,19 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentProviderStrategyFactory strategyFactory;
     private final PaymentEventPublisher eventPublisher;
 
+    //Boc try catch voi tao payment moi de tra ve ket qua cu khi request chay nhieu lan
     @Override @Transactional
     public CheckoutResponse createCheckout(UUID userId, CreateCheckoutRequest request) {
         BookingPaymentProjection booking = bookingRepository.findById(request.bookingId())
                 .orElseThrow(() -> new NotFoundException("Booking is not available for payment"));
         if (!booking.getUserId().equals(userId)) throw new ForbiddenException("You are not authorised to pay for this booking");
-        if (booking.getTotalAmount().compareTo(request.amount()) != 0) throw new BadRequestException("Payment amount does not match booking total");
+        java.math.BigDecimal payableAmount = java.math.BigDecimal.valueOf(booking.getBookingPrice() == null ? 0L : booking.getBookingPrice());
+        if (payableAmount.compareTo(request.amount()) != 0) throw new BadRequestException("Payment amount does not match booking total");
         String currency = request.currency().toUpperCase(Locale.ROOT);
         PaymentProvider provider = request.provider() == null ? PaymentProvider.STRIPE : request.provider();
         Payment payment = paymentRepository.findByBookingId(request.bookingId()).orElseGet(() -> paymentRepository.save(
                 Payment.builder().bookingId(request.bookingId()).userId(userId).provider(provider)
-                        .amount(booking.getTotalAmount()).currency(currency).status(PaymentStatus.PENDING).build()));
+                        .amount(payableAmount).currency(currency).status(PaymentStatus.PENDING).build()));
         if (payment.getStatus() == PaymentStatus.SUCCESS) throw new ConflictException("Booking has already been paid");
         if (payment.getProvider() != provider || !payment.getCurrency().equals(currency))
             throw new ConflictException("An existing payment uses a different provider or currency");

@@ -37,6 +37,7 @@ public interface UserMapper {
                         .draws(valueOrZero(user.getDraws()))
                         .losses(valueOrZero(user.getLosses()))
                         .winRate(calculateWinRate(user))
+                        .completedBookingCount(valueOrZero(user.getCompletedBookingCount()))
                         .build())
                 .reputation(ProfileReputationDto.builder()
                         .noCancelRate(user.getNoCancelRate())

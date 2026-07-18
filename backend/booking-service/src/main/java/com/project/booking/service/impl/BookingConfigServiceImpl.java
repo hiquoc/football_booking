@@ -5,8 +5,12 @@ import com.project.booking.dto.response.BookingConfigResponse;
 import com.project.booking.entity.BookingConfig;
 import com.project.booking.repository.BookingConfigRepository;
 import com.project.booking.service.BookingConfigService;
+import com.project.common.cache.CacheKeys;
+import com.project.common.cache.CacheNames;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +21,45 @@ import java.time.LocalDateTime;
 public class BookingConfigServiceImpl implements BookingConfigService {
 
     private final BookingConfigRepository repository;
-    private volatile BookingConfig cachedConfig;
 
     @PostConstruct
     @Transactional
     public void load() {
-        cachedConfig = repository.findByActiveTrue()
+        getOrCreateActiveConfig();
+    }
+
+    @Override
+    @Cacheable(cacheNames = CacheNames.BOOKING_CONFIG, key = CacheKeys.BOOKING_CONFIG, sync = true)
+    public BookingConfig getConfig() {
+        return getOrCreateActiveConfig();
+    }
+
+    @Override
+    @Cacheable(cacheNames = CacheNames.BOOKING_CONFIG, key = "'current-response'", sync = true)
+    public BookingConfigResponse getCurrent() {
+        return toResponse(getConfig());
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.BOOKING_CONFIG, allEntries = true)
+    public BookingConfigResponse update(BookingConfigRequest request) {
+        BookingConfig config = repository.findByActiveTrue()
+                .orElseThrow(() -> new IllegalStateException("Active booking configuration is missing"));
+        config.setFirstBookingFee(request.firstBookingFee());
+        config.setNotFirstBookingFee(request.notFirstBookingFee());
+        config.setRefundBeforeHours(request.refundBeforeHours());
+        config.setRefundEnabled(request.refundEnabled());
+        config.setUpdatedAt(LocalDateTime.now());
+        BookingConfig saved = repository.saveAndFlush(config);
+        return toResponse(saved);
+    }
+
+    private BookingConfig getOrCreateActiveConfig() {
+        return repository.findByActiveTrue()
                 .orElseGet(() -> repository.save(BookingConfig.builder()
-                        .bookingFee(0L)
+                        .firstBookingFee(5_000L)
+                        .notFirstBookingFee(1_000L)
                         .refundBeforeHours(24)
                         .refundEnabled(true)
                         .active(true)
@@ -33,38 +68,11 @@ public class BookingConfigServiceImpl implements BookingConfigService {
                         .build()));
     }
 
-    @Override
-    public BookingConfig getConfig() {
-        BookingConfig config = cachedConfig;
-        if (config == null) {
-            throw new IllegalStateException("Booking configuration has not been loaded");
-        }
-        return config;
-    }
-
-    @Override
-    public BookingConfigResponse getCurrent() {
-        return toResponse(getConfig());
-    }
-
-    @Override
-    @Transactional
-    public BookingConfigResponse update(BookingConfigRequest request) {
-        BookingConfig config = repository.findByActiveTrue()
-                .orElseThrow(() -> new IllegalStateException("Active booking configuration is missing"));
-        config.setBookingFee(request.bookingFee());
-        config.setRefundBeforeHours(request.refundBeforeHours());
-        config.setRefundEnabled(request.refundEnabled());
-        config.setUpdatedAt(LocalDateTime.now());
-        BookingConfig saved = repository.saveAndFlush(config);
-        cachedConfig = saved;
-        return toResponse(saved);
-    }
-
     private BookingConfigResponse toResponse(BookingConfig config) {
         return new BookingConfigResponse(
                 config.getId(),
-                config.getBookingFee(),
+                config.getFirstBookingFee(),
+                config.getNotFirstBookingFee(),
                 config.getRefundBeforeHours(),
                 config.getRefundEnabled(),
                 config.getCreatedAt(),

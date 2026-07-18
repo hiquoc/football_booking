@@ -51,7 +51,7 @@ outbox:
   batch-size: 50
   poll-interval: 5000
   max-retries: 5
-  scheduler-concurrency: 1
+  scheduler-concurrency: 8
   retry-delays: [10s, 30s, 1m, 5m, 15m]
   dlq: { enabled: true, topic-suffix: .dlq }
 inbox:

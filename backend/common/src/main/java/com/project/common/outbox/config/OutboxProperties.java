@@ -25,7 +25,7 @@ public record OutboxProperties(
             maxRetries = 5;
         }
         if (schedulerConcurrency <= 0) {
-            schedulerConcurrency = 1;
+            schedulerConcurrency = 8;
         }
         if (retryDelays == null || retryDelays.isEmpty()) {
             retryDelays = List.of(

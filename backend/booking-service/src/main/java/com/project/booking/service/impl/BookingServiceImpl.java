@@ -16,12 +16,16 @@ import com.project.booking.exception.BookingNotCancellableException;
 import com.project.booking.exception.BookingNotFoundException;
 import com.project.booking.kafka.BookingBalanceEventPublisher;
 import com.project.booking.kafka.BookingNotificationEventPublisher;
+import com.project.booking.kafka.BookingTrustEventPublisher;
 import com.project.booking.mapper.BookingMapper;
+import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.payment.BookingPaymentStrategyFactory;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
+import com.project.booking.repository.MatchResultRepository;
 import com.project.booking.repository.RecurringBookingRepository;
+import com.project.booking.repository.UserReplicaRepository;
 import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.BookingService;
 import com.project.booking.service.ResolvedOperatingHours;
@@ -86,6 +90,10 @@ public class BookingServiceImpl implements BookingService {
     private final AvailabilityCacheService availabilityCacheService;
     private final RecurringBookingRepository recurringBookingRepository;
     private final CommunityPostMaintenanceService communityPostMaintenanceService;
+    private final UserReplicaRepository userReplicaRepository;
+    private final BookingTrustEventPublisher bookingTrustEventPublisher;
+    private final BookingModerationService bookingModerationService;
+    private final MatchResultRepository matchResultRepository;
 
     @Value("${booking.payment-timeout-minutes:35}")
     private int paymentTimeoutMinutes = 35;
@@ -107,14 +115,14 @@ public class BookingServiceImpl implements BookingService {
 
     private BookingResponse createBooking(UUID userId, CreateBookingRequest request, UUID sourceRecurringBookingId) {
         SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
+        bookingModerationService.ensureCanBook(userId, subField.getFieldId());
         request.setEndTime(calculateEndTime(request.getStartTime(), request.getDurationMinutes()));
 
         validateBooking(subField, request, sourceRecurringBookingId);
 
-        var config = bookingConfigService.getConfig();
+        long bookingPrice = resolveBookingPrice(userId);
         PaymentMethod paymentMethod = request.getPaymentMethod() == null ? PaymentMethod.STRIPE : request.getPaymentMethod();
-        BigDecimal totalAmount = pricingStrategy.calculate(subField, request)
-                .add(BigDecimal.valueOf(config.getBookingFee()));
+        BigDecimal subFieldPrice = pricingStrategy.calculate(subField, request);
         Booking booking = Booking.builder()
                 .bookingCode(BookingCodeGenerator.generate())
                 .clientId(userId)
@@ -125,7 +133,10 @@ public class BookingServiceImpl implements BookingService {
                 .endTime(request.getEndTime())
                 .durationMinutes(request.getDurationMinutes())
                 .pricePerHour(resolveStartPrice(subField, request.getStartTime()))
-                .totalAmount(totalAmount)
+                .totalAmount(subFieldPrice)
+                .subFieldPrice(subFieldPrice)
+                .bookingPrice(bookingPrice)
+                .platformBookingFee(bookingPrice)
                 .paymentMethod(paymentMethod)
                 .status(BookingStatus.PENDING)
                 .note(request.getNote())
@@ -136,6 +147,9 @@ public class BookingServiceImpl implements BookingService {
         try {
             saved = bookingRepository.saveAndFlush(booking);
         } catch (DataIntegrityViolationException ex) {
+            /// them check neu chinh nguoi dung da book san nay de tra ve loi Ban da dat san thanh cong thay vi tra loi
+            /// Booking existing = bookingRepository.findByClientIdAndSubFieldIdAndBookingDateAndTime(...);
+            ///
             if (isBookingOverlapConstraintViolation(ex)) {
                 throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
             }
@@ -218,10 +232,14 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public int completeFinishedBookings() {
         LocalDateTime now = LocalDateTime.now();
-        int completedCount = bookingRepository.completeConfirmedBookings(
-                BookingStatus.CONFIRMED, BookingStatus.COMPLETED, now.toLocalDate(), now.toLocalTime());
+        List<Booking> finishedBookings = bookingRepository.findFinishedConfirmedBookings(
+                BookingStatus.CONFIRMED, now.toLocalDate(), now.toLocalTime());
+        finishedBookings.forEach(booking -> booking.setStatus(BookingStatus.COMPLETED));
+        int completedCount = finishedBookings.size();
         if (completedCount > 0) {
             availabilityCacheService.evictAll();
+            bookingRepository.saveAll(finishedBookings);
+            finishedBookings.forEach(bookingTrustEventPublisher::publishBookingCompleted);
             log.info("Completed {} confirmed bookings ending on or before {}", completedCount, now);
         }
         return completedCount;
@@ -235,8 +253,15 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, Pageable pageable) {
-        return PageResponse.from(bookingRepository.findByOwnerId(ownerId, pageable).map(bookingMapper::toResponse));
+    public PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable) {
+        var page = bookingRepository.findOwnerBookings(ownerId, bookingDate, subFieldId, status, pageable);
+        var responses = page.map(bookingMapper::toResponse);
+        var resultByBookingId = matchResultRepository.findByBookingIdIn(
+                        responses.getContent().stream().map(BookingResponse::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(result -> result.getBookingId(), bookingMapper::toMatchResultResponse));
+        responses.getContent().forEach(response -> response.setMatchResult(resultByBookingId.get(response.getId())));
+        return PageResponse.from(responses);
     }
 
     @Override
@@ -287,14 +312,26 @@ public class BookingServiceImpl implements BookingService {
 
     private void publishRefundIfEligible(Booking booking) {
         var config = bookingConfigService.getConfig();
-        if (!Boolean.TRUE.equals(config.getRefundEnabled()) || config.getBookingFee() <= 0) {
+        long refundAmount = booking.getBookingPrice() == null || booking.getBookingPrice() == 0L
+                ? (booking.getPlatformBookingFee() == null ? 0L : booking.getPlatformBookingFee())
+                : booking.getBookingPrice();
+        if (!Boolean.TRUE.equals(config.getRefundEnabled()) || refundAmount <= 0) {
             return;
         }
         LocalDateTime refundDeadline = LocalDateTime.of(booking.getBookingDate(), booking.getStartTime())
                 .minusHours(config.getRefundBeforeHours());
         if (LocalDateTime.now().isBefore(refundDeadline)) {
-            bookingBalanceEventPublisher.publishRefundRequested(booking, config.getBookingFee(), BOOKING_CANCEL_REFUND_REASON);
+            bookingBalanceEventPublisher.publishRefundRequested(booking, refundAmount, BOOKING_CANCEL_REFUND_REASON);
         }
+    }
+
+    private long resolveBookingPrice(UUID userId) {
+        int completedBookingCount = userReplicaRepository.findById(userId)
+                .map(replica -> replica.getCompletedBookingCount() == null ? 0 : replica.getCompletedBookingCount())
+                .orElse(0);
+
+        var config = bookingConfigService.getConfig();
+        return completedBookingCount == 0 ? config.getFirstBookingFee() : config.getNotFirstBookingFee();
     }
 
     private void validateBooking(SubFieldResponse subField, CreateBookingRequest request, UUID sourceRecurringBookingId) {

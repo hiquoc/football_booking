@@ -23,6 +23,8 @@ CREATE TABLE bookings (
     duration_minutes INTEGER NOT NULL,
     price_per_hour NUMERIC(10, 2) NOT NULL,
     total_amount NUMERIC(10, 2) NOT NULL,
+    sub_field_price NUMERIC(10, 2) NOT NULL,
+    booking_price BIGINT NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     note VARCHAR(255),
     cancellation_reason VARCHAR(255),

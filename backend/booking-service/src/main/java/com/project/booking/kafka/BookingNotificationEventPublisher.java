@@ -34,6 +34,9 @@ public class BookingNotificationEventPublisher {
                         booking.getStartTime(),
                         booking.getEndTime(),
                         booking.getTotalAmount(),
+                        booking.getPlatformBookingFee(),
+                        booking.getSubFieldPrice(),
+                        booking.getBookingPrice(),
                         Instant.now()));
         log.info("Stored booking created notification outbox event: bookingId={}", booking.getId());
     }

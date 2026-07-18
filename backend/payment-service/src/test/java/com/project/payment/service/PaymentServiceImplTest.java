@@ -34,7 +34,12 @@ class PaymentServiceImplTest {
         service = new PaymentServiceImpl(payments, bookings, webhookEvents, sessions, factory, publisher);
         userId = UUID.randomUUID(); bookingId = UUID.randomUUID();
         when(bookings.findById(bookingId)).thenReturn(Optional.of(BookingPaymentProjection.builder()
-                .bookingId(bookingId).bookingCode("BK-1").userId(userId).totalAmount(new BigDecimal("300000.00")).build()));
+                .bookingId(bookingId).bookingCode("BK-1").userId(userId)
+                .totalAmount(new BigDecimal("300000.00"))
+                .subFieldPrice(new BigDecimal("300000.00"))
+                .bookingPrice(5000L)
+                .platformBookingFee(5000L)
+                .build()));
         when(payments.findByBookingId(bookingId)).thenReturn(Optional.empty());
         when(payments.save(any(Payment.class))).thenAnswer(invocation -> {
             Payment value = invocation.getArgument(0);
@@ -46,9 +51,9 @@ class PaymentServiceImplTest {
     @Test void checkoutUsesAuthoritativeBookingAmountAndSelectedStrategy() {
         when(stripe.createCheckout(any())).thenReturn(new ProviderCheckoutResult("cs_test_1", "https://checkout.stripe.com/test", java.time.Instant.now().plusSeconds(1800)));
         var response = service.createCheckout(userId,
-                new CreateCheckoutRequest(bookingId, new BigDecimal("300000"), "vnd", PaymentProvider.STRIPE));
+                new CreateCheckoutRequest(bookingId, new BigDecimal("5000"), "vnd", PaymentProvider.STRIPE));
         assertEquals("https://checkout.stripe.com/test", response.checkoutUrl());
-        verify(stripe).createCheckout(argThat(request -> request.amount().compareTo(new BigDecimal("300000.00")) == 0
+        verify(stripe).createCheckout(argThat(request -> request.amount().compareTo(new BigDecimal("5000")) == 0
                 && request.currency().equals("VND") && request.attempt() == 1));
         verify(sessions).save(any(PaymentSession.class));
     }

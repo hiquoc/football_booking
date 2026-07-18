@@ -9,6 +9,11 @@ export async function GET(request: Request) {
       await getOwnerBookings(
         Math.max(0, Number(query.get("page")) || 0),
         Math.min(30, Math.max(1, Number(query.get("size")) || 10)),
+        {
+          bookingDate: query.get("bookingDate") ?? undefined,
+          subFieldId: query.get("subFieldId") ?? undefined,
+          status: query.get("status") ?? undefined,
+        },
       ),
     );
   } catch (error) {

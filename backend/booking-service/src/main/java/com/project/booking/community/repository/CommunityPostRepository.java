@@ -2,6 +2,7 @@ package com.project.booking.community.repository;
 
 import com.project.booking.community.entity.CommunityPost;
 import com.project.booking.community.enums.CommunityPostStatus;
+import com.project.booking.community.enums.CommunityPostType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -54,4 +55,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, UU
     List<CommunityPost> findByStatusAndBookingDateLessThanEqual(CommunityPostStatus status, LocalDate date);
 
     List<CommunityPost> findByOwnerIdAndStatusIn(UUID ownerId, Collection<CommunityPostStatus> statuses);
+
+    @EntityGraph(attributePaths = "applications")
+    Optional<CommunityPost> findFirstByBookingIdAndPostType(UUID bookingId, CommunityPostType postType);
 }

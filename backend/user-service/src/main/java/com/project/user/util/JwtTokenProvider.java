@@ -30,6 +30,10 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(UUID userId, String email, String role) {
+        return generateToken(userId, email, role, 0);
+    }
+
+    public String generateToken(UUID userId, String email, String role, Integer completedBookingCount) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
@@ -37,6 +41,7 @@ public class JwtTokenProvider {
                 .subject(email)
                 .claim("userId", userId.toString())
                 .claim("role", role)
+                .claim("completedBookingCount", completedBookingCount == null ? 0 : completedBookingCount)
                 .issuedAt(new Date())
                 .expiration(expiryDate)
                 .signWith(getSigningKey())

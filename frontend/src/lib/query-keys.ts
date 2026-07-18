@@ -17,9 +17,10 @@ export const bookingQueryKeys = {
   all: ["bookings"] as const,
   mine: (page: number, size = 10) =>
     [...bookingQueryKeys.all, "mine", { page, size }] as const,
-  owner: (page: number, size = 10) =>
-    [...bookingQueryKeys.all, "owner", { page, size }] as const,
+  owner: (page: number, size = 10, filters: object = {}) =>
+    [...bookingQueryKeys.all, "owner", { page, size, filters }] as const,
   detail: (id: string) => [...bookingQueryKeys.all, id] as const,
+  config: ["bookings", "config"] as const,
   availability: (subFieldId: string, date: string) =>
     ["availability", subFieldId, date] as const,
 };

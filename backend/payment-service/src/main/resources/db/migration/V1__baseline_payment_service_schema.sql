@@ -1,6 +1,9 @@
 CREATE TABLE booking_payment_projections (
     booking_id UUID PRIMARY KEY, booking_code VARCHAR(50) NOT NULL, user_id UUID NOT NULL,
-    user_email VARCHAR(255), total_amount NUMERIC(19,2) NOT NULL CHECK (total_amount > 0)
+    user_email VARCHAR(255), total_amount NUMERIC(19,2) NOT NULL CHECK (total_amount > 0),
+    sub_field_price NUMERIC(19,2) NOT NULL CHECK (sub_field_price > 0),
+    booking_price BIGINT NOT NULL DEFAULT 0 CHECK (booking_price >= 0),
+    platform_booking_fee BIGINT NOT NULL DEFAULT 0 CHECK (platform_booking_fee >= 0)
 );
 CREATE TABLE payments (
     id UUID PRIMARY KEY, booking_id UUID NOT NULL UNIQUE, user_id UUID NOT NULL,

@@ -66,6 +66,16 @@ export function CommunityDetailContent({
           <Info label="Contact Zalo" value={post.contactPhone} />
           {post.postType === "LOOKING_PLAYER" ? <Info label="Cầu thủ" value={`Cần ${post.playersNeeded}, đã nhận ${post.acceptedPlayersCount}`} /> : null}
         </dl>
+        {post.postType === "LOOKING_OPPONENT" && post.ownerStatistics ? (
+          <dl className="mt-4 grid gap-3 rounded-lg bg-emerald-50 p-4 text-sm sm:grid-cols-3">
+            <Info label="Matches" value={String(post.ownerStatistics.totalMatches)} />
+            <Info label="Win rate" value={formatPercent(post.ownerStatistics.winRate)} />
+            <Info label="On time" value={formatPercent(post.ownerStatistics.onTimeRate)} />
+            <Info label="No cancel" value={formatPercent(post.ownerStatistics.noCancelRate)} />
+            <Info label="Fair play" value={formatPercent(post.ownerStatistics.fairPlayRate)} />
+            <Info label="Completed bookings" value={String(post.ownerStatistics.completedBookingCount)} />
+          </dl>
+        ) : null}
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href={`/users/${post.ownerId}/profile`} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Xem hồ sơ chủ bài</Link>
           {isOwner && post.status === "OPEN" ? (
@@ -177,4 +187,8 @@ function Info({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 font-black text-slate-950">{value}</dd>
     </div>
   );
+}
+
+function formatPercent(value: number) {
+  return `${Number(value ?? 0).toFixed(1).replace(/\.0$/, "")}%`;
 }

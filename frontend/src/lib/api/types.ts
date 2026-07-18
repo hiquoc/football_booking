@@ -205,6 +205,7 @@ export interface User {
   userType: "CLIENT" | "OWNER" | "ADMIN";
   status: string;
   balance: number;
+  completedBookingCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -235,6 +236,7 @@ export interface PublicProfile {
     draws: number;
     losses: number;
     winRate: number;
+    completedBookingCount: number;
   };
   reputation: {
     noCancelRate: number;
@@ -254,6 +256,27 @@ export type BookingStatus =
   | "COMPLETED"
   | "EXPIRED";
 
+export type WinningTeam = "TEAM_A" | "TEAM_B" | "DRAW";
+
+export interface MatchResult {
+  id: string;
+  bookingId: string;
+  winningTeam: WinningTeam;
+  teamAPercentage: number;
+  teamBPercentage: number;
+  teamAAmount: number;
+  teamBAmount: number;
+  submittedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MatchResultInput {
+  winningTeam: WinningTeam;
+  teamAPercentage: number;
+  teamBPercentage: number;
+}
+
 export interface Booking {
   id: string;
   bookingCode: string;
@@ -268,12 +291,26 @@ export interface Booking {
   durationMinutes: number;
   pricePerHour: number;
   totalAmount: number;
+  subFieldPrice: number;
+  bookingPrice: number;
+  platformBookingFee: number;
   paymentMethod?: PaymentMethod;
   status: BookingStatus;
   note: string | null;
   cancellationReason: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
+  matchResult: MatchResult | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookingConfig {
+  id: string;
+  firstBookingFee: number;
+  notFirstBookingFee: number;
+  refundBeforeHours: number;
+  refundEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -487,9 +524,19 @@ export interface CommunityPost {
   hiddenAt: string | null;
   hiddenReason: string | null;
   ownerUnderModeration: boolean | null;
+  ownerStatistics: CommunityPlayerStatistics | null;
   createdAt: string;
   updatedAt: string;
   applications: CommunityApplication[] | null;
+}
+
+export interface CommunityPlayerStatistics {
+  totalMatches: number;
+  winRate: number;
+  onTimeRate: number;
+  noCancelRate: number;
+  fairPlayRate: number;
+  completedBookingCount: number;
 }
 
 export interface CommunityReport {
@@ -558,6 +605,41 @@ export interface CreateCommunityPostInput {
   ownerDisplayName?: string | null;
   ownerAvatarUrl?: string | null;
   ownerTeamPhotoUrl?: string | null;
+}
+
+export interface FieldViolation {
+  id: string;
+  userId: string;
+  fieldId: string;
+  violationCount: number;
+  banned: boolean;
+  banDate: string | null;
+  lastViolationDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PaymentDisputeStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface PaymentDisputeReport {
+  id: string;
+  bookingId: string;
+  fieldId: string;
+  reportedUserId: string;
+  ownerId: string;
+  description: string;
+  status: PaymentDisputeStatus;
+  adminNote: string | null;
+  imageUrls: string[];
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+}
+
+export interface CreatePaymentDisputeInput {
+  bookingId: string;
+  description: string;
+  imageUrls: string[];
 }
 
 export interface UpdateCommunityPostInput {

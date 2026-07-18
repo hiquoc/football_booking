@@ -10,6 +10,7 @@ const bookingSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   durationMinutes: z.number().int().positive(),
   note: z.string().trim().max(500).optional(),
+  paymentMethod: z.enum(["STRIPE", "ACCOUNT_BALANCE"]).optional(),
 });
 
 export async function GET(request: Request) {

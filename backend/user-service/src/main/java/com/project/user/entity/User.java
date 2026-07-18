@@ -100,4 +100,8 @@ public class User extends BaseEntity {
     @Builder.Default
     @Column(name = "balance", nullable = false)
     private Long balance = 0L;
+
+    @Builder.Default
+    @Column(name = "completed_booking_count", nullable = false)
+    private Integer completedBookingCount = 0;
 }

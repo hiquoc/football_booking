@@ -58,6 +58,36 @@ public class KafkaTopicConfig {
         return topic(NotificationEventTopics.COMMUNITY_NOTIFICATION);
     }
 
+    @Bean
+    public NewTopic bookingCompletedTopic() {
+        return topic(NotificationEventTopics.BOOKING_COMPLETED);
+    }
+
+    @Bean
+    public NewTopic userCompletedBookingCountChangedTopic() {
+        return topic(NotificationEventTopics.USER_COMPLETED_BOOKING_COUNT_CHANGED);
+    }
+
+    @Bean
+    public NewTopic moderationNotificationTopic() {
+        return topic(NotificationEventTopics.MODERATION_NOTIFICATION);
+    }
+
+    @Bean
+    public NewTopic platformBanRequestedTopic() {
+        return topic(NotificationEventTopics.PLATFORM_BAN_REQUESTED);
+    }
+
+    @Bean
+    public NewTopic matchEvaluationSubmittedTopic() {
+        return topic(NotificationEventTopics.MATCH_EVALUATION_SUBMITTED);
+    }
+
+    @Bean
+    public NewTopic playerMatchStatisticsAdjustedTopic() {
+        return topic(NotificationEventTopics.PLAYER_MATCH_STATISTICS_ADJUSTED);
+    }
+
     private NewTopic topic(String name) {
         return TopicBuilder.name(name)
                 .partitions(PARTITIONS)

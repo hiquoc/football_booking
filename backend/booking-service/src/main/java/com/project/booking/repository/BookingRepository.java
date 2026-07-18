@@ -63,6 +63,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
         boolean existsBySourceRecurringBookingIdAndBookingDate(UUID sourceRecurringBookingId, LocalDate bookingDate);
 
+        boolean existsByOwnerIdAndSubFieldFieldId(UUID ownerId, UUID fieldId);
+
         List<Booking> findBySubFieldIdAndBookingDateAndStatusInOrderByStartTimeAsc(
                         UUID subFieldId,
                         LocalDate bookingDate,
@@ -73,6 +75,22 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
         @EntityGraph(attributePaths = "subField")
         Page<Booking> findByOwnerId(UUID ownerId, Pageable pageable);
+
+        @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.ownerId = :ownerId
+                      AND (:bookingDate IS NULL OR b.bookingDate = :bookingDate)
+                      AND (:subFieldId IS NULL OR b.subFieldId = :subFieldId)
+                      AND (:status IS NULL OR b.status = :status)
+                """)
+        Page<Booking> findOwnerBookings(
+                @Param("ownerId") UUID ownerId,
+                @Param("bookingDate") LocalDate bookingDate,
+                @Param("subFieldId") UUID subFieldId,
+                @Param("status") BookingStatus status,
+                Pageable pageable);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
@@ -163,6 +181,19 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         int completeConfirmedBookings(
                 @Param("confirmedStatus") BookingStatus confirmedStatus,
                 @Param("completedStatus") BookingStatus completedStatus,
+                @Param("currentDate") LocalDate currentDate,
+                @Param("currentTime") LocalTime currentTime);
+
+        @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.status = :confirmedStatus
+                      AND (b.bookingDate < :currentDate
+                           OR (b.bookingDate = :currentDate AND b.endTime <= :currentTime))
+                """)
+        List<Booking> findFinishedConfirmedBookings(
+                @Param("confirmedStatus") BookingStatus confirmedStatus,
                 @Param("currentDate") LocalDate currentDate,
                 @Param("currentTime") LocalTime currentTime);
 }

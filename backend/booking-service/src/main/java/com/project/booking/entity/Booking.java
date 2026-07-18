@@ -66,6 +66,17 @@ public class Booking extends BaseEntity {
     @Column(name = "total_amount", precision = 10, scale = 2, nullable = false)
     private BigDecimal totalAmount;
 
+    @Column(name = "sub_field_price", precision = 10, scale = 2, nullable = false)
+    private BigDecimal subFieldPrice;
+
+    @Builder.Default
+    @Column(name = "booking_price", nullable = false)
+    private Long bookingPrice = 0L;
+
+    @Builder.Default
+    @Column(name = "platform_booking_fee", nullable = false)
+    private Long platformBookingFee = 0L;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 30, nullable = false)

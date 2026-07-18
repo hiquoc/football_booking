@@ -8,6 +8,7 @@ import com.project.booking.community.enums.CommunityApplicationStatus;
 import com.project.booking.community.enums.CommunityPostStatus;
 import com.project.booking.community.enums.CommunityPostType;
 import com.project.booking.community.kafka.CommunityNotificationEventPublisher;
+import com.project.booking.community.kafka.MatchEvaluationEventPublisher;
 import com.project.booking.community.mapper.CommunityMapper;
 import com.project.booking.community.repository.CommunityApplicationRepository;
 import com.project.booking.community.repository.CommunityPostRepository;
@@ -16,8 +17,10 @@ import com.project.booking.community.service.CommunityPostMaintenanceService;
 import com.project.booking.community.service.CommunityPostService;
 import com.project.booking.community.service.CommunityModerationService;
 import com.project.booking.entity.Booking;
+import com.project.booking.entity.UserReplica;
 import com.project.booking.exception.BookingNotFoundException;
 import com.project.booking.repository.BookingRepository;
+import com.project.booking.repository.UserReplicaRepository;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
 import com.project.common.exception.BadRequestException;
@@ -30,6 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 @Service
@@ -45,7 +50,9 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     private final BookingRepository bookingRepository;
     private final CommunityMapper mapper;
     private final CommunityNotificationEventPublisher notifications;
+    private final MatchEvaluationEventPublisher evaluationEvents;
     private final CommunityModerationService moderationService;
+    private final UserReplicaRepository userReplicaRepository;
 
     @Override
     @Transactional
@@ -91,7 +98,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
                 .ownerAvatarUrl(request.getOwnerAvatarUrl())
                 .ownerTeamPhotoUrl(request.getOwnerTeamPhotoUrl())
                 .build();
-        return mapper.toPostResponse(postRepository.save(post), true);
+        return withOwnerStatistics(mapper.toPostResponse(postRepository.save(post), true));
     }
 
     @Override
@@ -105,7 +112,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         post.setSkillLevel(request.getSkillLevel());
         post.setContactPhone(request.getContactPhone());
         post.setPlayersNeeded(post.getPostType() == CommunityPostType.LOOKING_PLAYER ? request.getPlayersNeeded() : null);
-        return mapper.toPostResponse(post, true);
+        return withOwnerStatistics(mapper.toPostResponse(post, true));
     }
 
     @Override
@@ -115,7 +122,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         post.setStatus(CommunityPostStatus.CLOSED);
         post.setClosedAt(LocalDateTime.now());
         notifyApplicants(post, "COMMUNITY_POST_CLOSED", "Bai dang da dong");
-        return mapper.toPostResponse(post, true);
+        return withOwnerStatistics(mapper.toPostResponse(post, true));
     }
 
     @Override
@@ -128,7 +135,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         post.setStatus(CommunityPostStatus.FULL);
         post.setClosedAt(LocalDateTime.now());
         notifyApplicants(post, "COMMUNITY_PLAYER_RECRUITMENT_FULL", "Da tuyen du nguoi cho tran dau");
-        return mapper.toPostResponse(post, true);
+        return withOwnerStatistics(mapper.toPostResponse(post, true));
     }
 
     @Override
@@ -139,15 +146,15 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         if (post.getStatus() == CommunityPostStatus.HIDDEN) {
             throw new BadRequestException("Post unavailable");
         }
-        return mapper.toPostResponse(post, post.getOwnerId().equals(viewerId),
-                moderationService.isUserUnderModeration(post.getOwnerId()));
+        return withOwnerStatistics(mapper.toPostResponse(post, post.getOwnerId().equals(viewerId),
+                moderationService.isUserUnderModeration(post.getOwnerId())));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<CommunityPostResponse> search(CommunityPostSearchRequest request, Pageable pageable) {
         return PageResponse.from(postRepository.findAll(spec(request), pageable)
-                .map(post -> mapper.toPostResponse(post, false)));
+                .map(post -> withOwnerStatistics(mapper.toPostResponse(post, false))));
     }
 
     @Override
@@ -251,7 +258,9 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
                 .wouldPlayAgain(request.getWouldPlayAgain())
                 .comment(request.getComment())
                 .build();
-        return mapper.toEvaluationResponse(evaluationRepository.save(evaluation));
+        MatchEvaluation saved = evaluationRepository.save(evaluation);
+        evaluationEvents.publish(saved);
+        return mapper.toEvaluationResponse(saved);
     }
 
     @Override
@@ -350,5 +359,33 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         payload.put("startTime", post.getStartTime());
         payload.putAll(extra);
         return payload;
+    }
+
+    private CommunityPostResponse withOwnerStatistics(CommunityPostResponse response) {
+        if (response.getPostType() != CommunityPostType.LOOKING_OPPONENT) {
+            return response;
+        }
+        userReplicaRepository.findById(response.getOwnerId())
+                .map(this::toStatistics)
+                .ifPresent(response::setOwnerStatistics);
+        return response;
+    }
+
+    private CommunityPlayerStatisticsResponse toStatistics(UserReplica replica) {
+        int totalMatches = replica.getTotalMatches() == null ? 0 : replica.getTotalMatches();
+        int wins = replica.getWins() == null ? 0 : replica.getWins();
+        BigDecimal winRate = totalMatches == 0
+                ? BigDecimal.ZERO.setScale(1)
+                : BigDecimal.valueOf(wins)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(totalMatches), 1, RoundingMode.HALF_UP);
+        return CommunityPlayerStatisticsResponse.builder()
+                .totalMatches(totalMatches)
+                .winRate(winRate)
+                .onTimeRate(replica.getOnTimeRate())
+                .noCancelRate(replica.getNoCancelRate())
+                .fairPlayRate(replica.getFairPlayRate())
+                .completedBookingCount(replica.getCompletedBookingCount())
+                .build();
     }
 }

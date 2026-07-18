@@ -15,7 +15,11 @@ import {
   hidePastSlots,
 } from "@/lib/booking-slots";
 import { formatCurrency, formatEnum } from "@/lib/field-format";
-import { useAvailability, useCreateBooking } from "@/lib/hooks/use-bookings";
+import {
+  useAvailability,
+  useBookingConfig,
+  useCreateBooking,
+} from "@/lib/hooks/use-bookings";
 import { useCreateRecurringBooking } from "@/lib/hooks/use-recurring-bookings";
 import { useCurrentTime } from "@/lib/hooks/use-current-time";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
@@ -43,6 +47,7 @@ export function BookingForm({
   const createMutation = useCreateBooking();
   const createRecurringMutation = useCreateRecurringBooking();
   const currentUser = useCurrentUser();
+  const bookingConfig = useBookingConfig();
   const now = useCurrentTime();
 
   const activeSubFields = subFields.data?.filter((item) => item.active) ?? [];
@@ -81,6 +86,12 @@ export function BookingForm({
     selectedStartTime,
     effectiveDuration,
   );
+  const completedBookingCount = currentUser.data?.completedBookingCount ?? 0;
+  const platformBookingFee =
+    completedBookingCount === 0
+      ? (bookingConfig.data?.firstBookingFee ?? 5000)
+      : (bookingConfig.data?.notFirstBookingFee ?? 1000);
+  const estimatedTotalWithFee = platformBookingFee;
   const isCheckingAvailability =
     !now || availability.isPending || availability.isFetching;
 
@@ -403,11 +414,25 @@ export function BookingForm({
           />
         </dl>
         <div className="mt-6 border-t border-slate-200 pt-5">
+          <span className="text-sm text-slate-500">Gia san tra tai san</span>
+          <strong className="mt-1 block text-xl">
+            {estimatedTotal === null
+              ? "Chon gio de xem gia"
+              : formatCurrency(estimatedTotal)}
+          </strong>
+        </div>
+        <div className="mt-6 border-t border-slate-200 pt-5">
+          <span className="text-sm text-slate-500">Platform Booking Fee</span>
+          <strong className="mt-1 block text-xl">
+            {formatCurrency(platformBookingFee)}
+          </strong>
+        </div>
+        <div className="mt-4 border-t border-slate-200 pt-5">
           <span className="text-sm text-slate-500">Tạm tính</span>
           <strong className="mt-1 block text-2xl">
-            {estimatedTotal === null
+            {estimatedTotalWithFee === null
               ? "Chọn giờ để xem giá"
-              : formatCurrency(estimatedTotal)}
+              : formatCurrency(estimatedTotalWithFee)}
           </strong>
         </div>
         <p className="mt-4 flex gap-2 text-xs leading-5 text-slate-500">

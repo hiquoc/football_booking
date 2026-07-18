@@ -11,7 +11,9 @@ import com.project.booking.community.service.CommunityPostMaintenanceService;
 import com.project.booking.entity.Booking;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.kafka.BookingNotificationEventPublisher;
+import com.project.booking.kafka.BookingTrustEventPublisher;
 import com.project.booking.mapper.BookingMapper;
+import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.entity.BookingConfig;
 import com.project.booking.kafka.BookingBalanceEventPublisher;
 import com.project.booking.payment.BookingPaymentStrategy;
@@ -20,6 +22,8 @@ import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
 import com.project.booking.repository.RecurringBookingRepository;
+import com.project.booking.repository.UserReplicaRepository;
+import com.project.booking.entity.UserReplica;
 import com.project.booking.service.ResolvedOperatingHours;
 import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.SubFieldProjectionService;
@@ -96,13 +100,23 @@ class BookingServiceImplTest {
     @Mock
     private CommunityPostMaintenanceService communityPostMaintenanceService;
 
+    @Mock
+    private UserReplicaRepository userReplicaRepository;
+
+    @Mock
+    private BookingTrustEventPublisher bookingTrustEventPublisher;
+
+    @Mock
+    private BookingModerationService bookingModerationService;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
         org.mockito.Mockito.lenient().when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
-                .bookingFee(0L)
+                .firstBookingFee(5000L)
+                .notFirstBookingFee(1000L)
                 .refundBeforeHours(24)
                 .refundEnabled(true)
                 .build());
@@ -117,6 +131,8 @@ class BookingServiceImplTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        org.mockito.Mockito.lenient().when(userReplicaRepository.findById(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -151,7 +167,7 @@ class BookingServiceImplTest {
     }
 
     @Test
-    void createBookingAddsConfiguredFeeAndUsesRequestedPaymentStrategy() {
+    void createBookingStoresConfiguredFeeSeparatelyAndUsesRequestedPaymentStrategy() {
         UUID userId = UUID.randomUUID();
         UUID subFieldId = UUID.randomUUID();
         SubFieldResponse subField = activeSubField(subFieldId);
@@ -164,7 +180,8 @@ class BookingServiceImplTest {
                 .build();
 
         when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
-                .bookingFee(5000L)
+                .firstBookingFee(6000L)
+                .notFirstBookingFee(2000L)
                 .refundBeforeHours(24)
                 .refundEnabled(true)
                 .build());
@@ -182,10 +199,49 @@ class BookingServiceImplTest {
         ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
         verify(bookingRepository).saveAndFlush(bookingCaptor.capture());
         Booking savedBooking = bookingCaptor.getValue();
-        assertEquals(new BigDecimal("105000"), savedBooking.getTotalAmount());
+        assertEquals(new BigDecimal("100000"), savedBooking.getTotalAmount());
+        assertEquals(6000L, savedBooking.getPlatformBookingFee());
         assertEquals(PaymentMethod.ACCOUNT_BALANCE, savedBooking.getPaymentMethod());
         verify(paymentStrategyFactory).get(PaymentMethod.ACCOUNT_BALANCE);
         verify(bookingPaymentStrategy).onBookingCreated(savedBooking, subField);
+    }
+
+    @Test
+    void createBookingUsesNotFirstBookingFeeForReturningClients() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(userReplicaRepository.findById(userId)).thenReturn(Optional.of(UserReplica.builder()
+                .userId(userId)
+                .completedBookingCount(3)
+                .build()));
+        when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
+                .firstBookingFee(6000L)
+                .notFirstBookingFee(2000L)
+                .refundBeforeHours(24)
+                .refundEnabled(true)
+                .build());
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder().build());
+
+        bookingService.createBooking(userId, request);
+
+        ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).saveAndFlush(bookingCaptor.capture());
+        assertEquals(2000L, bookingCaptor.getValue().getPlatformBookingFee());
     }
 
     @Test
@@ -346,20 +402,22 @@ class BookingServiceImplTest {
 
     @Test
     void completeFinishedBookingsOnlyTransitionsConfirmedBookings() {
-        when(bookingRepository.completeConfirmedBookings(
+        List<Booking> finishedBookings = List.of(
+                Booking.builder().id(UUID.randomUUID()).status(BookingStatus.CONFIRMED).build(),
+                Booking.builder().id(UUID.randomUUID()).status(BookingStatus.CONFIRMED).build(),
+                Booking.builder().id(UUID.randomUUID()).status(BookingStatus.CONFIRMED).build(),
+                Booking.builder().id(UUID.randomUUID()).status(BookingStatus.CONFIRMED).build());
+        when(bookingRepository.findFinishedConfirmedBookings(
                 eq(BookingStatus.CONFIRMED),
-                eq(BookingStatus.COMPLETED),
                 any(LocalDate.class),
-                any(LocalTime.class))).thenReturn(4);
+                any(LocalTime.class))).thenReturn(finishedBookings);
 
         int completedCount = bookingService.completeFinishedBookings();
 
         assertEquals(4, completedCount);
-        verify(bookingRepository).completeConfirmedBookings(
-                eq(BookingStatus.CONFIRMED),
-                eq(BookingStatus.COMPLETED),
-                any(LocalDate.class),
-                any(LocalTime.class));
+        finishedBookings.forEach(booking -> assertEquals(BookingStatus.COMPLETED, booking.getStatus()));
+        verify(bookingRepository).saveAll(finishedBookings);
+        finishedBookings.forEach(booking -> verify(bookingTrustEventPublisher).publishBookingCompleted(booking));
     }
 
     @Test
@@ -376,11 +434,13 @@ class BookingServiceImplTest {
                 .bookingCode("BK-1")
                 .bookingDate(LocalDate.now().plusDays(3))
                 .startTime(LocalTime.of(8, 0))
+                .platformBookingFee(2000L)
                 .status(BookingStatus.CANCELLED)
                 .build();
 
         when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
-                .bookingFee(5000L)
+                .firstBookingFee(5000L)
+                .notFirstBookingFee(1000L)
                 .refundBeforeHours(24)
                 .refundEnabled(true)
                 .build());
@@ -392,7 +452,7 @@ class BookingServiceImplTest {
 
         bookingService.cancelBooking(userId, request);
 
-        verify(bookingBalanceEventPublisher).publishRefundRequested(cancelled, 5000L, "BOOKING_CANCEL_REFUND");
+        verify(bookingBalanceEventPublisher).publishRefundRequested(cancelled, 2000L, "BOOKING_CANCEL_REFUND");
     }
 
     @Test
@@ -413,7 +473,8 @@ class BookingServiceImplTest {
                 .build();
 
         when(bookingConfigService.getConfig()).thenReturn(BookingConfig.builder()
-                .bookingFee(5000L)
+                .firstBookingFee(5000L)
+                .notFirstBookingFee(1000L)
                 .refundBeforeHours(48)
                 .refundEnabled(true)
                 .build());

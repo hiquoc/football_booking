@@ -17,9 +17,12 @@ public class BookingBalanceEventPublisher {
     private final OutboxService outboxService;
 
     public void publishDeductionRequested(Booking booking, String reason) {
+        long payableAmount = booking.getBookingPrice() == null || booking.getBookingPrice() == 0L
+                ? (booking.getPlatformBookingFee() == null ? 0L : booking.getPlatformBookingFee())
+                : booking.getBookingPrice();
         UserBalanceDeductionRequestedEvent event = new UserBalanceDeductionRequestedEvent(
                 booking.getClientId(),
-                booking.getTotalAmount().longValueExact(),
+                payableAmount,
                 booking.getId(),
                 booking.getBookingCode(),
                 reason,

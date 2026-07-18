@@ -18,6 +18,9 @@ public record BookingCreatedEvent(
         LocalTime startTime,
         LocalTime endTime,
         BigDecimal totalAmount,
+        Long platformBookingFee,
+        BigDecimal subFieldPrice,
+        Long bookingPrice,
         Instant occurredAt
 ) {
 }

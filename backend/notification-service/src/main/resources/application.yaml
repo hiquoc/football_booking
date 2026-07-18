@@ -73,7 +73,7 @@ outbox:
   batch-size: 50
   poll-interval: 5000
   max-retries: 5
-  scheduler-concurrency: 1
+  scheduler-concurrency: 8
   retry-delays:
     - 10s
     - 30s

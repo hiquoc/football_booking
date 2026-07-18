@@ -32,12 +32,16 @@ public class BookingResponse {
     private Integer durationMinutes;
     private BigDecimal pricePerHour;
     private BigDecimal totalAmount;
+    private BigDecimal subFieldPrice;
+    private Long bookingPrice;
+    private Long platformBookingFee;
     private PaymentMethod paymentMethod;
     private BookingStatus status;
     private String note;
     private String cancellationReason;
     private LocalDateTime cancelledAt;
     private BookingCancelledBy cancelledBy;
+    private MatchResultResponse matchResult;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

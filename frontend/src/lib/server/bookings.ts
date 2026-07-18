@@ -3,7 +3,9 @@ import "server-only";
 import type {
   Availability,
   Booking,
+  BookingConfig,
   CreateBookingInput,
+  MatchResultInput,
   PageResponse,
 } from "@/lib/api/types";
 import { authenticatedGatewayRequest } from "./authenticated-gateway";
@@ -15,9 +17,21 @@ export function getMyBookings(page = 0, size = 10) {
   );
 }
 
-export function getOwnerBookings(page = 0, size = 10) {
+export function getOwnerBookings(
+  page = 0,
+  size = 10,
+  filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
+) {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "createdAt,desc",
+  });
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) query.set(key, value);
+  });
   return authenticatedGatewayRequest<PageResponse<Booking>>(
-    `/api/v1/bookings/owner?page=${page}&size=${size}&sort=createdAt,desc`,
+    `/api/v1/bookings/owner?${query}`,
   );
 }
 
@@ -33,6 +47,12 @@ export function getAvailability(subFieldId: string, date: string) {
     `/api/v1/bookings/availability?${query}`,
     { cache: "no-store" },
   );
+}
+
+export function getBookingConfig() {
+  return gatewayRequest<BookingConfig>("/api/v1/bookings/config", {
+    next: { revalidate: 31_536_000 },
+  });
 }
 
 export function createBooking(input: CreateBookingInput) {
@@ -52,6 +72,16 @@ export function cancelBooking(
     {
       method: "PATCH",
       body: JSON.stringify({ bookingId, reason }),
+    },
+  );
+}
+
+export function upsertMatchResult(bookingId: string, input: MatchResultInput) {
+  return authenticatedGatewayRequest<Booking>(
+    `/api/v1/bookings/owner/${encodeURIComponent(bookingId)}/match-result`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input),
     },
   );
 }
