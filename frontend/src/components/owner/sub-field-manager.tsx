@@ -11,6 +11,11 @@ import {
   useUpdateSubField,
 } from "@/lib/hooks/use-owner-fields";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
+import {
+  closingTimeOptions,
+  toClosingTimeInputValue,
+  toClosingTimePayload,
+} from "@/lib/time-format";
 const types = [
   "FOOTBALL_5V5",
   "FOOTBALL_7V7",
@@ -22,6 +27,7 @@ const types = [
 ];
 type PriceRule = { startTime: string; endTime: string; hourlyPrice: number };
 const defaultPriceRule: PriceRule = { startTime: "06:00", endTime: "23:00", hourlyPrice: 200000 };
+const priceRuleEndOptions = closingTimeOptions();
 export function SubFieldManager({ fieldId }: { fieldId: string }) {
   const data = useFieldBookingData(fieldId);
   const create = useCreateSubField(fieldId);
@@ -34,7 +40,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
     setEditing(subField);
     setPriceRules(subField?.timePriceRules?.length ? subField.timePriceRules.map((rule) => ({
       startTime: rule.startTime.slice(0, 5),
-      endTime: rule.endTime.slice(0, 5),
+      endTime: toClosingTimeInputValue(rule.endTime, "23:00"),
       hourlyPrice: Number(rule.hourlyPrice),
     })) : [defaultPriceRule]);
     setShow(true);
@@ -58,7 +64,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
         },
         timePriceRules: priceRules.map((rule) => ({
           startTime: `${rule.startTime}:00`,
-          endTime: `${rule.endTime}:00`,
+          endTime: toClosingTimePayload(rule.endTime, "23:00:00"),
           hourlyPrice: rule.hourlyPrice,
         })),
       };
@@ -148,7 +154,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
               {priceRules.map((rule, index) => (
                 <div key={index} className="grid items-end gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_1.4fr_auto]">
                   <Input label="Từ giờ"><input required type="time" value={rule.startTime} onChange={(event) => setPriceRules((rules) => rules.map((item, i) => i === index ? { ...item, startTime: event.target.value } : item))} className="input-field" /></Input>
-                  <Input label="Đến giờ"><input required type="time" value={rule.endTime} onChange={(event) => setPriceRules((rules) => rules.map((item, i) => i === index ? { ...item, endTime: event.target.value } : item))} className="input-field" /></Input>
+                  <Input label="Đến giờ"><input required type="time" list="price-rule-end-time-options" value={rule.endTime} onChange={(event) => setPriceRules((rules) => rules.map((item, i) => i === index ? { ...item, endTime: event.target.value } : item))} className="input-field" /></Input>
                   <Input label="Giá mỗi giờ"><input required type="number" min={1000} step={1000} value={rule.hourlyPrice} onChange={(event) => setPriceRules((rules) => rules.map((item, i) => i === index ? { ...item, hourlyPrice: Number(event.target.value) } : item))} className="input-field" /></Input>
                   <button type="button" disabled={priceRules.length === 1} onClick={() => setPriceRules((rules) => rules.filter((_, i) => i !== index))} className="grid size-11 place-items-center rounded-xl border border-rose-100 text-rose-600 disabled:opacity-30" aria-label="Xóa khung giá"><X className="size-4" /></button>
                 </div>
@@ -170,6 +176,11 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
               {(create.error ?? update.error)?.message}
             </p>
           ) : null}
+          <datalist id="price-rule-end-time-options">
+            {priceRuleEndOptions.map((option) => (
+              <option key={option.value} value={option.value} label={option.label} />
+            ))}
+          </datalist>
           <button
             disabled={create.isPending || update.isPending}
             className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-black text-white"
@@ -228,7 +239,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
               <div className="mt-4 space-y-1 text-sm font-bold">
                 {item.timePriceRules?.length ? item.timePriceRules.map((rule) => (
                   <p key={rule.id}>
-                    {rule.startTime.slice(0, 5)}–{rule.endTime.slice(0, 5)}: {formatCurrency(Number(rule.hourlyPrice))}/giờ
+                    {rule.startTime.slice(0, 5)}–{toClosingTimeInputValue(rule.endTime) === "23:59" ? "12:00 CH" : rule.endTime.slice(0, 5)}: {formatCurrency(Number(rule.hourlyPrice))}/giờ
                   </p>
                 )) : <p>Chưa có giá</p>}
               </div>

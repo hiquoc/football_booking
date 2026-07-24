@@ -6,12 +6,12 @@ export default async function PaymentPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ checkout?: string }>;
+  searchParams: Promise<{ checkout?: string; topup?: string }>;
 }) {
   const query = await searchParams;
   return (
     <div className="min-h-[70vh] px-5 py-12">
-      <PaymentContent bookingId={(await params).id} returned={Boolean(query.checkout)} />
+      <PaymentContent bookingId={(await params).id} returned={Boolean(query.checkout || query.topup)} />
     </div>
   );
 }

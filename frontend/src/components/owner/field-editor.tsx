@@ -10,6 +10,15 @@ import { formatDay } from "@/lib/field-format";
 import { LocationMapPicker } from "./location-map-picker";
 import type { FieldLocationValue } from "./field-location-types";
 import { VietnamLocationFields } from "./vietnam-location-fields";
+import {
+  closingTimeOptions,
+  requireLocalTimePayload,
+  toClosingTimeInputValue,
+  toClosingTimePayload,
+  toTimeInputValue,
+} from "@/lib/time-format";
+
+const closeTimeOptions = closingTimeOptions();
 
 export function FieldEditor({ fieldId }: { fieldId: string }) {
   const data = useFieldEditorData(fieldId);
@@ -54,6 +63,7 @@ function EditorForm({
       openTime: item.openTime ?? "06:00:00",
       closeTime: item.closeTime ?? "23:00:00",
       closed: item.closed,
+      open24Hours: item.open24Hours,
     })),
   );
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -82,7 +92,19 @@ function EditorForm({
         phoneNumber: String(data.get("phoneNumber")),
         email: String(data.get("email") || ""),
         active: data.get("active") === "on",
-        operatingHours: schedule,
+        operatingHours: schedule.map((item) =>
+          item.closed || item.open24Hours
+            ? {
+                dayOfWeek: item.dayOfWeek,
+                closed: item.closed,
+                open24Hours: item.open24Hours,
+              }
+            : {
+                ...item,
+                openTime: requireLocalTimePayload(item.openTime, "06:00:00"),
+                closeTime: toClosingTimePayload(item.closeTime, "23:00:00"),
+              },
+        ),
       });
     } catch {
       /* Rendered below. */
@@ -164,23 +186,30 @@ function EditorForm({
           {schedule.map((item, index) => (
             <div
               key={item.dayOfWeek}
-              className="items-center gap-3 rounded-xl bg-slate-50 p-3 grid sm:grid-cols-[8rem_1fr_1fr_auto]"
+              className="items-center gap-3 rounded-xl bg-slate-50 p-3 grid sm:grid-cols-[8rem_1fr_1fr_auto_auto]"
             >
               <strong className="text-sm">{formatDay(item.dayOfWeek)}</strong>
               {item.closed ? (
                 <div className="col-span-2 flex items-center text-sm font-semibold text-slate-400">
                   Ngày nghỉ
                 </div>
+              ) : item.open24Hours ? (
+                <div className="col-span-2 flex items-center text-sm font-semibold text-slate-500">
+                  Mở cửa 24 giờ
+                </div>
               ) : (
                 <>
                   <input
                     type="time"
-                    value={item.openTime.slice(0, 5)}
+                    value={toTimeInputValue(item.openTime, "06:00")}
                     onChange={(event) =>
                       setSchedule((all) =>
                         all.map((value, i) =>
                           i === index
-                            ? { ...value, openTime: `${event.target.value}:00` }
+                            ? {
+                                ...value,
+                                openTime: requireLocalTimePayload(event.target.value, "06:00:00"),
+                              }
                             : value,
                         ),
                       )
@@ -189,12 +218,16 @@ function EditorForm({
                   />
                   <input
                     type="time"
-                    value={item.closeTime.slice(0, 5)}
+                    list="field-editor-close-time-options"
+                    value={toClosingTimeInputValue(item.closeTime, "23:00")}
                     onChange={(event) =>
                       setSchedule((all) =>
                         all.map((value, i) =>
                           i === index
-                            ? { ...value, closeTime: `${event.target.value}:00` }
+                            ? {
+                                ...value,
+                                closeTime: toClosingTimePayload(event.target.value, "23:00:00"),
+                              }
                             : value,
                         ),
                       )
@@ -206,12 +239,30 @@ function EditorForm({
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
+                  checked={item.open24Hours}
+                  onChange={(event) =>{
+                    setSchedule((all) =>
+                      all.map((value, i) =>
+                        i === index
+                          ? { ...value, open24Hours: event.target.checked }
+                          : value,
+                      ),
+                    )
+                    item.closed=!event.target.checked
+                  }
+                  }
+                />{" "}
+                24h
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
                   checked={item.closed}
                   onChange={(event) =>
                     setSchedule((all) =>
                       all.map((value, i) =>
                         i === index
-                          ? { ...value, closed: event.target.checked }
+                          ? { ...value, closed: event.target.checked, open24Hours: false }
                           : value,
                       ),
                     )
@@ -222,6 +273,11 @@ function EditorForm({
             </div>
           ))}
         </div>
+        <datalist id="field-editor-close-time-options">
+          {closeTimeOptions.map((option) => (
+            <option key={option.value} value={option.value} label={option.label} />
+          ))}
+        </datalist>
       </section>
       {update.isSuccess ? (
         <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-700">

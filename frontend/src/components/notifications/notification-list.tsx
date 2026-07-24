@@ -56,42 +56,51 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
           const content = formatNotification(item);
           const bookingId = typeof item.payload.bookingId === "string" ? item.payload.bookingId : null;
           return (
-          <article
-            key={item.id}
-            className={`flex w-full border-b border-slate-100 text-left last:border-0 ${compact ? "gap-3 p-3" : "gap-4 p-5"} ${item.isRead ? "bg-white" : "bg-sky-50/60"}`}
-          >
-            <span
-              className={`grid shrink-0 place-items-center rounded-xl ${compact ? "size-9" : "size-10"} ${item.isRead ? "bg-slate-100 text-slate-400" : "bg-sky-500 text-slate-950"}`}
+            <article
+              key={item.id}
+              className={`flex w-full border-b border-slate-100 text-left last:border-0 ${compact ? "gap-3 p-3" : "gap-4 p-5"} ${item.isRead ? "bg-white" : "bg-sky-50/60"}`}
             >
-              <Bell className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <strong className="block text-sm text-slate-900">
-                {content.title}
-              </strong>
-              {content.detail ? <span className="mt-1 block text-sm leading-5 text-slate-600">{content.detail}</span> : null}
-              <span className="mt-1 block text-xs text-slate-400">
-                {formatDate(item.createdAt)}
+              <span
+                className={`grid shrink-0 place-items-center rounded-xl ${compact ? "size-9" : "size-10"} ${item.isRead ? "bg-slate-100 text-slate-400" : "bg-sky-500 text-slate-950"}`}
+              >
+                <Bell className="size-4" />
               </span>
-            </span>
-            <span className="flex shrink-0 flex-col items-end gap-2">
-              {!item.isRead ? (
-                <button
-                  type="button"
-                  onClick={() => markOne.mutate(item.id)}
-                  disabled={markOne.isPending}
-                  className="action-button !min-h-0 h-8 border border-sky-200 bg-white px-2 py-1 text-xs text-sky-700 hover:bg-sky-50 action-button !shadow-none"
-                >
-                  <Check className="size-3.5" /> Đã đọc
-                </button>
-              ) : <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400"><Check className="size-3.5" /> Đã đọc</span>}
-              {bookingId ? (
-                <Link onClick={onNavigate} href={`/bookings/${encodeURIComponent(bookingId)}`} className="action-button !min-h-0 h-8 bg-slate-950 p-1 text-xs text-white hover:bg-slate-800">
-                  Chi tiết <ArrowUpRight className="size-3.5" />
-                </Link>
-              ) : null}
-            </span>
-          </article>
+              <span className="min-w-0 flex-1">
+                <strong className="block text-sm text-slate-900">
+                  {content.title}
+                </strong>
+                {content.detail ? <span className="mt-1 block text-sm leading-5 text-slate-600">{content.detail}</span> : null}
+                <span className="mt-1 block text-xs text-slate-400">
+                  {formatDate(item.createdAt)}
+                </span>
+              </span>
+              <span className="flex shrink-0 flex-col items-end gap-2">
+                {!item.isRead ? (
+                  <button
+                    type="button"
+                    onClick={() => markOne.mutate(item.id)}
+                    disabled={markOne.isPending}
+                    className="action-button !min-h-0 h-8 border border-sky-200 bg-white px-2 py-1 text-xs text-sky-700 hover:bg-sky-50 !shadow-none"
+                  >
+                    <Check className="size-3.5" /> Đã đọc
+                  </button>
+                ) : (
+                  <span className="action-button invisible !min-h-0 h-8 px-2 py-1 text-xs">
+                    <Check className="size-3.5" /> Đã đọc
+                  </span>
+                )}
+
+                {bookingId ? (
+                  <Link
+                    onClick={onNavigate}
+                    href={`/bookings/${encodeURIComponent(bookingId)}`}
+                    className="action-button !min-h-0 h-8 bg-slate-950 p-1 text-xs text-white hover:bg-slate-800"
+                  >
+                    Chi tiết <ArrowUpRight className="size-3.5" />
+                  </Link>
+                ) : null}
+              </span>
+            </article>
           );
         })}
       </div>

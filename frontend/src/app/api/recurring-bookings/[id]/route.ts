@@ -6,11 +6,11 @@ import { uuidSchema } from "@/lib/api/common-schemas";
 
 const recurringBookingSchema = z.object({
   subFieldId: uuidSchema,
-  dayOfWeek: z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
   startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   startDate: z.string().date(),
   endDate: z.string().date(),
+  intervalDays: z.number().int().min(1).max(7),
 });
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

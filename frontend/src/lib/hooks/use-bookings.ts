@@ -6,7 +6,13 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import type { Booking, CreateBookingInput, MatchResultInput, PageResponse } from "@/lib/api/types";
+import type {
+  Booking,
+  CreateBookingInput,
+  MatchResultInput,
+  PageResponse,
+  RecurringBooking,
+} from "@/lib/api/types";
 import {
   fetchAvailability,
   fetchBooking,
@@ -18,7 +24,7 @@ import {
   submitMatchResult,
 } from "@/lib/client/bookings";
 import { bookingQueryKeys } from "@/lib/query-keys";
-import { userQueryKeys } from "@/lib/query-keys";
+import { recurringBookingQueryKeys, userQueryKeys } from "@/lib/query-keys";
 
 function incrementCompletedBookingCount(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.setQueryData(userQueryKeys.mePrivate, (old: unknown) => {
@@ -78,6 +84,7 @@ export function useBooking(id: string) {
   return useQuery({
     queryKey: bookingQueryKeys.detail(id),
     queryFn: () => fetchBooking(id),
+    refetchInterval: (query) => query.state.data?.status === "PENDING" ? 1000 : false,
     select: (booking) => {
       const previous = queryClient.getQueryData<Booking>(bookingQueryKeys.detail(id));
       if (booking.status === "COMPLETED" && previous?.status && previous.status !== "COMPLETED") {
@@ -117,7 +124,7 @@ export function useCreateBooking() {
       void queryClient.invalidateQueries({
         queryKey: bookingQueryKeys.availability(
           input.subFieldId,
-          input.bookingDate,
+          input.bookingDate ?? input.startDateTime.slice(0, 10),
         ),
       });
     },
@@ -141,6 +148,20 @@ export function useCancelBooking(owner = false) {
     onError: (_error, _variables, snapshot) => snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data)),
     onSuccess: (booking) => {
       queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
+      queryClient.setQueriesData<PageResponse<RecurringBooking>>(
+        { queryKey: recurringBookingQueryKeys.all },
+        (old) =>
+          old
+            ? {
+                ...old,
+                content: old.content.map((item) =>
+                  item.latestBooking?.id === booking.id
+                    ? { ...item, latestBooking: booking }
+                    : item,
+                ),
+              }
+            : old,
+      );
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
     },
   });

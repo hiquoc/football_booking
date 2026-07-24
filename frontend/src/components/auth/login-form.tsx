@@ -15,6 +15,7 @@ import {
   type SendOtpInput,
   type VerifyOtpInput,
 } from "@/lib/api/auth-schemas";
+import { ClientRequestError } from "@/lib/client/http";
 import { useSendOtp, useVerifyOtp } from "@/lib/hooks/use-auth";
 
 type Step = "phone" | "otp";
@@ -105,12 +106,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
             </p>
           )}
         </div>
-        <FormError
-          message={mutationError(
-            verifyOtpMutation.error,
-            "Không thể xác minh mã OTP",
-          )}
-        />
+        <FormError message={verifyOtpError(verifyOtpMutation.error)} />
         <SubmitButton
           pending={verifyOtpMutation.isPending}
           label="Xác minh và tiếp tục"
@@ -175,7 +171,7 @@ function FormError({ message }: { message: string | null }) {
   return message ? (
     <p
       role="alert"
-      className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+      className="text-center rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
     >
       {message}
     </p>
@@ -185,6 +181,14 @@ function FormError({ message }: { message: string | null }) {
 function mutationError(error: unknown, fallback: string) {
   if (!error) return null;
   return error instanceof Error ? error.message : fallback;
+}
+
+function verifyOtpError(error: unknown) {
+  if (!error) return null;
+  if (error instanceof ClientRequestError && error.status === 400) {
+    return "Mã OTP không đúng. Vui lòng kiểm tra lại.";
+  }
+  return "Máy chủ không phản hồi. Vui lòng thử lại sau.";
 }
 
 function SubmitButton({ pending, label }: { pending: boolean; label: string }) {

@@ -60,7 +60,9 @@ export function SubFieldList({ fields,isBookable }: { fields: SubField[] | null,
                 ) : null}
                 {field.timePriceRules?.length ? (
                   <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-                    {field.timePriceRules.map((rule) => (
+                    {[...field.timePriceRules]
+                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                    .map((rule) => (
                       <div
                         key={rule.id ?? `${rule.startTime}-${rule.endTime}`}
                         className="flex justify-between gap-4 py-1 text-sm"

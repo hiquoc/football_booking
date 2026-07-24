@@ -12,8 +12,12 @@ export function useProfile(userId?: string) {
   });
 }
 
-export function useCurrentUser() {
-  return useQuery({ queryKey: userQueryKeys.mePrivate, queryFn: fetchCurrentUser });
+export function useCurrentUser(options?: { refetchInterval?: number | false }) {
+  return useQuery({
+    queryKey: userQueryKeys.mePrivate,
+    queryFn: fetchCurrentUser,
+    refetchInterval: options?.refetchInterval ?? false,
+  });
 }
 
 export function useUploadAvatar() {

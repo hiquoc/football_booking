@@ -137,6 +137,7 @@ export interface OperatingHours {
   openTime: string | null;
   closeTime: string | null;
   closed: boolean;
+  open24Hours: boolean;
 }
 
 export interface BookingRule {
@@ -247,7 +248,7 @@ export interface PublicProfile {
   updatedAt?: string;
 }
 
-export type PaymentMethod = "STRIPE" | "ACCOUNT_BALANCE";
+export type PaymentMethod = "ACCOUNT_BALANCE";
 
 export type BookingStatus =
   | "PENDING"
@@ -255,6 +256,8 @@ export type BookingStatus =
   | "CANCELLED"
   | "COMPLETED"
   | "EXPIRED";
+
+export type BookingPaymentStatus = "UNPAID" | "PAID" | "REFUNDED" | "FAILED";
 
 export type WinningTeam = "TEAM_A" | "TEAM_B" | "DRAW";
 
@@ -286,6 +289,8 @@ export interface Booking {
   fieldName: string;
   ownerId: string;
   bookingDate: string;
+  startDateTime?: string;
+  endDateTime?: string;
   startTime: string;
   endTime: string;
   durationMinutes: number;
@@ -296,9 +301,11 @@ export interface Booking {
   platformBookingFee: number;
   paymentMethod?: PaymentMethod;
   status: BookingStatus;
+  paymentStatus: BookingPaymentStatus;
   note: string | null;
   cancellationReason: string | null;
   cancelledAt: string | null;
+  paymentExpiresAt: string | null;
   cancelledBy: string | null;
   matchResult: MatchResult | null;
   createdAt: string;
@@ -316,15 +323,30 @@ export interface BookingConfig {
 }
 
 export interface Availability {
-  openTime: string;
-  closeTime: string;
-  unavailableSlots: Array<{ startTime: string; endTime: string }>;
+  openTime: string | null;
+  closeTime: string | null;
+  open24Hours: boolean;
+  operatingHours?: Array<{
+    date: string;
+    openTime: string | null;
+    closeTime: string | null;
+    closed: boolean;
+    open24Hours: boolean;
+  }>;
+  unavailableSlots: Array<{
+    startTime: string;
+    endTime: string;
+    startDateTime?: string;
+    endDateTime?: string;
+  }>;
 }
 
 export interface CreateBookingInput {
   subFieldId: string;
-  bookingDate: string;
-  startTime: string;
+  bookingDate?: string;
+  startTime?: string;
+  startDateTime: string;
+  endDateTime: string;
   durationMinutes: number;
   note?: string;
   paymentMethod?: PaymentMethod;
@@ -339,24 +361,26 @@ export interface RecurringBooking {
   fieldName: string | null;
   subFieldId: string;
   subFieldName: string | null;
-  dayOfWeek: string;
   startTime: string;
   endTime: string;
   startDate: string;
   endDate: string;
+  intervalDays: number;
   status: RecurringBookingStatus;
   nextProcessAt: string;
+  firstBooking?: Booking | null;
+  latestBooking?: Booking | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface RecurringBookingInput {
   subFieldId: string;
-  dayOfWeek: string;
   startTime: string;
   endTime: string;
   startDate: string;
   endDate: string;
+  intervalDays: number;
 }
 
 export interface Notification {
@@ -399,6 +423,7 @@ export interface FieldInput {
     openTime?: string;
     closeTime?: string;
     closed: boolean;
+    open24Hours?: boolean;
   }>;
 }
 
@@ -436,15 +461,16 @@ export interface UpdateProfileInput {
 
 export type PaymentStatus = "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED";
 export type PaymentProvider = "STRIPE";
+export type PaymentPurpose = "WALLET_TOP_UP";
 export interface Payment {
-  id: string; bookingId: string; provider: PaymentProvider; amount: number;
+  id: string; bookingId: string | null; provider: PaymentProvider; purpose: PaymentPurpose; amount: number;
   currency: string; status: PaymentStatus; failureReason: string | null;
   expiresAt: string | null;
   createdAt: string; updatedAt: string;
 }
 export interface CheckoutResponse { paymentId: string; checkoutUrl: string; }
 export interface CreateCheckoutInput {
-  bookingId: string; amount: number; currency: string; provider?: PaymentProvider;
+  bookingId?: string; amount: number; currency: string; provider?: PaymentProvider;
 }
 
 export interface AvatarUploadSlot {

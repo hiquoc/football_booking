@@ -1,5 +1,15 @@
 let refreshPromise: Promise<boolean> | null = null;
 
+export class ClientRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ClientRequestError";
+  }
+}
+
 function buildHeaders(init?: RequestInit) {
   return {
     Accept: "application/json",
@@ -50,10 +60,11 @@ function payloadMessage(payload: unknown) {
     : undefined;
 }
 
-function throwRequestError(payload: unknown) {
-  throw new Error(
+function throwRequestError(payload: unknown, status: number) {
+  throw new ClientRequestError(
     payloadMessage(payload) ??
       "Khong the hoan tat yeu cau. Vui long thu lai.",
+    status,
   );
 }
 
@@ -73,7 +84,7 @@ export async function requestJson<T>(
   }
 
   if (!response.ok) {
-    throwRequestError(payload);
+    throwRequestError(payload, response.status);
   }
 
   return payload as T;

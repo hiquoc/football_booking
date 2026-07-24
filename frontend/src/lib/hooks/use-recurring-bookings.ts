@@ -15,6 +15,24 @@ import {
 } from "@/lib/client/recurring-bookings";
 import { bookingQueryKeys, recurringBookingQueryKeys } from "@/lib/query-keys";
 
+function updateRecurringBookingInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  recurringBooking: RecurringBooking,
+) {
+  queryClient.setQueriesData<PageResponse<RecurringBooking>>(
+    { queryKey: recurringBookingQueryKeys.all },
+    (old) =>
+      old
+        ? {
+            ...old,
+            content: old.content.map((item) =>
+              item.id === recurringBooking.id ? recurringBooking : item,
+            ),
+          }
+        : old,
+  );
+}
+
 export function useRecurringBookings(scope: "my" | "owner" | "admin", page: number, size = 10, status?: RecurringBookingStatus) {
   return useQuery({
     queryKey: recurringBookingQueryKeys[scope === "my" ? "mine" : scope](page, size, status),
@@ -40,9 +58,8 @@ export function useUpdateRecurringBooking() {
     mutationFn: ({ id, input }: { id: string; input: RecurringBookingInput }) =>
       submitRecurringBookingUpdate(id, input),
     retry: false,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: recurringBookingQueryKeys.all });
-      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+    onSuccess: (recurringBooking) => {
+      updateRecurringBookingInCache(queryClient, recurringBooking);
     },
   });
 }
@@ -53,20 +70,14 @@ export function useRecurringBookingAction(admin = false) {
     mutationFn: ({ id, action }: { id: string; action: "pause" | "resume" | "cancel" }) =>
       submitRecurringBookingAction(id, action, admin),
     retry: false,
-    onMutate: async ({ id, action }) => {
-      await queryClient.cancelQueries({ queryKey: recurringBookingQueryKeys.all });
-      const snapshot = queryClient.getQueriesData({ queryKey: recurringBookingQueryKeys.all });
-      const nextStatus = action === "pause" ? "PAUSED" : action === "resume" ? "ACTIVE" : "CANCELLED";
-      const update = (item: RecurringBooking) => item.id === id ? { ...item, status: nextStatus as RecurringBookingStatus } : item;
-      queryClient.setQueriesData<PageResponse<RecurringBooking>>({ queryKey: recurringBookingQueryKeys.all }, (old) =>
-        old ? { ...old, content: old.content.map(update) } : old,
-      );
-      return snapshot;
-    },
-    onError: (_error, _variables, snapshot) => snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data)),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: recurringBookingQueryKeys.all });
-      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+    onSuccess: (recurringBooking) => {
+      updateRecurringBookingInCache(queryClient, recurringBooking);
+      if (recurringBooking.latestBooking) {
+        queryClient.setQueryData(
+          bookingQueryKeys.detail(recurringBooking.latestBooking.id),
+          recurringBooking.latestBooking,
+        );
+      }
     },
   });
 }

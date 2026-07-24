@@ -33,13 +33,13 @@ export function getBookingStatus(status: string) {
 }
 
 export function deriveBookingDisplayStatus(
-  booking: Pick<Booking, "status" | "bookingDate" | "startTime" | "endTime">,
+  booking: Pick<Booking, "status" | "bookingDate" | "startTime" | "endTime" | "startDateTime" | "endDateTime">,
   now = new Date(),
 ): BookingDisplayStatus {
   if (booking.status !== "CONFIRMED") return booking.status;
 
-  const start = new Date(`${booking.bookingDate}T${booking.startTime}`);
-  const end = new Date(`${booking.bookingDate}T${booking.endTime}`);
+  const start = new Date(booking.startDateTime ?? `${booking.bookingDate}T${booking.startTime}`);
+  const end = new Date(booking.endDateTime ?? `${booking.bookingDate}T${booking.endTime}`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return booking.status;
   if (now >= end) return "COMPLETED";
   if (now >= start) return "IN_PROGRESS";
@@ -53,4 +53,22 @@ export function formatBookingDate(value: string) {
     month: "2-digit",
     year: "numeric",
   }).format(new Date(`${value}T00:00:00`));
+}
+
+export function formatBookingDateTime(value: string) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+export function bookingStartDateTime(booking: Pick<Booking, "bookingDate" | "startTime" | "startDateTime">) {
+  return booking.startDateTime ?? `${booking.bookingDate}T${booking.startTime}`;
+}
+
+export function bookingEndDateTime(booking: Pick<Booking, "bookingDate" | "endTime" | "endDateTime">) {
+  return booking.endDateTime ?? `${booking.bookingDate}T${booking.endTime}`;
 }

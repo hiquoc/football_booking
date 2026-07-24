@@ -32,6 +32,7 @@ export function OperatingHours({
     const sameSchedule =
       lastGroup &&
       lastGroup[0].closed === current.closed &&
+      lastGroup[0].open24Hours === current.open24Hours &&
       lastGroup[0].openTime === current.openTime &&
       lastGroup[0].closeTime === current.closeTime;
 
@@ -43,6 +44,7 @@ export function OperatingHours({
 
     return groups;
   }, []);
+
   return (
     <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center gap-3">
@@ -64,11 +66,15 @@ export function OperatingHours({
           {groupedHours.map((group) => {
             const first = group[0];
             const last = group[group.length - 1];
-
             const dayLabel =
               group.length === 1
                 ? formatDay(first.dayOfWeek)
                 : `${formatDay(first.dayOfWeek)} - ${formatDay(last.dayOfWeek)}`;
+            const scheduleLabel = first.closed
+              ? "Đóng cửa"
+              : first.open24Hours
+                ? "Mở cửa 24 giờ"
+                : `${formatTime(first.openTime)} – ${formatTime(first.closeTime)}`;
 
             return (
               <div
@@ -76,7 +82,6 @@ export function OperatingHours({
                 className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3.5 text-sm last:border-0"
               >
                 <dt className="font-bold text-slate-800">{dayLabel}</dt>
-
                 <dd
                   className={
                     first.closed
@@ -84,9 +89,7 @@ export function OperatingHours({
                       : "rounded-full bg-emerald-50 px-3 py-1 font-bold text-emerald-700"
                   }
                 >
-                  {first.closed
-                    ? "Đóng cửa"
-                    : `${formatTime(first.openTime)} – ${formatTime(first.closeTime)}`}
+                  {scheduleLabel}
                 </dd>
               </div>
             );

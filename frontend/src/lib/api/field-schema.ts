@@ -1,10 +1,13 @@
 import { z } from "zod";
 
+const localTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/);
+
 const operatingHoursSchema = z.object({
   dayOfWeek: z.string(),
-  openTime: z.string().optional(),
-  closeTime: z.string().optional(),
+  openTime: localTimeSchema.optional(),
+  closeTime: localTimeSchema.optional(),
   closed: z.boolean(),
+  open24Hours: z.boolean().optional(),
 });
 
 export const fieldInputSchema = z.object({

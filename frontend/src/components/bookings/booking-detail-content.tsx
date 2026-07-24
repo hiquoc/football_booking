@@ -15,10 +15,11 @@ import {
 import { BackLink } from "@/components/ui/back-link";
 import { DataError, DetailSkeleton } from "@/components/ui/data-state";
 import type { BookingDisplayStatus } from "@/lib/booking-format";
-import { bookingStatus, formatBookingDate } from "@/lib/booking-format";
-import { formatCurrency, formatTime } from "@/lib/field-format";
+import { bookingEndDateTime, bookingStartDateTime, bookingStatus, formatBookingDateTime } from "@/lib/booking-format";
+import { formatCurrency } from "@/lib/field-format";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
 import { useBooking, useCancelBooking } from "@/lib/hooks/use-bookings";
+import { useCurrentUser } from "@/lib/hooks/use-profile";
 
 const statusDescriptions: Record<BookingDisplayStatus, string> = {
   PENDING: "Lịch đặt đang giữ chỗ và chờ xác nhận thanh toán.",
@@ -37,6 +38,7 @@ export function BookingDetailContent({
   owner?: boolean;
 }) {
   const booking = useBooking(bookingId);
+  const currentUser = useCurrentUser();
   const cancelMutation = useCancelBooking(owner);
   const derivedStatus = useBookingDisplayStatus(booking.data);
   const [reason, setReason] = useState("");
@@ -50,6 +52,10 @@ export function BookingDetailContent({
   const displayStatus = derivedStatus ?? data.status;
   const status = bookingStatus[displayStatus];
   const canCancel = data.status === "PENDING" || data.status === "CONFIRMED";
+  const fieldPrice = Number(data.subFieldPrice ?? data.totalAmount ?? 0);
+  const bookingFee = Number(data.bookingPrice ?? data.platformBookingFee ?? 0);
+  const walletBalance = currentUser.data?.balance ?? 0;
+  const needsTopUp = walletBalance < bookingFee;
 
   async function cancel() {
     try {
@@ -104,13 +110,18 @@ export function BookingDetailContent({
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <Info
                 icon={<CalendarDays />}
-                label="Ngày thi đấu"
-                value={formatBookingDate(data.bookingDate)}
+                label="Bắt đầu"
+                value={formatBookingDateTime(bookingStartDateTime(data))}
               />
               <Info
                 icon={<Clock3 />}
-                label="Thời gian"
-                value={`${formatTime(data.startTime)} - ${formatTime(data.endTime)} (${data.durationMinutes} phút)`}
+                label="Kết thúc"
+                value={`${formatBookingDateTime(bookingEndDateTime(data))})`}
+              />
+              <Info
+                icon={<Clock3 />}
+                label="Tạo lúc"
+                value={formatBookingDateTime(data.createdAt)}
               />
               <div className="sm:col-span-2">
                 <Info
@@ -121,15 +132,20 @@ export function BookingDetailContent({
               </div>
             </div>
 
-            <div className="mt-7 flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Thành tiền
-                </p>
+            <div className="mt-7 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="text-base font-black text-slate-950">
+                Chi phí đặt sân
+              </h3>
+              <div className="mt-4 space-y-3 text-sm">
+                <PriceLine label="Thanh toán tại sân" value={fieldPrice} />
+                <PriceLine label="Phí đặt lịch" value={bookingFee} />
+                <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+                  <span className="font-semibold text-slate-600">Thanh toán qua ví</span>
+                  <strong className="text-lg text-slate-950">
+                    {formatCurrency(bookingFee)}
+                  </strong>
+                </div>
               </div>
-              <strong className="shrink-0 text-xl text-slate-950">
-                {formatCurrency(Number(data.totalAmount))}
-              </strong>
             </div>
 
             {data.cancellationReason ? (
@@ -155,13 +171,31 @@ export function BookingDetailContent({
             Thao tác
           </h3>
 
-          {data.status === "PENDING" && !owner ? (
+          {data.status === "PENDING" && !owner && currentUser.isPending ? (
+            <button
+              disabled
+              className="action-button mt-4 w-full cursor-not-allowed bg-slate-300 text-white"
+            >
+              <LoaderCircle className="size-4 animate-spin" />
+              Đang kiểm tra ví
+            </button>
+          ) : null}
+          {data.status === "PENDING" && !owner && !currentUser.isPending && needsTopUp ? (
             <Link
               href={`/bookings/${data.id}/payment`}
               className="action-button mt-4 w-full bg-sky-500 text-white hover:bg-sky-600"
             >
-              Thanh toán ngay
+              Thanh toán
             </Link>
+          ) : null}
+          {data.status === "PENDING" && !owner && !currentUser.isPending && !needsTopUp ? (
+            <button
+              disabled
+              className="action-button mt-4 w-full cursor-not-allowed bg-slate-900 text-white opacity-80"
+            >
+              <LoaderCircle className="size-4 animate-spin" />
+              Đang thanh toán
+            </button>
           ) : null}
           {canCancel ? (
             <button
@@ -230,6 +264,15 @@ function Info({
         </p>
         <p className="mt-1 font-semibold text-slate-700">{value}</p>
       </div>
+    </div>
+  );
+}
+
+function PriceLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="font-semibold text-slate-600">{label}</span>
+      <strong className="text-slate-950">{formatCurrency(value)}</strong>
     </div>
   );
 }

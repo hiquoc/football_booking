@@ -7,5 +7,5 @@ These rules are mandatory for all frontend work. In particular:
 - Keep pages, UI components, hooks, client API functions, BFF routes, and server data access separated.
 - Browser code must call same-origin `/api/**` routes only.
 - Put React Query query/mutation logic in custom hooks.
-- Keep all user-facing display text in Vietnamese.
+- Use only Vietnamese for all user-facing display text on the web UI.
 - Run typecheck, lint, relevant tests, and a production build after structural changes.

@@ -34,6 +34,7 @@ export function createRecurringBooking(input: RecurringBookingInput) {
   return authenticatedGatewayRequest<RecurringBooking>("/api/v1/recurring-bookings", {
     method: "POST",
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(25_000),
   });
 }
 

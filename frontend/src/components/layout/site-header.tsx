@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/server/session";
 import { LogoutButton } from "./logout-button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { MobileMenu } from "./mobile-menu";
+import { WalletBalance } from "./wallet-balance";
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
@@ -50,6 +51,7 @@ export async function SiteHeader() {
         {user ? (
           <div className="flex items-center gap-3">
             <NotificationBell />
+            {user.userType === "CLIENT" ? <WalletBalance /> : null}
             <Link
               href="/profile"
               className="hidden items-center gap-2.5 rounded-full py-1 pl-1 pr-2 text-sm font-bold text-slate-700 hover:bg-sky-50 hover:text-sky-700 sm:inline-flex"

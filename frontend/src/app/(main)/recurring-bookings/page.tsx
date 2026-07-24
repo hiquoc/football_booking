@@ -7,7 +7,7 @@ export default function RecurringBookingsPage() {
       <PageHeading
         eyebrow="Bookings"
         title="Recurring bookings"
-        description="Manage your weekly recurring reservations."
+        description="Manage your recurring reservations."
       />
       <RecurringBookingList scope="my" />
     </div>

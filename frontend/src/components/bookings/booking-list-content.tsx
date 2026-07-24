@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, type FormEvent } from "react";
 import type { BookingStatus } from "@/lib/api/types";
+import { getBookingStatus } from "@/lib/booking-format";
 import { useBookingList, useCancelBooking } from "@/lib/hooks/use-bookings";
 import { BookingCard } from "./booking-card";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
@@ -30,17 +31,17 @@ export function BookingListContent({
       <ListSkeleton />
     );
   }
-  if (query.isError) return <DataError title="Cannot load bookings" />;
+  if (query.isError) return <DataError title="Không thể tải danh sách lịch đặt" />;
   if (!query.data.content.length) {
     return (
       <>
         {owner ? <OwnerFilters filters={filters} /> : null}
         <DataEmpty
-          title="No bookings yet"
+          title="Chưa có lịch đặt"
           description={
             owner
-              ? "Customer bookings will appear here."
-              : "Choose a suitable field and start your first match."
+              ? "Lịch đặt của khách hàng sẽ hiển thị tại đây."
+              : "Chọn sân phù hợp để bắt đầu trận đấu đầu tiên của bạn."
           }
         />
       </>
@@ -61,16 +62,16 @@ export function BookingListContent({
               <button
                 disabled={cancelMutation.isPending}
                 onClick={() => {
-                  if (window.confirm("Confirm cancelling this booking?")) {
+                  if (window.confirm("Xác nhận hủy lịch đặt này?")) {
                     cancelMutation.mutate({
                       id: booking.id,
-                      reason: "Owner cancelled booking",
+                      reason: "Chủ sân đã hủy lịch đặt",
                     });
                   }
                 }}
                 className="action-button min-h-0 rounded-lg bg-rose-500 px-3 py-2 text-xs text-white hover:bg-rose-600"
               >
-                Cancel
+                Hủy lịch
               </button>
             ) : undefined
           }
@@ -83,7 +84,7 @@ export function BookingListContent({
               className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold"
               href={pageLink(page, filters)}
             >
-              Previous
+              Trước
             </Link>
           ) : null}
           {page + 1 < query.data.totalPages ? (
@@ -91,7 +92,7 @@ export function BookingListContent({
               className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white"
               href={pageLink(page + 2, filters)}
             >
-              Next
+              Sau
             </Link>
           ) : null}
         </div>
@@ -133,7 +134,7 @@ function OwnerFilters({
       <input
         name="subFieldId"
         defaultValue={filters.subFieldId ?? ""}
-        placeholder="Subfield ID"
+        placeholder="Mã sân con"
         className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
       />
       <select
@@ -141,10 +142,10 @@ function OwnerFilters({
         defaultValue={filters.status ?? ""}
         className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
       >
-        <option value="">All statuses</option>
+        <option value="">Tất cả trạng thái</option>
         {(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "EXPIRED"] satisfies BookingStatus[]).map((status) => (
           <option key={status} value={status}>
-            {status}
+            {getBookingStatus(status).label}
           </option>
         ))}
       </select>
@@ -152,13 +153,13 @@ function OwnerFilters({
         disabled={pending}
         className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
       >
-        Filter
+        Lọc
       </button>
       <Link
         href="/owner/bookings"
         className="rounded-lg border border-slate-200 px-4 py-2 text-center text-sm font-bold text-slate-700"
       >
-        Clear
+        Xóa lọc
       </Link>
     </form>
   );

@@ -6,11 +6,13 @@ import { uuidSchema } from "@/lib/api/common-schemas";
 
 const bookingSchema = z.object({
   subFieldId: uuidSchema,
-  bookingDate: z.string().date(),
-  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  bookingDate: z.string().date().optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+  startDateTime: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/),
+  endDateTime: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/),
   durationMinutes: z.number().int().positive(),
   note: z.string().trim().max(500).optional(),
-  paymentMethod: z.enum(["STRIPE", "ACCOUNT_BALANCE"]).optional(),
+  paymentMethod: z.literal("ACCOUNT_BALANCE").optional(),
 });
 
 export async function GET(request: Request) {
@@ -29,13 +31,7 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     const input = bookingSchema.parse(await request.json());
     return NextResponse.json(
-      await createBooking({
-        ...input,
-        startTime:
-          input.startTime.length === 5
-            ? `${input.startTime}:00`
-            : input.startTime,
-      }),
+      await createBooking(input),
     );
   } catch (error) {
     return routeError(error);

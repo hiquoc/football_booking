@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       const error = await response.json().catch(() => null);
       return NextResponse.json(
         { message: error?.message ?? "Verification failed" },
-        { status: 400 },
+        { status: response.status },
       );
     }
 

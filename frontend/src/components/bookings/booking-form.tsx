@@ -7,12 +7,12 @@ import {
   Clock3,
   Layers3,
   LoaderCircle,
-  ShieldCheck,
 } from "lucide-react";
 import {
-  buildAvailableSlots,
+  type AvailableSlotOption,
+  buildAvailableSlotOptions,
   calculateBookingPrice,
-  hidePastSlots,
+  hidePastSlotOptions,
 } from "@/lib/booking-slots";
 import { formatCurrency, formatEnum } from "@/lib/field-format";
 import {
@@ -25,7 +25,9 @@ import { useCurrentTime } from "@/lib/hooks/use-current-time";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
 import { useCurrentUser } from "@/lib/hooks/use-profile";
 import { DataEmpty, DataError, FormSkeleton } from "@/components/ui/data-state";
-import type { PaymentMethod } from "@/lib/api/types";
+
+const DEFAULT_FIRST_BOOKING_FEE = 5000;
+const DEFAULT_RETURNING_BOOKING_FEE = 1000;
 
 export function BookingForm({
   fieldId,
@@ -38,12 +40,19 @@ export function BookingForm({
   const [subFieldType, setSubFieldType] = useState("");
   const [subFieldId, setSubFieldId] = useState("");
   const [date, setDate] = useState(initialDate);
-  const [startTime, setStartTime] = useState("");
+  const [selectedSlotKey, setSelectedSlotKey] = useState("");
   const [duration, setDuration] = useState(90);
   const [note, setNote] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("STRIPE");
   const [recurringEnabled, setRecurringEnabled] = useState(false);
-  const [recurringEndDate, setRecurringEndDate] = useState(initialDate);
+  const [recurringIntervalDays, setRecurringIntervalDays] = useState(7);
+  const addDays = (dateString: string, days: number) => {
+    if (!dateString || !days) return dateString;
+    const d = new Date(dateString);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0]; // yyyy-MM-dd
+  };
+
+  const [recurringEndDate, setRecurringEndDate] = useState(addDays(date, 7));
   const createMutation = useCreateBooking();
   const createRecurringMutation = useCreateRecurringBooking();
   const currentUser = useCurrentUser();
@@ -74,26 +83,43 @@ export function BookingForm({
     ? duration
     : durationOptions[0];
   const availability = useAvailability(selectedId, date);
-  const availableSlots = buildAvailableSlots(
+  const availableSlots = buildAvailableSlotOptions(
     availability.data,
     effectiveDuration,
     interval,
+    date,
   );
-  const slots = now ? hidePastSlots(availableSlots, date, now) : [];
-  const selectedStartTime = slots.includes(startTime) ? startTime : "";
+  const slots = now ? hidePastSlotOptions(availableSlots, date, now) : [];
+  const selectedSlot: AvailableSlotOption | undefined = slots.find(
+    (slot) => slot.key === selectedSlotKey,
+  );
+  const selectedStartTime = selectedSlot?.time ?? "";
   const estimatedTotal = calculateBookingPrice(
     selectedSubField,
     selectedStartTime,
     effectiveDuration,
   );
-  const completedBookingCount = currentUser.data?.completedBookingCount ?? 0;
+  const completedBookingCount = currentUser.data?.completedBookingCount;
   const platformBookingFee =
-    completedBookingCount === 0
-      ? (bookingConfig.data?.firstBookingFee ?? 5000)
-      : (bookingConfig.data?.notFirstBookingFee ?? 1000);
+    completedBookingCount === undefined || completedBookingCount === 0
+      ? (bookingConfig.data?.firstBookingFee ?? DEFAULT_FIRST_BOOKING_FEE)
+      : (bookingConfig.data?.notFirstBookingFee ?? DEFAULT_RETURNING_BOOKING_FEE);
   const estimatedTotalWithFee = platformBookingFee;
+  const walletBalance = currentUser.data ? currentUser.data.balance : null;
+  const remainingBalance =
+    estimatedTotalWithFee === null || walletBalance === null
+      ? null
+      : walletBalance - estimatedTotalWithFee;
+  const hasEnoughBalance = remainingBalance !== null && remainingBalance >= 0;
+  const isFeeReady = estimatedTotalWithFee !== null && walletBalance !== null;
   const isCheckingAvailability =
     !now || availability.isPending || availability.isFetching;
+  const recurringPreview = buildRecurringPreview(
+    selectedSlot?.date ?? date,
+    recurringEndDate,
+    recurringIntervalDays,
+  );
+
 
   if (field.isPending || subFields.isPending) return <FormSkeleton />;
   if (field.isError || subFields.isError)
@@ -107,47 +133,47 @@ export function BookingForm({
     );
 
   function resetTimeSelection() {
-    setStartTime("");
+    setSelectedSlotKey("");
     createMutation.reset();
     createRecurringMutation.reset();
   }
-
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!selectedSubField || !selectedStartTime) return;
+    if (createMutation.isPending || createRecurringMutation.isPending) return;
+    if (!selectedSubField || !selectedSlot || !isFeeReady) return;
     try {
+      const start = new Date(selectedSlot.startDateTime);
+      const end = new Date(start.getTime() + effectiveDuration * 60_000);
+      const slotDate = selectedSlot.date;
       if (recurringEnabled) {
-        const start = new Date(`${date}T${selectedStartTime}:00`);
-        const end = new Date(start.getTime() + effectiveDuration * 60_000);
-        const dayOfWeek = [
-          "SUNDAY",
-          "MONDAY",
-          "TUESDAY",
-          "WEDNESDAY",
-          "THURSDAY",
-          "FRIDAY",
-          "SATURDAY",
-        ][start.getDay()];
-        await createRecurringMutation.mutateAsync({
+        const recurringBooking = await createRecurringMutation.mutateAsync({
           subFieldId: selectedSubField.id,
-          dayOfWeek,
-          startDate: date,
-          endDate: recurringEndDate < date ? date : recurringEndDate,
+          startDate: slotDate,
+          endDate: recurringEndDate < slotDate ? slotDate : recurringEndDate,
+          intervalDays: recurringIntervalDays,
           startTime: `${selectedStartTime}:00`,
           endTime: end.toTimeString().slice(0, 8),
         });
-        window.location.assign("/recurring-bookings");
+        const firstBooking = recurringBooking.firstBooking;
+        window.location.assign(
+          firstBooking
+            ? (firstBooking.paymentStatus === "PAID"
+                ? `/bookings/${firstBooking.id}`
+                : `/bookings/${firstBooking.id}/payment`)
+            : "/recurring-bookings",
+        );
         return;
       }
       const booking = await createMutation.mutateAsync({
         subFieldId: selectedSubField.id,
-        bookingDate: date,
+        bookingDate: slotDate,
         startTime: `${selectedStartTime}:00`,
+        startDateTime: formatLocalDateTime(start),
+        endDateTime: formatLocalDateTime(end),
         durationMinutes: effectiveDuration,
         note: note.trim() || undefined,
-        paymentMethod,
       });
-      window.location.assign(paymentMethod === "STRIPE" ? `/bookings/${booking.id}/payment` : `/bookings/${booking.id}`);
+      window.location.assign(hasEnoughBalance ? `/bookings/${booking.id}` : `/bookings/${booking.id}/payment`);
     } catch {
       // React Query exposes the booking conflict below.
     }
@@ -235,7 +261,9 @@ export function BookingForm({
               <h2 className="font-black text-slate-900">Bảng giá {selectedSubField.name}</h2>
             </div>
             <div className="overflow-hidden rounded-2xl border border-slate-200">
-              {selectedSubField.timePriceRules.map((rule) => (
+              {selectedSubField.timePriceRules
+              .sort((a, b) => a.startTime.localeCompare(b.startTime))
+              .map((rule) => (
                 <div key={rule.id} className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm last:border-0">
                   <span className="font-semibold text-slate-600">
                     {rule.startTime.slice(0, 5)} - {rule.endTime.slice(0, 5)}
@@ -255,7 +283,11 @@ export function BookingForm({
                 min={initialDate}
                 value={date}
                 onChange={(event) => {
-                  setDate(event.target.value);
+                  const nextDate = event.target.value;
+                  setDate(nextDate);
+                  if (recurringEndDate < nextDate) {
+                    setRecurringEndDate(addDays(nextDate, 7));
+                  }
                   resetTimeSelection();
                 }}
                 className="input-field"
@@ -293,12 +325,17 @@ export function BookingForm({
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {slots.map((slot) => (
                 <button
-                  key={slot}
+                  key={slot.key}
                   type="button"
-                  onClick={() => setStartTime(slot)}
-                  className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition ${selectedStartTime === slot ? "border-sky-500 bg-sky-500 text-white" : "border-slate-200 hover:border-sky-300"}`}
+                  onClick={() => setSelectedSlotKey(slot.key)}
+                  className={`rounded-xl border px-3 py-2.5 text-sm font-bold transition ${selectedSlot?.key === slot.key ? "border-sky-500 bg-sky-500 text-white" : "border-slate-200 hover:border-sky-300"}`}
                 >
-                  <span className="block">{slot}</span>
+                  <span className="block">{slot.time}</span>
+                  {slot.date !== date ? (
+                    <span className="mt-0.5 block text-[10px] font-semibold opacity-70">
+                      {new Date(`${slot.date}T00:00:00`).toLocaleDateString("vi-VN")}
+                    </span>
+                  ) : null}
                   <span className="mt-0.5 block text-[10px] font-semibold opacity-70">
                     Còn trống
                   </span>
@@ -341,46 +378,83 @@ export function BookingForm({
               className="mt-1 size-4"
             />
             <span>
-              <strong className="block text-sm text-slate-900">Recurring Booking</strong>
+              <strong className="block text-sm text-slate-900">Đặt sân định kỳ</strong>
               <span className="mt-1 block text-xs text-slate-500">
-                Reserve this same sub-field and time every week. Eligibility is checked when you submit.
+                Đặt sân này cùng một thời gian mỗi tuần. Bạn cần đặt sân này trước ít nhất một lần.
               </span>
             </span>
           </label>
           {recurringEnabled ? (
-            <div className="mb-4">
-              <Field label="Ngày kết thúc lặp lại">
+            <div className="mb-4 grid gap-4 sm:grid-cols-2">
+              <Field label="Repeat every">
+                <select
+                  value={recurringIntervalDays}
+                  onChange={(event) => setRecurringIntervalDays(Number(event.target.value))}
+                  className="input-field"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map((value) => (
+                    <option key={value} value={value}>
+                      {value} day(s)
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Ngày đặt sân định kỳ cuối cùng">
                 <input
                   type="date"
                   min={date}
-                  value={recurringEndDate < date ? date : recurringEndDate}
-                  onChange={(event) => setRecurringEndDate(event.target.value)}
+                  value={recurringEndDate}
+                  onChange={(e) => setRecurringEndDate(e.target.value)}
                   className="input-field"
                 />
               </Field>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm sm:col-span-2">
+                <p className="font-bold text-slate-800">This booking will occur:</p>
+                {recurringPreview.length ? (
+                  <p className="mt-2 text-slate-600">
+                    {recurringPreview
+                      .map((item) =>
+                        new Date(`${item}T00:00:00`).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        }),
+                      )
+                      .join(", ")}
+                    {recurringPreview.length === 8 ? ", ..." : ""}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-rose-600">Choose an end date on or after the start date.</p>
+                )}
+              </div>
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("STRIPE")}
-              className={`rounded-2xl border p-4 text-left transition ${paymentMethod === "STRIPE" ? "border-sky-500 bg-sky-50 ring-2 ring-sky-500/10" : "border-slate-200 hover:border-sky-300"}`}
-            >
-              <strong className="block text-sm text-slate-900">Stripe</strong>
-              <span className="mt-1 block text-xs text-slate-500">
-                Thanh toán bằng thẻ hoặc ví hỗ trợ Stripe.
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPaymentMethod("ACCOUNT_BALANCE")}
-              className={`rounded-2xl border p-4 text-left transition ${paymentMethod === "ACCOUNT_BALANCE" ? "border-sky-500 bg-sky-50 ring-2 ring-sky-500/10" : "border-slate-200 hover:border-sky-300"}`}
-            >
-              <strong className="block text-sm text-slate-900">Số dư tài khoản</strong>
-              <span className="mt-1 block text-xs text-slate-500">
-                Hiện có {formatCurrency(currentUser.data?.balance ?? 0)}.
-              </span>
-            </button>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Phí đặt sân</span>
+              <strong className="text-slate-950">
+                {estimatedTotalWithFee === null ? "..." : formatCurrency(estimatedTotalWithFee)}
+              </strong>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-slate-500">Số dư ví hiện tại</span>
+              <strong className="text-slate-950">
+                {walletBalance === null ? "..." : formatCurrency(walletBalance)}
+              </strong>
+            </div>
+            {!isFeeReady ? (
+              <p className="mt-3 rounded-xl bg-white/70 p-3 text-slate-500">
+                Dang tai thong tin phi.
+              </p>
+            ) : hasEnoughBalance ? (
+              <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
+                <span className="text-slate-500">Số dư sau thanh toán</span>
+                <strong className="text-emerald-700">{formatCurrency(remainingBalance)}</strong>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-xl bg-amber-50 p-3 text-amber-700">
+                Bạn chưa đủ số dư. Lịch đặt sẽ được giữ trong khi bạn nạp thêm tiền vào ví.
+              </p>
+            )}
           </div>
         </BookingStep>
       </div>
@@ -401,7 +475,7 @@ export function BookingForm({
           <Summary
             icon={<CalendarDays />}
             label="Ngày"
-            value={new Date(`${date}T00:00:00`).toLocaleDateString("vi-VN")}
+            value={new Date(`${selectedSlot?.date ?? date}T00:00:00`).toLocaleDateString("vi-VN")}
           />
           <Summary
             icon={<Clock3 />}
@@ -414,35 +488,21 @@ export function BookingForm({
           />
         </dl>
         <div className="mt-6 border-t border-slate-200 pt-5">
-          <span className="text-sm text-slate-500">Gia san tra tai san</span>
+          <span className="text-sm text-slate-500">Giá trả tại sân</span>
           <strong className="mt-1 block text-xl">
             {estimatedTotal === null
-              ? "Chon gio de xem gia"
+              ? "Chọn giờ để xem giá"
               : formatCurrency(estimatedTotal)}
           </strong>
         </div>
         <div className="mt-6 border-t border-slate-200 pt-5">
-          <span className="text-sm text-slate-500">Platform Booking Fee</span>
-          <strong className="mt-1 block text-xl">
-            {formatCurrency(platformBookingFee)}
-          </strong>
-        </div>
-        <div className="mt-4 border-t border-slate-200 pt-5">
-          <span className="text-sm text-slate-500">Tạm tính</span>
+          <span className="text-sm text-slate-500">Phí đặt sân</span>
           <strong className="mt-1 block text-2xl">
             {estimatedTotalWithFee === null
               ? "Chọn giờ để xem giá"
               : formatCurrency(estimatedTotalWithFee)}
           </strong>
         </div>
-        <p className="mt-4 flex gap-2 text-xs leading-5 text-slate-500">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-sky-600" />
-          Dữ liệu lịch trống đã được tải trước. Hệ thống vẫn xác nhận lần cuối
-          để tránh hai người đặt cùng một khung giờ.
-        </p>
-        <p className="mt-3 rounded-xl bg-white/70 p-3 text-xs leading-5 text-slate-500">
-          Tổng thanh toán cuối cùng có thể bao gồm phí đặt sân được cấu hình bởi hệ thống.
-        </p>
         {createMutation.error || createRecurringMutation.error ? (
           <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
             {(createMutation.error || createRecurringMutation.error)?.message}
@@ -452,6 +512,7 @@ export function BookingForm({
           disabled={
             !selectedSubField ||
             !selectedStartTime ||
+            !isFeeReady ||
             createMutation.isPending ||
             createRecurringMutation.isPending
           }
@@ -460,11 +521,35 @@ export function BookingForm({
           {createMutation.isPending || createRecurringMutation.isPending ? (
             <LoaderCircle className="size-4 animate-spin" />
           ) : null}
-          {recurringEnabled ? "Create recurring booking" : "Tiếp tục thanh toán"}
+          {recurringEnabled ? "Tạo đặt sân định kỳ" : "Xác nhận đặt sân"}
         </button>
       </aside>
     </form>
   );
+}
+
+function formatLocalDateTime(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+  const seconds = String(value.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+function buildRecurringPreview(startDate: string, endDate: string, intervalDays: number) {
+  if (!startDate || !endDate || intervalDays < 1 || intervalDays > 7 || endDate < startDate) {
+    return [];
+  }
+  const result: string[] = [];
+  const cursor = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  while (cursor <= end && result.length < 8) {
+    result.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + intervalDays);
+  }
+  return result;
 }
 
 function BookingStep({

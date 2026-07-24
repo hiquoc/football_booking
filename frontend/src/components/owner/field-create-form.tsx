@@ -9,6 +9,13 @@ import {
   type FieldLocationValue,
 } from "./field-location-types";
 import { VietnamLocationFields } from "./vietnam-location-fields";
+import {
+  closingTimeOptions,
+  requireLocalTimePayload,
+  toClosingTimeInputValue,
+  toClosingTimePayload,
+  toTimeInputValue,
+} from "@/lib/time-format";
 
 const days = [
   ["MONDAY", "Thứ Hai"],
@@ -19,6 +26,7 @@ const days = [
   ["SATURDAY", "Thứ Bảy"],
   ["SUNDAY", "Chủ Nhật"],
 ] as const;
+const closeTimeOptions = closingTimeOptions();
 
 export function FieldCreateForm() {
   const mutation = useCreateField();
@@ -32,6 +40,7 @@ export function FieldCreateForm() {
       openTime: "06:00:00",
       closeTime: "23:00:00",
       closed: false,
+      open24Hours: false,
     })),
   );
 
@@ -61,7 +70,19 @@ export function FieldCreateForm() {
         phoneNumber: String(data.get("phoneNumber")),
         email: String(data.get("email") || ""),
         active: true,
-        operatingHours: hours,
+        operatingHours: hours.map((item) =>
+          item.closed || item.open24Hours
+            ? {
+                dayOfWeek: item.dayOfWeek,
+                closed: item.closed,
+                open24Hours: item.open24Hours,
+              }
+            : {
+                ...item,
+                openTime: requireLocalTimePayload(item.openTime),
+                closeTime: toClosingTimePayload(item.closeTime, "23:00:00"),
+              },
+        ),
       });
       window.location.assign(`/fields/${field.id}`);
     } catch {
@@ -154,33 +175,47 @@ export function FieldCreateForm() {
           {hours.map((item, index) => (
             <div
               key={item.dayOfWeek}
-              className="grid items-center gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-[8rem_1fr_1fr_auto]"
+              className="grid items-center gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-[8rem_1fr_1fr_auto_auto]"
             >
               <strong className="text-sm">{days[index][1]}</strong>
               <input
                 type="time"
-                disabled={item.closed}
-                value={item.openTime.slice(0, 5)}
-                onChange={(event) =>
-                  updateHour(index, { openTime: `${event.target.value}:00` })
-                }
+                disabled={item.closed || item.open24Hours}
+                value={toTimeInputValue(item.openTime, "06:00")}
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  updateHour(index, { openTime: requireLocalTimePayload(event.target.value) });
+                }}
                 className="input-field disabled:opacity-40"
               />
               <input
                 type="time"
-                disabled={item.closed}
-                value={item.closeTime.slice(0, 5)}
-                onChange={(event) =>
-                  updateHour(index, { closeTime: `${event.target.value}:00` })
-                }
+                list="field-create-close-time-options"
+                disabled={item.closed || item.open24Hours}
+                value={toClosingTimeInputValue(item.closeTime, "23:00")}
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  updateHour(index, { closeTime: toClosingTimePayload(event.target.value, "23:00:00") });
+                }}
                 className="input-field disabled:opacity-40"
               />
               <label className="inline-flex items-center gap-2 text-sm font-bold text-slate-600">
                 <input
                   type="checkbox"
+                  checked={item.open24Hours}
+                  disabled={item.closed}
+                  onChange={(event) =>
+                    updateHour(index, { open24Hours: event.target.checked })
+                  }
+                />{" "}
+                24h
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm font-bold text-slate-600">
+                <input
+                  type="checkbox"
                   checked={item.closed}
                   onChange={(event) =>
-                    updateHour(index, { closed: event.target.checked })
+                    updateHour(index, { closed: event.target.checked, open24Hours: false })
                   }
                 />{" "}
                 Đóng cửa
@@ -188,6 +223,11 @@ export function FieldCreateForm() {
             </div>
           ))}
         </div>
+        <datalist id="field-create-close-time-options">
+          {closeTimeOptions.map((option) => (
+            <option key={option.value} value={option.value} label={option.label} />
+          ))}
+        </datalist>
       </section>
       {mutation.error ? (
         <p className="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">

@@ -10,7 +10,7 @@ export default function MainLayout({
       <SiteHeader />
       <main className="flex flex-1 flex-col">{children}</main>
       <SiteFooter />
-      <ChatWidget />
+      {/* <ChatWidget /> */}
     </div>
   );
 }

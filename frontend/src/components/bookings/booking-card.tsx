@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, MapPin, Save } from "lucide-react";
+import { CalendarDays, Clock3, Eye, MapPin, Save, UserRound } from "lucide-react";
 import type { Booking, WinningTeam } from "@/lib/api/types";
-import { formatBookingDate, getBookingStatus } from "@/lib/booking-format";
-import { formatCurrency, formatTime } from "@/lib/field-format";
+import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime, getBookingStatus } from "@/lib/booking-format";
+import { formatCurrency } from "@/lib/field-format";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
 import { useSubmitMatchResult } from "@/lib/hooks/use-bookings";
 
@@ -15,7 +15,7 @@ const splitPresets = [
   { label: "70 / 30", a: 70, b: 30 },
   { label: "80 / 20", a: 80, b: 20 },
   { label: "90 / 10", a: 90, b: 10 },
-  { label: "Custom", a: null, b: null },
+  { label: "Tùy chỉnh", a: null, b: null },
 ] as const;
 
 export function BookingCard({
@@ -28,53 +28,99 @@ export function BookingCard({
   action?: React.ReactNode;
 }) {
   const status = getBookingStatus(useBookingDisplayStatus(booking) ?? booking.status);
+  const fieldPrice = Number(booking.subFieldPrice ?? booking.totalAmount ?? 0);
+  const bookingFee = Number(booking.bookingPrice ?? booking.platformBookingFee ?? 0);
   return (
-    <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div>
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded-full px-3 py-1 text-xs font-black ${status.className}`}>
               {status.label}
             </span>
-            <span className="text-xs font-bold text-slate-400">{booking.bookingCode}</span>
-            <span className="text-xs font-bold text-slate-400">ID: {booking.id}</span>
+            <span className="text-xs font-semibold text-slate-400">{booking.bookingCode}</span>
           </div>
-          <h2 className="mt-3 text-xl font-black text-slate-700">{booking.fieldName}</h2>
+          <h2 className="mt-3 truncate text-lg font-black text-slate-900">{booking.fieldName}</h2>
           <p className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-            <MapPin className="size-4 text-sky-600" /> {booking.subFieldName}
+            <MapPin className="size-4 shrink-0 text-sky-600" /> {booking.subFieldName}
           </p>
           {owner ? (
-            <p className="mt-2 text-xs font-semibold text-slate-500">Customer: {booking.clientId}</p>
+            <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <UserRound className="size-3.5 text-slate-400" />
+              Khách hàng: {booking.clientId}
+            </p>
           ) : null}
         </div>
-        <strong className="text-lg text-slate-950">
-          {formatCurrency(Number(booking.totalAmount))}
-        </strong>
+
+        <div className="grid shrink-0 gap-2 text-sm sm:min-w-56">
+          <PriceItem label="Thanh toán tại sân" value={fieldPrice} />
+          <PriceItem label="Phí đặt lịch" value={bookingFee} strong />
+        </div>
       </div>
-      <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-500">
-        <span className="inline-flex items-center gap-2">
-          <CalendarDays className="size-4" /> {formatBookingDate(booking.bookingDate)}
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <Clock3 className="size-4" /> {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-        </span>
-        <span>Total amount: {formatCurrency(Number(booking.totalAmount))}</span>
-        <span className="ml-auto flex items-center gap-3">
-          {action}
-          {!owner ? (
-            <Link
-              href={`/bookings/${booking.id}`}
-              className="rounded-lg px-2 py-1 font-black text-sky-600 hover:bg-sky-50"
-            >
-              View details
-            </Link>
-          ) : null}
-        </span>
+
+      <div className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:grid-cols-3">
+        <BookingMeta
+          icon={<CalendarDays />}
+          label="Bắt đầu"
+          value={formatBookingDateTime(bookingStartDateTime(booking))}
+        />
+        <BookingMeta
+          icon={<Clock3 />}
+          label="Kết thúc"
+          value={formatBookingDateTime(bookingEndDateTime(booking))}
+        />
+        <BookingMeta
+          icon={<Clock3 />}
+          label="Tạo lúc"
+          value={formatBookingDateTime(booking.createdAt)}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+        {action}
+        {!owner ? (
+          <Link
+            href={`/bookings/${booking.id}`}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:border-sky-300 hover:text-sky-700"
+          >
+            <Eye className="size-4" />
+            Xem chi tiết
+          </Link>
+        ) : null}
       </div>
       {owner && booking.status === "COMPLETED" ? (
         <MatchResultEditor key={booking.matchResult?.updatedAt ?? "new-result"} booking={booking} />
       ) : null}
     </article>
+  );
+}
+
+function PriceItem({ label, value, strong = false }: { label: string; value: number; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-5 sm:justify-end">
+      <span className="text-slate-500">{label}</span>
+      <strong className={strong ? "text-slate-950" : "font-semibold text-slate-700"}>{formatCurrency(value)}</strong>
+    </div>
+  );
+}
+
+function BookingMeta({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-sky-600 [&_svg]:size-4">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-slate-400">{label}</p>
+        <p className="mt-0.5 font-semibold text-slate-700">{value}</p>
+      </div>
+    </div>
   );
 }
 
@@ -99,7 +145,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
     <div className="mt-5 grid gap-4 border-t border-slate-100 pt-4">
       <div className="grid gap-3 md:grid-cols-3">
         <label className="grid gap-1 text-sm font-bold text-slate-600">
-          Split preset
+          Tỷ lệ chia tiền
           <select
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
             value={matchingPreset(teamAPercentage, teamBPercentage)}
@@ -117,7 +163,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
           </select>
         </label>
         <label className="grid gap-1 text-sm font-bold text-slate-600">
-          Team A %
+          Đội A %
           <input
             type="number"
             min={0}
@@ -128,7 +174,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
           />
         </label>
         <label className="grid gap-1 text-sm font-bold text-slate-600">
-          Team B %
+          Đội B %
           <input
             type="number"
             min={0}
@@ -141,34 +187,34 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-lg bg-slate-50 p-3 text-sm">
-          <p className="font-bold text-slate-500">Team A pays</p>
+          <p className="font-bold text-slate-500">Đội A trả</p>
           <p className="mt-1 text-lg font-black text-slate-950">{formatCurrency(teamAAmount)}</p>
         </div>
         <div className="rounded-lg bg-slate-50 p-3 text-sm">
-          <p className="font-bold text-slate-500">Team B pays</p>
+          <p className="font-bold text-slate-500">Đội B trả</p>
           <p className="mt-1 text-lg font-black text-slate-950">{formatCurrency(teamBAmount)}</p>
         </div>
         <label className="grid gap-1 text-sm font-bold text-slate-600">
-          Result
+          Kết quả
           <select
             value={winningTeam}
             onChange={(event) => setWinningTeam(event.target.value as WinningTeam)}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
           >
-            <option value="TEAM_A">Team A won</option>
-            <option value="TEAM_B">Team B won</option>
-            <option value="DRAW">Draw</option>
+            <option value="TEAM_A">Đội A thắng</option>
+            <option value="TEAM_B">Đội B thắng</option>
+            <option value="DRAW">Hòa</option>
           </select>
         </label>
       </div>
       {!splitValid ? (
         <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-          Team A and Team B percentages must total 100%.
+          Tổng tỷ lệ của đội A và đội B phải bằng 100%.
         </p>
       ) : null}
       {result ? (
         <p className="text-sm font-semibold text-slate-500">
-          Saved result: {result.winningTeam.replace("_", " ")} - {result.teamAPercentage}/{result.teamBPercentage}
+          Kết quả đã lưu: {winningTeamLabel(result.winningTeam)} - {result.teamAPercentage}/{result.teamBPercentage}
         </p>
       ) : null}
       <button
@@ -182,7 +228,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
         className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
       >
         <Save className="size-4" />
-        {result ? "Update result" : "Submit result"}
+        {result ? "Cập nhật kết quả" : "Lưu kết quả"}
       </button>
       {mutation.error ? <p className="text-sm font-semibold text-rose-600">{mutation.error.message}</p> : null}
     </div>
@@ -190,5 +236,11 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
 }
 
 function matchingPreset(teamAPercentage: number, teamBPercentage: number) {
-  return splitPresets.find((preset) => preset.a === teamAPercentage && preset.b === teamBPercentage)?.label ?? "Custom";
+  return splitPresets.find((preset) => preset.a === teamAPercentage && preset.b === teamBPercentage)?.label ?? "Tùy chỉnh";
+}
+
+function winningTeamLabel(winningTeam: WinningTeam) {
+  if (winningTeam === "TEAM_A") return "Đội A thắng";
+  if (winningTeam === "TEAM_B") return "Đội B thắng";
+  return "Hòa";
 }

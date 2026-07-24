@@ -53,11 +53,11 @@ export function formatTime(value: string | null) {
 }
 
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(value);
+  const amount = Math.round(Number.isFinite(value) ? value : 0);
+  const sign = amount < 0 ? "-" : "";
+  const digits = Math.abs(amount).toString();
+  const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${sign}${formatted} ₫`;
 }
 
 export function formatDate(value: string) {
