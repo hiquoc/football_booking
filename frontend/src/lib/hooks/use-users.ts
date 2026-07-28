@@ -2,13 +2,31 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@/lib/api/types";
-import { fetchUsers, submitUserRole } from "@/lib/client/users";
+import { fetchEmployeeByPhone, fetchPublicProfile, fetchUsers, submitUserRole } from "@/lib/client/users";
 import { userQueryKeys } from "@/lib/query-keys";
 
 export function useUsers(page: number, size = 10) {
   return useQuery({
     queryKey: userQueryKeys.list(page, size),
     queryFn: () => fetchUsers(page, size),
+  });
+}
+
+export function useEmployeeByPhone(phoneNumber: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...userQueryKeys.all, "employee-by-phone", phoneNumber],
+    queryFn: () => fetchEmployeeByPhone(phoneNumber),
+    enabled: enabled && phoneNumber.trim().length > 0,
+    retry: false,
+  });
+}
+
+export function usePublicProfile(id: string, enabled = true) {
+  return useQuery({
+    queryKey: userQueryKeys.profile(id),
+    queryFn: () => fetchPublicProfile(id),
+    enabled: enabled && Boolean(id),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

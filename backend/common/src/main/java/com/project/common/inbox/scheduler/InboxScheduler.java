@@ -19,7 +19,7 @@ public class InboxScheduler {
     private final InboxProcessingService processingService;
     private final MeterRegistry meterRegistry;
 
-    @Scheduled(fixedDelayString = "${inbox.poll-interval:5000}")
+    @Scheduled(fixedDelayString = "${inbox.poll-interval:1000}")
     public void processReceivedEvents() {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {

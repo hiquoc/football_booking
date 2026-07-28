@@ -29,7 +29,9 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET,
                                 "/api/v1/fields/**", "/api/v1/sub-fields/**",
                                 "/api/v1/field-types/**", "/api/v1/reviews/**",
-                                "/api/v1/bookings/availability").permitAll()
+                                "/api/v1/community-posts", "/api/v1/community-posts/*",
+                                "/api/v1/bookings/availability",
+                                "/api/v1/bookings/config").permitAll()
                         .pathMatchers(HttpMethod.PUT, "/api/v1/users/*/role").hasRole("ADMIN")
                         .anyExchange().authenticated())
                 .exceptionHandling(exceptions -> exceptions

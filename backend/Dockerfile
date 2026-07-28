@@ -28,7 +28,7 @@ COPY booking-service booking-service
 COPY notification-service notification-service
 COPY payment-service payment-service
 
-RUN ./mvnw -q -pl "${SERVICE_DIR}" -am -DskipTests package && \
+RUN ./mvnw -q -pl "${SERVICE_DIR}" -am -Dmaven.test.skip=true package && \
     cp "${SERVICE_DIR}/target/${ARTIFACT_ID}-0.0.1-SNAPSHOT.jar" /workspace/app.jar
 
 FROM eclipse-temurin:21-jre-alpine

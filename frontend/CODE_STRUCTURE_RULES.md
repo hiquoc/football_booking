@@ -10,6 +10,8 @@ Tài liệu này là quy ước bắt buộc khi tạo mới hoặc chỉnh sử
 - Browser chỉ gọi Next.js BFF qua các đường dẫn cùng origin `/api/**`.
 - Chỉ code chạy trên server mới được gọi API gateway trực tiếp.
 - Nội dung hiển thị cho người dùng phải dùng tiếng Việt.
+- Khi thêm hoặc chỉnh sửa text hiển thị trên UI, viết bằng tiếng Việt có dấu. Không để lại label, heading, mô tả, nút, empty state, error state hoặc tooltip bằng tiếng Anh.
+- Giá trị kỹ thuật từ API như enum/status/code có thể giữ nguyên trong dữ liệu, nhưng khi hiển thị cho người dùng phải map sang nhãn tiếng Việt.
 - Query key phải được khai báo tập trung, không viết chuỗi query key rải rác.
 
 ## 2. Trách nhiệm theo thư mục
@@ -199,5 +201,6 @@ src/
 - [ ] Mutation invalidate đúng cache liên quan.
 - [ ] Không có state trùng với state đã được React Query cung cấp.
 - [ ] Loading, empty và error state đã được xử lý.
-- [ ] Nội dung giao diện sử dụng tiếng Việt.
+- [ ] Nội dung giao diện sử dụng tiếng Việt có dấu, bao gồm label, heading, mô tả, nút, empty state, error state và tooltip.
+- [ ] Enum/status/code từ API đã được map sang nhãn tiếng Việt trước khi hiển thị.
 - [ ] Typecheck, lint, test và production build đều đạt.

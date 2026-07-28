@@ -2,6 +2,7 @@ package com.project.payment.entity;
 
 import com.project.common.entity.BaseEntity;
 import com.project.payment.enums.PaymentProvider;
+import com.project.payment.enums.PaymentPurpose;
 import com.project.payment.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -13,9 +14,11 @@ import java.time.Instant;
 @Entity @Table(name="payments") @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Payment extends BaseEntity {
     @Id @GeneratedValue @UuidGenerator private UUID id;
-    @Column(name="booking_id", nullable=false, unique=true) private UUID bookingId;
+    @Column(name="booking_id") private UUID bookingId;
     @Column(name="user_id", nullable=false) private UUID userId;
     @Column(name="provider", nullable=false, length=30) @Enumerated(EnumType.STRING) private PaymentProvider provider;
+    @Builder.Default
+    @Column(name="purpose", nullable=false, length=30) @Enumerated(EnumType.STRING) private PaymentPurpose purpose = PaymentPurpose.WALLET_TOP_UP;
     @Column(name="stripe_session_id", unique=true) private String providerSessionId;
     @Column(name="payment_intent_id", unique=true) private String providerPaymentId;
     @Column(nullable=false, precision=19, scale=2) private BigDecimal amount;

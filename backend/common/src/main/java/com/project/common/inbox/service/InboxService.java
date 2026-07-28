@@ -7,6 +7,7 @@ import com.project.common.inbox.entity.InboxEvent;
 import com.project.common.inbox.entity.InboxEventStatus;
 import com.project.common.inbox.repository.InboxEventRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,6 +19,7 @@ import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InboxService {
 
     private final InboxEventRepository inboxEventRepository;
@@ -44,6 +46,14 @@ public class InboxService {
                 .build();
         try {
             inboxEventRepository.saveAndFlush(event);
+            log.info(
+                    "Received Kafka event: eventId={}, topic={}, partition={}, offset={}, key={}, consumerGroup={}",
+                    eventId,
+                    record.topic(),
+                    record.partition(),
+                    record.offset(),
+                    record.key(),
+                    consumerGroup);
         } catch (DataIntegrityViolationException ignored) {
             // Another instance already inserted the same event for this consumer group.
         }

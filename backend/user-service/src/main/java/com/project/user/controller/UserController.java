@@ -62,6 +62,13 @@ public class UserController {
         return ApiResponse.success(userService.getUsers(pageable));
     }
 
+    @Operation(summary = "Find employee by phone", description = "Returns one EMPLOYEE profile matching an exact phone number for field assignment.")
+    @PreAuthorize("hasRole('OWNER')")
+    @GetMapping("/employees/by-phone")
+    public ApiResponse<UserDto> findEmployeeByPhone(@RequestParam String phoneNumber) {
+        return ApiResponse.success(userService.getEmployeeByPhone(phoneNumber));
+    }
+
     @Operation(summary = "Get my profile", description = "Returns the profile of the currently authenticated user")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile retrieved",

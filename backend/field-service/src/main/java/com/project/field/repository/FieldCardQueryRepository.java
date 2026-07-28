@@ -91,7 +91,7 @@ public class FieldCardQueryRepository {
             where.append(" AND ").append(DISTANCE_SQL).append(" <= :radiusKm");
         }
 
-        String favoriteSelect = userId == null
+        String savedSelect = userId == null
                 ? "false"
                 : "EXISTS (SELECT 1 FROM field_favorites ff WHERE ff.field_id = f.id AND ff.user_id = :userId AND ff.deleted = false)";
 
@@ -103,7 +103,7 @@ public class FieldCardQueryRepository {
                        (SELECT string_agg(DISTINCT ft.sport_type, ',' ORDER BY ft.sport_type)
                         FROM field_field_types fft JOIN field_types ft ON ft.id = fft.field_type_id
                         WHERE fft.field_id = f.id AND ft.deleted = false AND ft.active = true) AS field_types,
-                """ + distanceSelect + " AS distance_km, " + favoriteSelect + " AS is_favorite FROM fields f " + where
+                """ + distanceSelect + " AS distance_km, " + savedSelect + " AS is_saved FROM fields f " + where
                 + " ORDER BY " + sortColumn + " " + sortDirection + ", f.id ASC";
         String countSql = "SELECT count(*) FROM fields f " + where;
 
@@ -151,7 +151,7 @@ public class FieldCardQueryRepository {
                 .primaryImageUrl((String) row[9])
                 .fieldTypes(types == null || types.isBlank() ? List.of() : Arrays.asList(types.split(",")))
                 .distanceKm(row[11] == null ? null : ((Number) row[11]).doubleValue())
-                .isFavorite((Boolean) row[12])
+                .isSaved((Boolean) row[12])
                 .build();
     }
 }

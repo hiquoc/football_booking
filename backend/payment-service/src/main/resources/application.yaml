@@ -19,7 +19,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     client-id: payment-service
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -36,6 +36,10 @@ spring:
         spring.json.trusted.packages: com.project.common.events.notification
         spring.json.use.type.headers: true
     listener: { ack-mode: record, missing-topics-fatal: false }
+  task:
+    scheduling:
+      pool:
+        size: 4
 eureka:
   client:
     service-url: { defaultZone: "${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}" }
@@ -49,14 +53,14 @@ internal:
   gateway: { secret: "${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}" }
 outbox:
   batch-size: 50
-  poll-interval: 5000
+  poll-interval: 1000
   max-retries: 5
   scheduler-concurrency: 8
   retry-delays: [10s, 30s, 1m, 5m, 15m]
   dlq: { enabled: true, topic-suffix: .dlq }
 inbox:
   batch-size: 50
-  poll-interval: 5000
+  poll-interval: 1000
   max-retries: 5
   scheduler-concurrency: 1
   retry-delays: [10s, 30s, 1m, 5m, 15m]

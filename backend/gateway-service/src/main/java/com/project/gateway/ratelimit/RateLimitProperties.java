@@ -14,6 +14,7 @@ import java.util.Map;
 @Getter
 @ConfigurationProperties(prefix = "gateway.rate-limits")
 public class RateLimitProperties {
+    private boolean enabled = true;
     private boolean failOpenOnRedisError = true;
     private int maxBodyBytes = 16 * 1024;
     private Map<String, Policy> policies = new LinkedHashMap<>();
@@ -30,6 +31,7 @@ public class RateLimitProperties {
     @Setter
     @Getter
     public static class Endpoint {
+        private boolean enabled = true;
         private String id;
         private String policy;
         private List<String> paths = new ArrayList<>();

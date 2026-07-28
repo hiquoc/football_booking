@@ -9,6 +9,7 @@ import type {
   PageResponse,
   Review,
   SubField,
+  SubFieldFilterOption,
 } from "@/lib/api/types";
 import { requestJson } from "./http";
 import { jsonBody } from "./http";
@@ -55,6 +56,14 @@ export function fetchSubFields(id: string) {
   );
 }
 
+export function fetchSubFieldFilterOptions(search = "") {
+  const query = new URLSearchParams();
+  if (search.trim()) query.set("search", search.trim());
+  return requestJson<SubFieldFilterOption[]>(
+    `/api/subfields/filter-options${query.size ? `?${query}` : ""}`,
+  );
+}
+
 export function fetchFieldReviews(id: string) {
   return requestJson<Review[]>(`/api/fields/${encodeURIComponent(id)}/reviews`);
 }
@@ -77,8 +86,9 @@ export function submitFieldStatus(id: string, status: FieldStatus) {
   });
 }
 
-export function fetchFavoriteFields() {
-  return requestJson<Field[]>("/api/users/me/favorites");
+export function fetchFavoriteFields(page: number, size = 4) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return requestJson<PageResponse<Field>>(`/api/users/me/favorites?${query}`);
 }
 
 export function addFavoriteField(fieldId: string) {

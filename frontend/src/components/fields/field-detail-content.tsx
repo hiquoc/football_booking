@@ -44,7 +44,7 @@ export function FieldDetailContent({
           <FieldDetailActions
             fieldId={fieldId}
             fieldOwnerId={field.ownerId}
-            isFavorite={field.isFavorite}
+            isSaved={field.isSaved ?? field.isFavorite}
             viewerRole={viewerRole}
             viewerUserId={viewerUserId}
           />
@@ -90,13 +90,13 @@ export function FieldDetailContent({
 function FieldDetailActions({
   fieldId,
   fieldOwnerId,
-  isFavorite,
+  isSaved,
   viewerRole,
   viewerUserId,
 }: {
   fieldId: string;
   fieldOwnerId: string;
-  isFavorite?: boolean;
+  isSaved?: boolean;
   viewerRole: User["userType"] | null;
   viewerUserId: string | null;
 }) {
@@ -115,11 +115,11 @@ function FieldDetailActions({
     return null;
   }
 
-  if (viewerRole === "CLIENT") {
+  if (viewerRole === "CLIENT" || viewerRole === "EMPLOYEE") {
     return (
       <FavoriteButton
         fieldId={fieldId}
-        isFavorite={isFavorite}
+        isSaved={isSaved}
         className="inline-grid size-11 place-items-center rounded-full border border-slate-200 bg-white text-xl shadow-sm transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-wait disabled:opacity-70"
       />
     );

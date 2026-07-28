@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock3, Images, Pencil, Shapes } from "lucide-react";
+import { Clock3, Images, Pencil, Shapes, Users } from "lucide-react";
 export function FieldManagementNav({ fieldId }: { fieldId: string }) {
   const root = `/owner/fields/${fieldId}`;
   const links = [
@@ -7,6 +7,7 @@ export function FieldManagementNav({ fieldId }: { fieldId: string }) {
     { href: `${root}/sub-fields`, label: "Sân con & giá", icon: Shapes },
     { href: `${root}/images`, label: "Hình ảnh", icon: Images },
     { href: `${root}/closures`, label: "Lịch đóng", icon: Clock3 },
+    { href: `${root}/employees`, label: "NhÃ¢n viÃªn", icon: Users },
   ];
   return (
     <nav className="mb-7 flex justify-center gap-2 overflow-x-auto">

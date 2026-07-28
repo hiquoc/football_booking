@@ -12,7 +12,9 @@ import com.project.common.outbox.service.OutboxService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -64,29 +66,61 @@ public class FieldEventPublisher {
     }
 
     public void publishFieldOperatingHoursUpdated(List<FieldOperatingHours> hours) {
+        publishFieldOperatingHoursUpdated(List.of(), hours, List.of());
+    }
+
+    public void publishFieldOperatingHoursUpdated(List<FieldOperatingHours> previousHours, List<FieldOperatingHours> hours,
+            List<UUID> affectedSubFieldIds) {
         if (hours == null || hours.isEmpty()) {
             return;
         }
         FieldOperatingHours first = hours.getFirst();
         save("FieldOperatingHours", first.getFieldId().toString(),
-                FieldEventTopics.FIELD_OPERATING_HOURS_UPDATED,
+                FieldEventTopics.OPERATING_HOURS_CHANGED,
                 first.getFieldId().toString(),
-                new FieldOperatingHoursUpdatedEvent(
+                new OperatingHoursChangedEvent(
+                        "FIELD",
                         first.getFieldId(),
-                        hours.stream().map(this::toSnapshot).toList()));
+                        first.getFieldId(),
+                        previousHours == null ? List.of() : previousHours.stream().map(this::toSnapshot).toList(),
+                        hours.stream().map(this::toSnapshot).toList(),
+                        Instant.now(),
+                        UUID.randomUUID()));
     }
 
     public void publishSubFieldOperatingHoursUpdated(List<SubFieldOperatingHours> hours) {
+        publishSubFieldOperatingHoursUpdated(List.of(), hours, null);
+    }
+
+    public void publishSubFieldOperatingHoursUpdated(List<SubFieldOperatingHours> previousHours,
+            List<SubFieldOperatingHours> hours, UUID fieldId) {
         if (hours == null || hours.isEmpty()) {
             return;
         }
         SubFieldOperatingHours first = hours.getFirst();
         save("SubFieldOperatingHours", first.getSubFieldId().toString(),
-                FieldEventTopics.SUB_FIELD_OPERATING_HOURS_UPDATED,
+                FieldEventTopics.OPERATING_HOURS_CHANGED,
                 first.getSubFieldId().toString(),
-                new SubFieldOperatingHoursUpdatedEvent(
+                new OperatingHoursChangedEvent(
+                        "SUBFIELD",
                         first.getSubFieldId(),
-                        hours.stream().map(this::toSnapshot).toList()));
+                        fieldId,
+                        previousHours == null ? List.of() : previousHours.stream().map(this::toSnapshot).toList(),
+                        hours.stream().map(this::toSnapshot).toList(),
+                        Instant.now(),
+                        UUID.randomUUID()));
+    }
+
+    public void publishTimePriceRulesChanged(SubField subField) {
+        save("TimePriceRule", subField.getId().toString(),
+                FieldEventTopics.TIME_PRICE_RULES_CHANGED,
+                subField.getId().toString(),
+                new TimePriceRulesChangedEvent(
+                        subField.getId(),
+                        subField.getField().getId(),
+                        timePriceRules(subField),
+                        Instant.now(),
+                        UUID.randomUUID()));
     }
 
     public void publishClosureCreated(List<SubFieldClosure> closures) {
@@ -174,7 +208,8 @@ public class FieldEventPublisher {
                 hours.getDayOfWeek(),
                 hours.getOpenTime(),
                 hours.getCloseTime(),
-                hours.getClosed());
+                hours.getClosed(),
+                hours.getOpen24Hours());
     }
 
     private OperatingHoursSnapshot toSnapshot(SubFieldOperatingHours hours) {
@@ -182,6 +217,7 @@ public class FieldEventPublisher {
                 hours.getDayOfWeek(),
                 hours.getOpenTime(),
                 hours.getCloseTime(),
-                hours.getClosed());
+                hours.getClosed(),
+                hours.getOpen24Hours());
     }
 }

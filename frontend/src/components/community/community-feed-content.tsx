@@ -18,6 +18,7 @@ export function CommunityFeedContent({
   canCreate: boolean;
 }) {
   const { data, isPending, isError } = useCommunityPosts(pageNumber - 1, 10, filters);
+  console.log(data?.content.at(0));
 
   return (
     <div className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8">

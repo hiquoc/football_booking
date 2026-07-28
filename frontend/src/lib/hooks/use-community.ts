@@ -81,6 +81,9 @@ export function useApplyCommunityPost(id: string) {
     mutationFn: (body: Record<string, unknown>) => submitCommunityApplication(id, body),
     retry: false,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: communityQueryKeys.detail(id) }),
+    onError: (error) => {
+      console.error("Error applying to community post:", error);
+    },
   });
 }
 

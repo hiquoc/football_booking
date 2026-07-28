@@ -6,10 +6,13 @@ export const fieldQueryKeys = {
   details: (id: string) => [...fieldQueryKeys.detail(id), "details"] as const,
   cards: (page: number, size = 9, filters: object = {}) =>
     [...fieldQueryKeys.all, "cards", { page, size, filters }] as const,
-  favorites: ["fields", "favorites"] as const,
+  favorites: (page: number, size = 4) =>
+    [...fieldQueryKeys.all, "favorites", { page, size }] as const,
   operatingHours: (id: string) =>
     [...fieldQueryKeys.detail(id), "operating-hours"] as const,
   subFields: (id: string) => ["sub-fields", id] as const,
+  subFieldFilterOptions: (search = "") =>
+    ["sub-fields", "filter-options", { search }] as const,
   reviews: (id: string) => ["reviews", id] as const,
 };
 
@@ -62,6 +65,9 @@ export const ownerFieldQueryKeys = {
   all: ["owner-fields"] as const,
   list: (page: number, size = 10) =>
     [...ownerFieldQueryKeys.all, "list", { page, size }] as const,
+  assigned: (page: number, size = 10) =>
+    [...ownerFieldQueryKeys.all, "assigned", { page, size }] as const,
+  employees: (fieldId: string) => [...ownerFieldQueryKeys.all, fieldId, "employees"] as const,
   closures: (fieldId: string, subFieldId: string) =>
     [...ownerFieldQueryKeys.all, fieldId, "closures", subFieldId] as const,
 };

@@ -32,21 +32,21 @@ public class StripePaymentProviderStrategy implements PaymentProviderStrategy {
             long unitAmount = (ZERO_DECIMAL_CURRENCIES.contains(currency) ? request.amount() : request.amount().movePointRight(2)).longValueExact();
             SessionCreateParams.Builder params = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.PAYMENT)
-                    .setSuccessUrl(properties.frontendUrl() + "/bookings/" + request.bookingId() + "/payment?checkout=returned")
-                    .setCancelUrl(properties.frontendUrl() + "/bookings/" + request.bookingId() + "/payment?checkout=cancelled")
+                    .setSuccessUrl(successUrl(request))
+                    .setCancelUrl(cancelUrl(request))
                     .setExpiresAt(Instant.now().plusSeconds(30 * 60).getEpochSecond())
                     .putMetadata("paymentId", request.paymentId().toString())
-                    .putMetadata("bookingId", request.bookingId().toString())
                     .addLineItem(SessionCreateParams.LineItem.builder().setQuantity(1L)
                             .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
                                     .setCurrency(currency)
                                     .setUnitAmount(unitAmount)
                                     .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                            .setName("Football booking " + request.bookingCode()).build())
+                                            .setName(request.bookingCode() == null ? "Wallet top-up" : "Wallet top-up for booking " + request.bookingCode()).build())
                                     .build()).build());
+            if (request.bookingId() != null) params.putMetadata("bookingId", request.bookingId().toString());
             if (request.customerEmail() != null && !request.customerEmail().isBlank()) params.setCustomerEmail(request.customerEmail());
             RequestOptions options = RequestOptions.builder().setApiKey(properties.secretKey())
-                    .setIdempotencyKey("checkout-booking-" + request.bookingId() + "-" + request.attempt()).build();
+                    .setIdempotencyKey("checkout-wallet-top-up-" + request.paymentId() + "-" + request.attempt()).build();
             Session session = Session.create(params.build(), options);
             return new ProviderCheckoutResult(session.getId(), session.getUrl(), Instant.ofEpochSecond(session.getExpiresAt()));
         } catch (ArithmeticException ex) {
@@ -95,6 +95,18 @@ public class StripePaymentProviderStrategy implements PaymentProviderStrategy {
 
     private ProviderWebhookResult ignored(Event event) {
         return new ProviderWebhookResult(event.getId(), event.getType(), null, null, null, null);
+    }
+
+    private String successUrl(ProviderCheckoutRequest request) {
+        return request.bookingId() == null
+                ? properties.frontendUrl() + "/profile?topup=returned"
+                : properties.frontendUrl() + "/bookings/" + request.bookingId() + "/payment?topup=returned";
+    }
+
+    private String cancelUrl(ProviderCheckoutRequest request) {
+        return request.bookingId() == null
+                ? properties.frontendUrl() + "/profile?topup=cancelled"
+                : properties.frontendUrl() + "/bookings/" + request.bookingId() + "/payment?topup=cancelled";
     }
 
     private StripeObject deserializeUnsafe(Event event) {

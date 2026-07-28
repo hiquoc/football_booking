@@ -15,8 +15,7 @@ export default async function ProfilePage({
   const isOwnProfile = !userId || userId === currentUser?.id;
 
   return (
-    <div className="mx-auto min-h-[70vh] max-w-5xl px-5 py-12 sm:px-8">
-      <PageHeading eyebrow="Cầu thủ" title="Hồ sơ cầu thủ" />
+    <div className="mx-auto min-h-[70vh] max-w-5xl px-5 sm:px-8">
       <div className="mt-8">
         <ProfileContent userId={userId} isOwnProfile={isOwnProfile} />
       </div>

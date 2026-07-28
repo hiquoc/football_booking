@@ -20,6 +20,7 @@ import com.project.field.dto.UserDto;
 import com.project.field.entity.Field;
 import com.project.field.entity.FieldImage;
 import com.project.field.entity.FieldOperatingHours;
+import com.project.field.entity.SubField;
 import com.project.field.exceptions.FieldNotFoundException;
 import com.project.field.enums.FieldStatus;
 import com.project.field.kafka.FieldEventPublisher;
@@ -59,6 +60,7 @@ public class FieldServiceImpl implements FieldService {
     private final UserServiceClient userServiceClient;
     private final CloudinaryService cloudinaryService;
     private final FieldEventPublisher fieldEventPublisher;
+    private final OperatingHoursPriceRuleSynchronizer operatingHoursPriceRuleSynchronizer;
 
     @Override
     @Transactional
@@ -70,7 +72,7 @@ public class FieldServiceImpl implements FieldService {
         Field field = fieldMapper.toEntity(ownerId, request);
 
         Field saved = fieldRepository.save(field);
-        fieldEventPublisher.publishFieldOperatingHoursUpdated(createOperatingHours(saved, request));
+        fieldEventPublisher.publishFieldOperatingHoursUpdated(List.of(), createOperatingHours(saved, request), List.of());
         return fieldMapper.toDto(saved);
     }
 
@@ -90,7 +92,18 @@ public class FieldServiceImpl implements FieldService {
 
         Field saved = fieldRepository.save(field);
         if (request.getOperatingHours() != null) {
-            fieldEventPublisher.publishFieldOperatingHoursUpdated(upsertOperatingHours(saved, request));
+            List<FieldOperatingHours> previousHours = fieldOperatingHoursRepository.findByFieldId(id).stream()
+                    .map(this::copyOperatingHours)
+                    .toList();
+            List<FieldOperatingHours> operatingHours = upsertOperatingHours(saved, request);
+            List<SubField> affectedSubFields = subFieldRepository.findByFieldId(id);
+            List<SubField> updatedSubFields = operatingHoursPriceRuleSynchronizer
+                    .synchronizeFieldHours(affectedSubFields, operatingHours);
+            fieldEventPublisher.publishFieldOperatingHoursUpdated(
+                    previousHours,
+                    operatingHours,
+                    affectedSubFields.stream().map(SubField::getId).toList());
+            updatedSubFields.forEach(fieldEventPublisher::publishTimePriceRulesChanged);
         }
         return fieldMapper.toDto(saved);
     }
@@ -150,7 +163,7 @@ public class FieldServiceImpl implements FieldService {
                                                   int page, int size, UserPrincipal currentUser) {
         return PageResponse.from(fieldCardQueryRepository.search(keyword, fieldType, subFieldType, district, provinceCode,
                 latitude, longitude, radiusKm, sortBy, direction, page, size,
-                currentUser != null && "CLIENT".equals(currentUser.role()) ? currentUser.id() : null));
+                currentUser != null && isClientLike(currentUser.role()) ? currentUser.id() : null));
     }
 
     @Override
@@ -265,7 +278,7 @@ public class FieldServiceImpl implements FieldService {
     }
 
     private Boolean isFavorite(UserPrincipal userPrincipal, UUID fieldId) {
-        if (userPrincipal == null || userPrincipal.id() == null || !"CLIENT".equals(userPrincipal.role())) {
+        if (userPrincipal == null || userPrincipal.id() == null || !isClientLike(userPrincipal.role())) {
             return false;
         }
         return fieldFavoriteRepository.existsByUserIdAndFieldId(userPrincipal.id(), fieldId);
@@ -273,7 +286,7 @@ public class FieldServiceImpl implements FieldService {
 
     private PageResponse<FieldDto> toFavoriteAwarePage(org.springframework.data.domain.Page<Field> fields,
                                                        UserPrincipal currentUser) {
-        if (currentUser == null || currentUser.id() == null || !"CLIENT".equals(currentUser.role())) {
+        if (currentUser == null || currentUser.id() == null || !isClientLike(currentUser.role())) {
             return PageResponse.from(fields.map(field -> fieldMapper.toDto(field, false)));
         }
         List<UUID> fieldIds = fields.getContent().stream().map(Field::getId).toList();
@@ -307,8 +320,9 @@ public class FieldServiceImpl implements FieldService {
                                     .fieldId(field.getId())
                                     .dayOfWeek(request.getDayOfWeek())
                                     .build());
-                    operatingHours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getOpenTime());
-                    operatingHours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getCloseTime());
+                    operatingHours.setOpen24Hours(!Boolean.TRUE.equals(request.getClosed()) && Boolean.TRUE.equals(request.getOpen24Hours()));
+                    operatingHours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getOpenTime());
+                    operatingHours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getCloseTime());
                     operatingHours.setClosed(Boolean.TRUE.equals(request.getClosed()));
                     return operatingHours;
                 })
@@ -321,13 +335,26 @@ public class FieldServiceImpl implements FieldService {
                 .fieldId(fieldId)
                 .dayOfWeek(request.getDayOfWeek())
                 .build();
-        operatingHours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getOpenTime());
-        operatingHours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getCloseTime());
+        operatingHours.setOpen24Hours(!Boolean.TRUE.equals(request.getClosed()) && Boolean.TRUE.equals(request.getOpen24Hours()));
+        operatingHours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getOpenTime());
+        operatingHours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getCloseTime());
         operatingHours.setClosed(Boolean.TRUE.equals(request.getClosed()));
         return operatingHours;
     }
 
     // ─── Private helpers ────────────────────────────────────────────────────────
+
+    private FieldOperatingHours copyOperatingHours(FieldOperatingHours hours) {
+        return FieldOperatingHours.builder()
+                .id(hours.getId())
+                .fieldId(hours.getFieldId())
+                .dayOfWeek(hours.getDayOfWeek())
+                .openTime(hours.getOpenTime())
+                .closeTime(hours.getCloseTime())
+                .closed(hours.getClosed())
+                .open24Hours(hours.getOpen24Hours())
+                .build();
+    }
 
     private void validate(UUID ownerId) {
         ApiResponse<UserDto> response = userServiceClient.getUserProfile(ownerId);
@@ -337,6 +364,10 @@ public class FieldServiceImpl implements FieldService {
         if (response.getData().getUserType() != UserType.OWNER) {
             throw new ForbiddenException("You don't have permission to do this operation");
         }
+    }
+
+    private boolean isClientLike(String role) {
+        return "CLIENT".equals(role) || "EMPLOYEE".equals(role);
     }
 
     private void validateCreateRequest(FieldRequest request) {
@@ -424,18 +455,21 @@ public class FieldServiceImpl implements FieldService {
 
     private void validateOperatingHours(OperatingHoursRequest request) {
         if (Boolean.TRUE.equals(request.getClosed())) {
-            if (request.getOpenTime() != null || request.getCloseTime() != null) {
+            if (request.getOpenTime() != null || request.getCloseTime() != null || Boolean.TRUE.equals(request.getOpen24Hours())) {
 //                throw new BadRequestException("Closed days must not include open time or close time");
                 request.setOpenTime(null);
                 request.setCloseTime(null);
+                request.setOpen24Hours(false);
             }
+            return;
+        }
+        if (Boolean.TRUE.equals(request.getOpen24Hours())) {
+            request.setOpenTime(null);
+            request.setCloseTime(null);
             return;
         }
         if (request.getOpenTime() == null || request.getCloseTime() == null) {
             throw new BadRequestException("Open time and close time are required for open days");
-        }
-        if (!request.getCloseTime().isAfter(request.getOpenTime())) {
-            throw new BadRequestException("Close time must be after open time");
         }
     }
 

@@ -27,7 +27,7 @@ public class FieldMapper {
         return toDto(entity, null);
     }
 
-    public FieldDto toDto(Field entity, Boolean isFavorite) {
+    public FieldDto toDto(Field entity, Boolean isSaved) {
         if (entity == null) return null;
         return FieldDto.builder()
                 .id(entity.getId())
@@ -51,7 +51,7 @@ public class FieldMapper {
                 .status(entity.getStatus())
                 .ratingAverage(entity.getRatingAverage())
                 .totalReviews(entity.getTotalReviews())
-                .isFavorite(isFavorite)
+                .isSaved(isSaved)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .images(entity.getImages() != null

@@ -19,7 +19,7 @@ export default async function BookFieldPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser();
-  if (user.userType !== "CLIENT") return <AccessDenied />;
+  if (user.userType !== "CLIENT" && user.userType !== "EMPLOYEE") return <AccessDenied />;
   const { id } = await params;
   const initialDate = todayInVietnam();
   const queryClient = await prefetchFieldBooking(id, initialDate);

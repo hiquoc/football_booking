@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Clock3, Eye, MapPin, Save, UserRound } from "lucide-react";
-import type { Booking, WinningTeam } from "@/lib/api/types";
+import type { Booking, MatchResultOutcome, WinningTeam } from "@/lib/api/types";
 import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime, getBookingStatus } from "@/lib/booking-format";
 import { formatCurrency } from "@/lib/field-format";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
@@ -30,6 +30,7 @@ export function BookingCard({
   const status = getBookingStatus(useBookingDisplayStatus(booking) ?? booking.status);
   const fieldPrice = Number(booking.subFieldPrice ?? booking.totalAmount ?? 0);
   const bookingFee = Number(booking.bookingPrice ?? booking.platformBookingFee ?? 0);
+  const bookerDetails = customerDetails(booking);
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -47,7 +48,7 @@ export function BookingCard({
           {owner ? (
             <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
               <UserRound className="size-3.5 text-slate-400" />
-              Khách hàng: {booking.clientId}
+              Khách hàng: {bookerDetails}
             </p>
           ) : null}
         </div>
@@ -126,10 +127,13 @@ function BookingMeta({
 
 function MatchResultEditor({ booking }: { booking: Booking }) {
   const result = booking.matchResult;
-  const [teamAPercentage, setTeamAPercentage] = useState(result?.teamAPercentage ?? 50);
-  const [teamBPercentage, setTeamBPercentage] = useState(result?.teamBPercentage ?? 50);
-  const [winningTeam, setWinningTeam] = useState<WinningTeam>(result?.winningTeam ?? "DRAW");
+  const [teamAPercentage, setTeamAPercentage] = useState(result?.teamAPercentage ?? 70);
+  const [teamBPercentage, setTeamBPercentage] = useState(result?.teamBPercentage ?? 30);
+  const [matchResult, setMatchResult] = useState<MatchResultOutcome>(
+    normalizeResult(result?.result ?? result?.winningTeam),
+  );
   const mutation = useSubmitMatchResult();
+  const bookerName = customerDetails(booking);
 
   const teamAAmount = useMemo(
     () => (Number(booking.totalAmount) * teamAPercentage) / 100,
@@ -197,13 +201,13 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
         <label className="grid gap-1 text-sm font-bold text-slate-600">
           Kết quả
           <select
-            value={winningTeam}
-            onChange={(event) => setWinningTeam(event.target.value as WinningTeam)}
+            value={matchResult}
+            onChange={(event) => setMatchResult(event.target.value as MatchResultOutcome)}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
           >
-            <option value="TEAM_A">Đội A thắng</option>
-            <option value="TEAM_B">Đội B thắng</option>
-            <option value="DRAW">Hòa</option>
+            <option value="BOOKER_WIN">{bookerTeamLabel(bookerName, "won")}</option>
+            <option value="BOOKER_LOSS">{bookerTeamLabel(bookerName, "lost")}</option>
+            <option value="DRAW">Draw</option>
           </select>
         </label>
       </div>
@@ -214,7 +218,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
       ) : null}
       {result ? (
         <p className="text-sm font-semibold text-slate-500">
-          Kết quả đã lưu: {winningTeamLabel(result.winningTeam)} - {result.teamAPercentage}/{result.teamBPercentage}
+          Kết quả đã lưu: {winningTeamLabel(result.result ?? result.winningTeam, bookerName)} - {result.teamAPercentage}/{result.teamBPercentage}
         </p>
       ) : null}
       <button
@@ -222,7 +226,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
         onClick={() =>
           mutation.mutate({
             bookingId: booking.id,
-            input: { winningTeam, teamAPercentage, teamBPercentage },
+            input: { result: matchResult, teamAPercentage, teamBPercentage },
           })
         }
         className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
@@ -239,8 +243,23 @@ function matchingPreset(teamAPercentage: number, teamBPercentage: number) {
   return splitPresets.find((preset) => preset.a === teamAPercentage && preset.b === teamBPercentage)?.label ?? "Tùy chỉnh";
 }
 
-function winningTeamLabel(winningTeam: WinningTeam) {
-  if (winningTeam === "TEAM_A") return "Đội A thắng";
-  if (winningTeam === "TEAM_B") return "Đội B thắng";
-  return "Hòa";
+function winningTeamLabel(result: WinningTeam | undefined, bookerName: string) {
+  const normalized = normalizeResult(result);
+  if (normalized === "BOOKER_WIN") return bookerTeamLabel(bookerName, "won");
+  if (normalized === "BOOKER_LOSS") return bookerTeamLabel(bookerName, "lost");
+  return "Draw";
+}
+
+function normalizeResult(result: WinningTeam | undefined): MatchResultOutcome {
+  if (result === "TEAM_A") return "BOOKER_WIN";
+  if (result === "TEAM_B") return "BOOKER_LOSS";
+  return result ?? "DRAW";
+}
+
+function bookerTeamLabel(bookerName: string, outcome: "won" | "lost") {
+  return `Team ${bookerName}'s ${outcome === "won" ? "Thắng" : "Thua"}`;
+}
+
+function customerDetails(booking: Booking) {
+  return booking.clientName ? booking.clientName + (booking.clientPhoneNumber ? " (" + booking.clientPhoneNumber + ")" : "") : booking.clientPhoneNumber ? booking.clientPhoneNumber : "Không xác định";
 }

@@ -3,6 +3,7 @@ package com.project.booking.repository;
 import com.project.common.enums.BookingStatus;
 import com.project.booking.entity.Booking;
 import com.project.common.enums.BookingCancelledBy;
+import com.project.common.enums.BookingPaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -31,17 +32,64 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     SELECT COUNT(b) > 0
                     FROM Booking b
                     WHERE b.subFieldId = :subFieldId
-                      AND b.bookingDate = :bookingDate
-                      AND b.startTime < :endTime
-                      AND b.endTime > :startTime
+                      AND b.startDateTime < :endDateTime
+                      AND b.endDateTime > :startDateTime
                       AND b.status IN :reservingStatuses
                 """)
         boolean existsConflictingBookings(
                 UUID subFieldId,
+                LocalDateTime startDateTime,
+                LocalDateTime endDateTime,
+                Collection<BookingStatus> reservingStatuses);
+
+        @Query("""
+                    SELECT COUNT(b) > 0
+                    FROM Booking b
+                    WHERE b.subFieldId = :subFieldId
+                      AND b.startDateTime < :endDateTime
+                      AND b.endDateTime > :startDateTime
+                      AND b.status IN :reservingStatuses
+                      AND (b.sourceRecurringBookingId IS NULL OR b.sourceRecurringBookingId <> :sourceRecurringBookingId)
+                """)
+        boolean existsConflictingBookingsExcludingSource(
+                UUID subFieldId,
+                LocalDateTime startDateTime,
+                LocalDateTime endDateTime,
+                Collection<BookingStatus> reservingStatuses,
+                UUID sourceRecurringBookingId);
+
+        default boolean existsConflictingBookings(
+                UUID subFieldId,
                 LocalDate bookingDate,
                 LocalTime startTime,
                 LocalTime endTime,
-                Collection<BookingStatus> reservingStatuses);
+                Collection<BookingStatus> reservingStatuses) {
+                LocalDateTime startDateTime = LocalDateTime.of(bookingDate, startTime);
+                LocalDateTime endDateTime = LocalDateTime.of(bookingDate, endTime);
+                if (!endTime.isAfter(startTime)) {
+                        endDateTime = endDateTime.plusDays(1);
+                }
+                return existsConflictingBookings(subFieldId, startDateTime, endDateTime, reservingStatuses);
+        }
+
+        default boolean existsConflictingBookings(
+                UUID subFieldId,
+                LocalDate bookingDate,
+                LocalTime startTime,
+                LocalTime endTime,
+                Collection<BookingStatus> reservingStatuses,
+                UUID sourceRecurringBookingId) {
+                if (sourceRecurringBookingId == null) {
+                        return existsConflictingBookings(subFieldId, bookingDate, startTime, endTime, reservingStatuses);
+                }
+                LocalDateTime startDateTime = LocalDateTime.of(bookingDate, startTime);
+                LocalDateTime endDateTime = LocalDateTime.of(bookingDate, endTime);
+                if (!endTime.isAfter(startTime)) {
+                        endDateTime = endDateTime.plusDays(1);
+                }
+                return existsConflictingBookingsExcludingSource(
+                        subFieldId, startDateTime, endDateTime, reservingStatuses, sourceRecurringBookingId);
+        }
 
         boolean existsBySubFieldIdInAndBookingDateBetweenAndStatusIn(
                 Collection<UUID> subFieldIds,
@@ -61,14 +109,60 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("fieldId") UUID fieldId,
                 @Param("status") BookingStatus status);
 
-        boolean existsBySourceRecurringBookingIdAndBookingDate(UUID sourceRecurringBookingId, LocalDate bookingDate);
+        boolean existsBySourceRecurringBookingIdAndStartDateTime(UUID sourceRecurringBookingId, LocalDateTime startDateTime);
+
+        @EntityGraph(attributePaths = "subField")
+        Optional<Booking> findFirstBySourceRecurringBookingIdOrderByStartDateTimeAsc(UUID sourceRecurringBookingId);
+
+        @EntityGraph(attributePaths = "subField")
+        Optional<Booking> findFirstBySourceRecurringBookingIdOrderByStartDateTimeDesc(UUID sourceRecurringBookingId);
+
+        @Query("""
+                    SELECT COUNT(b) > 0
+                    FROM Booking b
+                    WHERE b.sourceRecurringBookingId = :sourceRecurringBookingId
+                      AND b.startDateTime >= :dayStart
+                      AND b.startDateTime < :dayEnd
+                """)
+        boolean existsBySourceRecurringBookingIdOnDate(
+                @Param("sourceRecurringBookingId") UUID sourceRecurringBookingId,
+                @Param("dayStart") LocalDateTime dayStart,
+                @Param("dayEnd") LocalDateTime dayEnd);
+
+        default boolean existsBySourceRecurringBookingIdAndBookingDate(UUID sourceRecurringBookingId, LocalDate bookingDate) {
+                return existsBySourceRecurringBookingIdOnDate(
+                        sourceRecurringBookingId,
+                        bookingDate.atStartOfDay(),
+                        bookingDate.plusDays(1).atStartOfDay());
+        }
 
         boolean existsByOwnerIdAndSubFieldFieldId(UUID ownerId, UUID fieldId);
 
-        List<Booking> findBySubFieldIdAndBookingDateAndStatusInOrderByStartTimeAsc(
-                        UUID subFieldId,
-                        LocalDate bookingDate,
-                        Collection<BookingStatus> reservingStatuses);
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.subFieldId = :subFieldId
+                      AND b.startDateTime < :windowEnd
+                      AND b.endDateTime > :windowStart
+                      AND b.status IN :reservingStatuses
+                    ORDER BY b.startDateTime ASC
+                """)
+        List<Booking> findOverlappingBookings(
+                @Param("subFieldId") UUID subFieldId,
+                @Param("windowStart") LocalDateTime windowStart,
+                @Param("windowEnd") LocalDateTime windowEnd,
+                @Param("reservingStatuses") Collection<BookingStatus> reservingStatuses);
+
+        default List<Booking> findBySubFieldIdAndBookingDateAndStatusInOrderByStartTimeAsc(
+                UUID subFieldId,
+                LocalDate bookingDate,
+                Collection<BookingStatus> reservingStatuses) {
+                return findOverlappingBookings(
+                        subFieldId,
+                        bookingDate.atStartOfDay(),
+                        bookingDate.plusDays(1).atStartOfDay(),
+                        reservingStatuses);
+        }
 
         @EntityGraph(attributePaths = "subField")
         Page<Booking> findByClientId(UUID clientId, Pageable pageable);
@@ -81,13 +175,33 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     SELECT b
                     FROM Booking b
                     WHERE b.ownerId = :ownerId
-                      AND (:bookingDate IS NULL OR b.bookingDate = :bookingDate)
-                      AND (:subFieldId IS NULL OR b.subFieldId = :subFieldId)
-                      AND (:status IS NULL OR b.status = :status)
+                      AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
+                      AND (CAST(:subFieldId AS uuid) IS NULL OR b.subFieldId = :subFieldId)
+                      AND (CAST(:status AS string) IS NULL OR b.status = :status)
+                    ORDER BY b.startDateTime ASC
                 """)
         Page<Booking> findOwnerBookings(
                 @Param("ownerId") UUID ownerId,
-                @Param("bookingDate") LocalDate bookingDate,
+                @Param("bookingDateStart") LocalDateTime bookingDateStart,
+                @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
+                @Param("subFieldId") UUID subFieldId,
+                @Param("status") BookingStatus status,
+                Pageable pageable);
+
+        @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.subField.fieldId IN :fieldIds
+                      AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
+                      AND (CAST(:subFieldId AS uuid) IS NULL OR b.subFieldId = :subFieldId)
+                      AND (CAST(:status AS string) IS NULL OR b.status = :status)
+                    ORDER BY b.startDateTime ASC
+                """)
+        Page<Booking> findEmployeeManagedBookings(
+                @Param("fieldIds") Collection<UUID> fieldIds,
+                @Param("bookingDateStart") LocalDateTime bookingDateStart,
+                @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
                 @Param("subFieldId") UUID subFieldId,
                 @Param("status") BookingStatus status,
                 Pageable pageable);
@@ -95,7 +209,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
                     UPDATE Booking b
-                    SET b.status = :confirmedStatus
+                    SET b.status = :confirmedStatus,
+                        b.paymentStatus = :paidStatus
                     WHERE b.id = :bookingId
                       AND b.clientId = :clientId
                       AND b.status = :pendingStatus
@@ -104,13 +219,35 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("bookingId") UUID bookingId,
                 @Param("clientId") UUID clientId,
                 @Param("pendingStatus") BookingStatus pendingStatus,
-                @Param("confirmedStatus") BookingStatus confirmedStatus);
+                @Param("confirmedStatus") BookingStatus confirmedStatus,
+                @Param("paidStatus") BookingPaymentStatus paidStatus);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
-        @Query("UPDATE Booking b SET b.status = :confirmedStatus WHERE b.id = :bookingId AND b.status = :pendingStatus")
+        @Query("""
+                    UPDATE Booking b
+                    SET b.status = :confirmedStatus,
+                        b.paymentStatus = :paidStatus
+                    WHERE b.id = :bookingId
+                      AND b.status = :pendingStatus
+                """)
         int confirmPendingBookingFromPayment(@Param("bookingId") UUID bookingId,
                 @Param("pendingStatus") BookingStatus pendingStatus,
-                @Param("confirmedStatus") BookingStatus confirmedStatus);
+                @Param("confirmedStatus") BookingStatus confirmedStatus,
+                @Param("paidStatus") BookingPaymentStatus paidStatus);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query("""
+                    UPDATE Booking b
+                    SET b.paymentStatus = :refundedStatus
+                    WHERE b.id = :bookingId
+                      AND b.paymentStatus <> :refundedStatus
+                """)
+        int markPaymentRefunded(
+                @Param("bookingId") UUID bookingId,
+                @Param("refundedStatus") BookingPaymentStatus refundedStatus);
+
+        @EntityGraph(attributePaths = "subField")
+        Optional<Booking> findFirstByClientIdAndStatusOrderByCreatedAtAsc(UUID clientId, BookingStatus status);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
@@ -118,7 +255,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     SET b.status = :expiredStatus,
                         b.cancellationReason = :reason,
                         b.cancelledAt = :cancelledAt,
-                        b.cancelledBy = :cancelledBy
+                        b.cancelledBy = :cancelledBy,
+                        b.paymentStatus = CASE
+                            WHEN b.paymentStatus = :paidStatus THEN b.paymentStatus
+                            WHEN b.paymentStatus = :refundedStatus THEN b.paymentStatus
+                            ELSE :failedStatus
+                        END
                     WHERE b.id = :bookingId
                       AND b.clientId = :clientId
                       AND b.status IN :cancellableStatuses
@@ -130,7 +272,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("expiredStatus") BookingStatus expiredStatus,
                 @Param("reason") String reason,
                 @Param("cancelledAt") LocalDateTime cancelledAt,
-                @Param("cancelledBy") BookingCancelledBy cancelledBy);
+                @Param("cancelledBy") BookingCancelledBy cancelledBy,
+                @Param("paidStatus") BookingPaymentStatus paidStatus,
+                @Param("refundedStatus") BookingPaymentStatus refundedStatus,
+                @Param("failedStatus") BookingPaymentStatus failedStatus);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
@@ -138,7 +283,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     SET b.status = :cancelledStatus,
                         b.cancellationReason = :reason,
                         b.cancelledAt = :cancelledAt,
-                        b.cancelledBy = :cancelledBy
+                        b.cancelledBy = :cancelledBy,
+                        b.paymentStatus = CASE
+                            WHEN b.paymentStatus = :paidStatus THEN b.paymentStatus
+                            WHEN b.paymentStatus = :refundedStatus THEN b.paymentStatus
+                            ELSE :failedStatus
+                        END
                     WHERE b.id = :bookingId
                       AND b.ownerId = :ownerId
                       AND b.status IN :cancellableStatuses
@@ -150,7 +300,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("cancelledStatus") BookingStatus cancelledStatus,
                 @Param("reason") String reason,
                 @Param("cancelledAt") LocalDateTime cancelledAt,
-                @Param("cancelledBy") BookingCancelledBy cancelledBy);
+                @Param("cancelledBy") BookingCancelledBy cancelledBy,
+                @Param("paidStatus") BookingPaymentStatus paidStatus,
+                @Param("refundedStatus") BookingPaymentStatus refundedStatus,
+                @Param("failedStatus") BookingPaymentStatus failedStatus);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
@@ -158,9 +311,40 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     SET b.status = :cancelledStatus,
                         b.cancellationReason = :reason,
                         b.cancelledAt = :cancelledAt,
-                        b.cancelledBy = :cancelledBy
+                        b.cancelledBy = :cancelledBy,
+                        b.paymentStatus = CASE
+                            WHEN b.paymentStatus = :paidStatus THEN b.paymentStatus
+                            WHEN b.paymentStatus = :refundedStatus THEN b.paymentStatus
+                            ELSE :failedStatus
+                        END
+                    WHERE b.id = :bookingId
+                      AND b.status IN :cancellableStatuses
+                """)
+        int cancelManagerBooking(
+                @Param("bookingId") UUID bookingId,
+                @Param("cancellableStatuses") Collection<BookingStatus> cancellableStatuses,
+                @Param("cancelledStatus") BookingStatus cancelledStatus,
+                @Param("reason") String reason,
+                @Param("cancelledAt") LocalDateTime cancelledAt,
+                @Param("cancelledBy") BookingCancelledBy cancelledBy,
+                @Param("paidStatus") BookingPaymentStatus paidStatus,
+                @Param("refundedStatus") BookingPaymentStatus refundedStatus,
+                @Param("failedStatus") BookingPaymentStatus failedStatus);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query("""
+                    UPDATE Booking b
+                    SET b.status = :cancelledStatus,
+                        b.cancellationReason = :reason,
+                        b.cancelledAt = :cancelledAt,
+                        b.cancelledBy = :cancelledBy,
+                        b.paymentStatus = CASE
+                            WHEN b.paymentStatus = :paidStatus THEN b.paymentStatus
+                            WHEN b.paymentStatus = :refundedStatus THEN b.paymentStatus
+                            ELSE :failedStatus
+                        END
                     WHERE b.status = :pendingStatus
-                      AND b.createdAt <= :expiresBefore
+                      AND b.paymentExpiresAt <= :expiresBefore
                 """)
         int expirePendingBookings(
                 @Param("pendingStatus") BookingStatus pendingStatus,
@@ -168,32 +352,38 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("expiresBefore") LocalDateTime expiresBefore,
                 @Param("reason") String reason,
                 @Param("cancelledAt") LocalDateTime cancelledAt,
-                @Param("cancelledBy") BookingCancelledBy cancelledBy);
+                @Param("cancelledBy") BookingCancelledBy cancelledBy,
+                @Param("paidStatus") BookingPaymentStatus paidStatus,
+                @Param("refundedStatus") BookingPaymentStatus refundedStatus,
+                @Param("failedStatus") BookingPaymentStatus failedStatus);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""
                     UPDATE Booking b
                     SET b.status = :completedStatus
                     WHERE b.status = :confirmedStatus
-                      AND (b.bookingDate < :currentDate
-                           OR (b.bookingDate = :currentDate AND b.endTime <= :currentTime))
+                      AND b.endDateTime <= :now
                 """)
         int completeConfirmedBookings(
                 @Param("confirmedStatus") BookingStatus confirmedStatus,
                 @Param("completedStatus") BookingStatus completedStatus,
-                @Param("currentDate") LocalDate currentDate,
-                @Param("currentTime") LocalTime currentTime);
+                @Param("now") LocalDateTime now);
 
         @EntityGraph(attributePaths = "subField")
         @Query("""
                     SELECT b
                     FROM Booking b
                     WHERE b.status = :confirmedStatus
-                      AND (b.bookingDate < :currentDate
-                           OR (b.bookingDate = :currentDate AND b.endTime <= :currentTime))
+                      AND b.endDateTime <= :now
                 """)
         List<Booking> findFinishedConfirmedBookings(
                 @Param("confirmedStatus") BookingStatus confirmedStatus,
-                @Param("currentDate") LocalDate currentDate,
-                @Param("currentTime") LocalTime currentTime);
+                @Param("now") LocalDateTime now);
+
+        default List<Booking> findFinishedConfirmedBookings(
+                BookingStatus confirmedStatus,
+                LocalDate currentDate,
+                LocalTime currentTime) {
+                return findFinishedConfirmedBookings(confirmedStatus, LocalDateTime.of(currentDate, currentTime));
+        }
 }

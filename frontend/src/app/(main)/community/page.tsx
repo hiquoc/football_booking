@@ -19,7 +19,7 @@ export default async function CommunityPage({
     <CommunityFeedContent
       pageNumber={parsePage(single(params.page))}
       filters={parseFilters(params)}
-      canCreate={user?.userType === "CLIENT"}
+      canCreate={user?.userType === "CLIENT" || user?.userType === "EMPLOYEE"}
     />
   );
 }

@@ -1,6 +1,7 @@
 package com.project.booking.dto.response;
 
 import com.project.common.enums.BookingCancelledBy;
+import com.project.common.enums.BookingPaymentStatus;
 import com.project.common.enums.BookingStatus;
 import com.project.common.enums.PaymentMethod;
 import lombok.AllArgsConstructor;
@@ -22,11 +23,16 @@ public class BookingResponse {
     private UUID id;
     private String bookingCode;
     private UUID clientId;
+    private String clientName;
+    private String clientPhoneNumber;
+    private String clientAvatarUrl;
     private UUID subFieldId;
     private String subFieldName;
     private String fieldName;
     private UUID ownerId;
     private LocalDate bookingDate;
+    private LocalDateTime startDateTime;
+    private LocalDateTime endDateTime;
     private LocalTime startTime;
     private LocalTime endTime;
     private Integer durationMinutes;
@@ -37,9 +43,11 @@ public class BookingResponse {
     private Long platformBookingFee;
     private PaymentMethod paymentMethod;
     private BookingStatus status;
+    private BookingPaymentStatus paymentStatus;
     private String note;
     private String cancellationReason;
     private LocalDateTime cancelledAt;
+    private LocalDateTime paymentExpiresAt;
     private BookingCancelledBy cancelledBy;
     private MatchResultResponse matchResult;
     private LocalDateTime createdAt;

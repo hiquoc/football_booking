@@ -114,12 +114,11 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PostMapping
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody CreateBookingRequest request) {
-
         BookingResponse response = bookingService.createBooking(user.id(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Booking created successfully", response));
@@ -170,7 +169,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/cancel")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(
             @CurrentUser UserPrincipal user,
@@ -196,13 +195,13 @@ public class BookingController {
             )
         )
     )
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PatchMapping("/owner/cancel")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBookingByOwner(
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody CancelBookingRequest request) {
 
-        BookingResponse response = bookingService.cancelBookingByOwner(user.id(), request);
+        BookingResponse response = bookingService.cancelBookingByManager(user.id(), user.role(), request);
         return ResponseEntity.ok(ApiResponse.success("Booking cancelled successfully", response));
     }
 
@@ -233,7 +232,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PageableAsQueryParam
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getMyBookings(
@@ -272,7 +271,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PageableAsQueryParam
     @GetMapping("/owner")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getOwnerBookings(
@@ -283,17 +282,17 @@ public class BookingController {
             @Parameter(hidden = true)
             Pageable pageable) {
 
-        PageResponse<BookingResponse> bookings = bookingService.getOwnerBookings(user.id(), bookingDate, subFieldId, status, pageable);
+        PageResponse<BookingResponse> bookings = bookingService.getManagerBookings(user.id(), user.role(), bookingDate, subFieldId, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(bookings));
     }
 
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PutMapping("/owner/{bookingId}/match-result")
     public ResponseEntity<ApiResponse<BookingResponse>> upsertMatchResult(
             @PathVariable UUID bookingId,
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody UpsertMatchResultRequest request) {
-        BookingResponse response = matchResultService.upsert(user.id(), bookingId, request);
+        BookingResponse response = matchResultService.upsert(user.id(), user.role(), bookingId, request);
         return ResponseEntity.ok(ApiResponse.success("Match result saved successfully", response));
     }
 
@@ -327,7 +326,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @GetMapping("/{bookingId}")
     public ResponseEntity<ApiResponse<BookingResponse>> getBookingById(
             @PathVariable UUID bookingId,

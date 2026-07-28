@@ -82,7 +82,8 @@ class FieldServiceImplTest {
                 fieldMapper,
                 userServiceClient,
                 cloudinaryService,
-                fieldEventPublisher);
+                fieldEventPublisher,
+                new OperatingHoursPriceRuleSynchronizer());
     }
 
     @Test

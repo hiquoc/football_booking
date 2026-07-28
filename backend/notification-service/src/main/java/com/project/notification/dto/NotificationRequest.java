@@ -3,8 +3,10 @@ package com.project.notification.dto;
 import com.project.notification.enums.NotificationChannel;
 import com.project.notification.enums.NotificationCode;
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "Internal notification creation request built from domain events.")
 public class NotificationRequest {
     @Schema(description = "Recipient user ID.")

@@ -26,7 +26,7 @@ public class EmailNotificationSender implements NotificationSender {
 
     @Override
     public void send(NotificationRequest request) {
-        if (!StringUtils.hasText(request.getRecipientEmail())) {
+        if (true || !StringUtils.hasText(request.getRecipientEmail())) {
             log.info("Skipping EMAIL notification without recipient: userId={}, code={}",
                     request.getUserId(), request.getCode());
             return;

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.common.dto.ApiResponse;
@@ -20,6 +21,7 @@ import com.project.field.dto.FieldClosureRequest;
 import com.project.field.dto.OperatingHoursDto;
 import com.project.field.dto.OperatingHoursRequest;
 import com.project.field.dto.SubFieldDto;
+import com.project.field.dto.SubFieldFilterOptionDto;
 import com.project.field.dto.SubFieldRequest;
 import com.project.field.service.FieldScheduleService;
 import com.project.field.service.SubFieldService;
@@ -43,6 +45,13 @@ public class SubFieldController {
 
     private final SubFieldService subFieldService;
     private final FieldScheduleService fieldScheduleService;
+
+    @Operation(summary = "Get sub-field filter options", description = "Returns lightweight active sub-field options for booking filters.")
+    @GetMapping("/filter-options")
+    public ApiResponse<List<SubFieldFilterOptionDto>> getFilterOptions(
+            @RequestParam(required = false) String search) {
+        return ApiResponse.success(subFieldService.getFilterOptions(search));
+    }
 
     @Operation(
             summary = "Create a sub-field under a field",

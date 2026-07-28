@@ -6,5 +6,5 @@ import com.project.booking.dto.response.BookingResponse;
 import java.util.UUID;
 
 public interface MatchResultService {
-    BookingResponse upsert(UUID ownerId, UUID bookingId, UpsertMatchResultRequest request);
+    BookingResponse upsert(UUID managerId, String managerRole, UUID bookingId, UpsertMatchResultRequest request);
 }

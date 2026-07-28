@@ -11,7 +11,19 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface UserMapper {
+    @Mapping(target = "isBookingBanned", ignore = true)
+    @Mapping(target = "banExpiresAt", ignore = true)
+    @Mapping(target = "isPermanentBan", ignore = true)
     UserDto toDto(User user);
+
+    default UserDto toDtoWithBan(User user) {
+        UserDto dto = toDto(user);
+        boolean banned = user != null && "PLATFORM_BANNED".equals(user.getStatus());
+        dto.setIsBookingBanned(banned);
+        dto.setIsPermanentBan(banned);
+        dto.setBanExpiresAt(null);
+        return dto;
+    }
 
     @Mapping(target = "avatarPublicId", ignore = true)
     @Mapping(target = "teamPhotoPublicId", ignore = true)

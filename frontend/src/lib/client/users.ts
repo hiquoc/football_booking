@@ -25,6 +25,11 @@ export function fetchUsers(page: number, size = 10) {
   return requestJson<PageResponse<User>>(`/api/admin/users?${query}`);
 }
 
+export function fetchEmployeeByPhone(phoneNumber: string) {
+  const params = new URLSearchParams({ phoneNumber });
+  return requestJson<User>(`/api/owner/employees/by-phone?${params}`);
+}
+
 export function submitProfileUpdate(input: UpdateProfileInput) {
   return requestJson<PublicProfile>("/api/profile", {
     method: "PATCH",

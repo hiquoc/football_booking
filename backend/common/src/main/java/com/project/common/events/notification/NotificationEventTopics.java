@@ -14,6 +14,9 @@ public final class NotificationEventTopics {
     public static final String PLATFORM_BAN_REQUESTED = "platform-ban.requested";
     public static final String USER_BALANCE_REFUND_REQUESTED = "user.balance.refund-requested";
     public static final String USER_BALANCE_DEDUCTION_REQUESTED = "user.balance.deduction-requested";
+    public static final String USER_BALANCE_TOP_UP_SUCCEEDED = "user.balance.top-up-succeeded";
+    public static final String USER_BALANCE_UPDATED = "user.balance.updated";
+    public static final String USER_PROFILE_UPDATED = "user.profile.updated";
     public static final String COMMUNITY_NOTIFICATION = "community.notification";
     public static final String MATCH_EVALUATION_SUBMITTED = "match.evaluation.submitted";
     public static final String PLAYER_MATCH_STATISTICS_ADJUSTED = "player.match-statistics.adjusted";

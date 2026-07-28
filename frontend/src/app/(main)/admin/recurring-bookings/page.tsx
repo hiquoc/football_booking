@@ -5,9 +5,9 @@ export default function AdminRecurringBookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeading
-        eyebrow="Admin"
-        title="Recurring bookings"
-        description="Search, pause, resume, and cancel recurring bookings."
+        eyebrow="Quản trị"
+        title="Lịch đặt định kỳ"
+        description="Tìm kiếm, tạm dừng, tiếp tục và hủy lịch đặt định kỳ."
       />
       <RecurringBookingList scope="admin" />
     </div>

@@ -8,7 +8,6 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UuidGenerator;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -43,10 +42,6 @@ public class RecurringBooking extends BaseEntity {
     @JoinColumn(name = "sub_field_id", insertable = false, updatable = false)
     private SubFieldProjection subField;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "day_of_week", length = 20, nullable = false)
-    private DayOfWeek dayOfWeek;
-
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
@@ -59,11 +54,14 @@ public class RecurringBooking extends BaseEntity {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
+    @Column(name = "interval_days", nullable = false)
+    private Integer intervalDays;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     private RecurringBookingStatus status = RecurringBookingStatus.ACTIVE;
 
-    @Column(name = "next_process_at", nullable = false)
+    @Column(name = "next_process_at")
     private LocalDateTime nextProcessAt;
 }

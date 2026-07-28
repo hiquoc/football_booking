@@ -5,9 +5,9 @@ export default function OwnerRecurringBookingsPage() {
   return (
     <div className="space-y-6">
       <PageHeading
-        eyebrow="Owner"
-        title="Recurring bookings"
-        description="View recurring bookings for your fields."
+        eyebrow="Chủ sân"
+        title="Lịch đặt định kỳ"
+        description="Xem các lịch đặt định kỳ tại sân của bạn."
       />
       <RecurringBookingList scope="owner" />
     </div>

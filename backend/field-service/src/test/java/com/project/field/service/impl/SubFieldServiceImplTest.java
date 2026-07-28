@@ -3,6 +3,7 @@ package com.project.field.service.impl;
 import com.project.common.enums.SportType;
 import com.project.common.enums.SubFieldType;
 import com.project.common.exception.BadRequestException;
+import com.project.field.dto.SubFieldDto;
 import com.project.field.dto.SubFieldRequest;
 import com.project.field.dto.BookingRuleDto;
 import com.project.field.dto.TimePriceRuleDto;
@@ -31,6 +32,35 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class SubFieldServiceImplTest {
+
+    @Test
+    void getFilterOptionsReturnsLightweightDisplayDtos() {
+        UUID subFieldId = UUID.randomUUID();
+        Field field = Field.builder().id(UUID.randomUUID()).name("ABC Football Field").build();
+        SubField subField = SubField.builder()
+                .id(subFieldId)
+                .field(field)
+                .name("Pitch A")
+                .active(true)
+                .subFieldType(SubFieldType.FOOTBALL_5V5)
+                .build();
+        SubFieldRepository subFieldRepository = mock(SubFieldRepository.class);
+        when(subFieldRepository.findFilterOptions("abc")).thenReturn(List.of(subField));
+        SubFieldServiceImpl service = new SubFieldServiceImpl(
+                subFieldRepository,
+                mock(FieldRepository.class),
+                mock(FieldOperatingHoursRepository.class),
+                mock(SubFieldMapper.class),
+                mock(FieldEventPublisher.class));
+
+        var options = service.getFilterOptions(" abc ");
+
+        assertEquals(1, options.size());
+        assertEquals(subFieldId, options.get(0).getId());
+        assertEquals("ABC Football Field - 5v5", options.get(0).getName());
+        assertEquals("ABC Football Field", options.get(0).getFieldName());
+        assertEquals(SubFieldType.FOOTBALL_5V5, options.get(0).getType());
+    }
 
     @Test
     void updateChangesOnlySuppliedFieldsIncludingNestedBookingRuleFields() {
@@ -105,5 +135,55 @@ class SubFieldServiceImplTest {
                 .build();
 
         assertThrows(BadRequestException.class, () -> service.create(fieldId, request));
+    }
+
+    @Test
+    void createAcceptsOvernightTimePriceRuleForOvernightOperatingHours() {
+        UUID fieldId = UUID.randomUUID();
+        FieldType football = FieldType.builder().id(1L).name(SportType.FOOTBALL).build();
+        Field field = Field.builder().id(fieldId).name("Sports Center")
+                .fieldTypes(Set.of(football)).build();
+        FieldRepository fieldRepository = mock(FieldRepository.class);
+        FieldOperatingHoursRepository operatingHoursRepository = mock(FieldOperatingHoursRepository.class);
+        SubFieldRepository subFieldRepository = mock(SubFieldRepository.class);
+        SubFieldMapper mapper = mock(SubFieldMapper.class);
+        SubField subField = SubField.builder()
+                .field(field)
+                .name("Pitch A")
+                .subFieldType(SubFieldType.FOOTBALL_5V5)
+                .build();
+
+        when(fieldRepository.findById(fieldId)).thenReturn(java.util.Optional.of(field));
+        when(operatingHoursRepository.findByFieldId(fieldId)).thenReturn(List.of(FieldOperatingHours.builder()
+                .fieldId(fieldId)
+                .dayOfWeek(DayOfWeek.MONDAY)
+                .openTime(LocalTime.of(17, 0))
+                .closeTime(LocalTime.of(2, 0))
+                .closed(false)
+                .build()));
+        when(mapper.toEntity(org.mockito.ArgumentMatchers.any(SubFieldRequest.class))).thenReturn(subField);
+        when(subFieldRepository.save(subField)).thenReturn(subField);
+        when(mapper.toDto(subField)).thenReturn(SubFieldDto.builder().build());
+
+        SubFieldServiceImpl service = new SubFieldServiceImpl(
+                subFieldRepository,
+                fieldRepository,
+                operatingHoursRepository,
+                mapper,
+                mock(FieldEventPublisher.class));
+        SubFieldRequest request = SubFieldRequest.builder()
+                .subFieldType(SubFieldType.FOOTBALL_5V5)
+                .name("Pitch A")
+                .timePriceRules(List.of(TimePriceRuleDto.builder()
+                        .startTime(LocalTime.of(17, 0))
+                        .endTime(LocalTime.of(2, 0))
+                        .hourlyPrice(java.math.BigDecimal.TEN)
+                        .build()))
+                .build();
+
+        service.create(fieldId, request);
+
+        assertEquals(LocalTime.of(17, 0), subField.getTimePriceRules().get(0).getStartTime());
+        assertEquals(LocalTime.of(2, 0), subField.getTimePriceRules().get(0).getEndTime());
     }
 }

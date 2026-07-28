@@ -19,4 +19,5 @@ public class OperatingHoursDto {
     private LocalTime openTime;
     private LocalTime closeTime;
     private Boolean closed;
+    private Boolean open24Hours;
 }

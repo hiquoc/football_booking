@@ -15,5 +15,7 @@ import java.util.List;
 public class AvailabilityResponse {
     private LocalTime openTime;
     private LocalTime closeTime;
+    private Boolean open24Hours;
+    private List<AvailabilityOperatingHoursResponse> operatingHours;
     private List<UnavailableSlotResponse> unavailableSlots;
 }

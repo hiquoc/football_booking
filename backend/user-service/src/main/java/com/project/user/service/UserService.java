@@ -12,6 +12,7 @@ import java.util.UUID;
 
 public interface UserService {
     PageResponse<UserDto> getUsers(Pageable pageable);
+    UserDto getEmployeeByPhone(String phoneNumber);
     UserDto getUserById(UUID id);
     UserDto getUserById(UUID id, UserPrincipal requester);
     PublicProfileDto getPublicProfile(UUID id);

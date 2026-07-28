@@ -11,6 +11,7 @@ import com.project.user.dto.UpdateProfileRequest;
 import com.project.user.dto.UserDto;
 import com.project.user.dto.PublicProfileDto;
 import com.project.user.entity.User;
+import com.project.user.kafka.UserProfileEventPublisher;
 import com.project.user.mapper.UserMapper;
 import com.project.user.repository.UserRepository;
 import com.project.user.service.UserService;
@@ -29,18 +30,31 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final UserProfileEventPublisher userProfileEventPublisher;
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<UserDto> getUsers(Pageable pageable) {
-        return PageResponse.from(userRepository.findAll(pageable).map(userMapper::toDto));
+        return PageResponse.from(userRepository.findAll(pageable).map(userMapper::toDtoWithBan));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserDto getEmployeeByPhone(String phoneNumber) {
+        String value = phoneNumber == null ? "" : phoneNumber.trim();
+        User user = userRepository.findByPhoneNumber(value)
+                .orElseThrow(() -> new NotFoundException("Employee not found with phone number: " + value));
+        if (user.getUserType() != UserType.EMPLOYEE) {
+            throw new NotFoundException("Employee not found with phone number: " + value);
+        }
+        return userMapper.toDtoWithBan(user);
     }
 
     @Override
     @Cacheable(cacheNames = CacheNames.USER_BY_ID, key = CacheKeys.USER, sync = true)
     public UserDto getUserById(UUID id) {
         User user = getUser(id);
-        return userMapper.toDto(user);
+        return userMapper.toDtoWithBan(user);
     }
 
     @Override
@@ -48,12 +62,16 @@ public class UserServiceImpl implements UserService {
     public UserDto getUserById(UUID id, UserPrincipal requester) {
         if (id.equals(requester.id())) {
             User user = getUser(id);
-            return userMapper.toDto(user);
+            return userMapper.toDtoWithBan(user);
+        }
+        User user = getUser(id);
+        if (UserType.OWNER.name().equals(requester.role()) && user.getUserType() == UserType.EMPLOYEE) {
+            return userMapper.toDtoWithBan(user);
         }
         if (!UserType.ADMIN.name().equals(requester.role())) {
             throw new ForbiddenException("You don't have permission to perform this operation");
         }
-        return userMapper.toDto(getUser(id));
+        return userMapper.toDtoWithBan(user);
     }
 
     @Override
@@ -67,7 +85,7 @@ public class UserServiceImpl implements UserService {
     public UserDto getUserByPhone(String phone) {
         User user = userRepository.findByPhoneNumber(phone)
                 .orElseThrow(() -> new NotFoundException("User not found with phone number: " + phone));
-        return userMapper.toDto(user);
+        return userMapper.toDtoWithBan(user);
     }
 
     @Override
@@ -89,7 +107,9 @@ public class UserServiceImpl implements UserService {
         if (request.getSkillLevel() != null) {
             user.setSkillLevel(request.getSkillLevel());
         }
-        return userMapper.toDto(userRepository.save(user));
+        User saved = userRepository.save(user);
+        userProfileEventPublisher.publishUpdated(saved);
+        return userMapper.toDtoWithBan(saved);
     }
 
     @Override
@@ -99,7 +119,9 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));
         user.setUserType(newRole);
-        return userMapper.toDto(userRepository.save(user));
+        User saved = userRepository.save(user);
+        userProfileEventPublisher.publishUpdated(saved);
+        return userMapper.toDtoWithBan(saved);
     }
 
 

@@ -3,12 +3,14 @@ import { z } from "zod";
 import { applyCommunityPost } from "@/lib/server/community";
 import { assertSameOrigin, routeError } from "@/lib/server/route-response";
 
+const optionalString = (max: number) => z.string().trim().max(max).nullish().transform((value) => value ?? undefined);
+
 const schema = z.object({
-  message: z.string().trim().max(1000).optional(),
-  applicantDisplayName: z.string().trim().max(255).optional(),
-  applicantAvatarUrl: z.string().trim().max(1000).optional(),
-  applicantTeamPhotoUrl: z.string().trim().max(1000).optional(),
-  applicantSkillLevel: z.string().trim().max(40).optional(),
+  message: optionalString(1000),
+  applicantDisplayName: optionalString(255),
+  applicantAvatarUrl: optionalString(1000),
+  applicantTeamPhotoUrl: optionalString(1000),
+  applicantSkillLevel: optionalString(40),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

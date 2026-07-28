@@ -3,6 +3,7 @@ import type {
   FieldClosure,
   FieldImage,
   FieldInput,
+  FieldEmployee,
   PageResponse,
   SubField,
   SubFieldInput,
@@ -13,6 +14,24 @@ import { jsonBody, requestJson } from "./http";
 export function fetchOwnerFields(page: number, size = 10) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   return requestJson<PageResponse<Field>>(`/api/owner/fields?${query}`);
+}
+export function fetchAssignedFields(page: number, size = 10) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return requestJson<PageResponse<Field>>(`/api/employee/fields?${query}`);
+}
+export function fetchFieldEmployees(fieldId: string) {
+  return requestJson<FieldEmployee[]>(`/api/owner/fields/${fieldId}/employees`);
+}
+export function submitFieldEmployee(fieldId: string, employeeId: string) {
+  return requestJson<FieldEmployee>(`/api/owner/fields/${fieldId}/employees`, {
+    method: "POST",
+    ...jsonBody({ employeeId }),
+  });
+}
+export function submitFieldEmployeeRemoval(fieldId: string, employeeId: string) {
+  return requestJson<void>(`/api/owner/fields/${fieldId}/employees/${employeeId}`, {
+    method: "DELETE",
+  });
 }
 export function submitField(input: FieldInput) {
   return requestJson<Field>("/api/owner/fields", {

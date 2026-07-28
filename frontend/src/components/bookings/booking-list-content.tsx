@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition, type FormEvent } from "react";
+import { useTransition } from "react";
 import type { BookingStatus } from "@/lib/api/types";
 import { getBookingStatus } from "@/lib/booking-format";
 import { useBookingList, useCancelBooking } from "@/lib/hooks/use-bookings";
+import { useSubFieldFilterOptions } from "@/lib/hooks/use-fields";
 import { BookingCard } from "./booking-card";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 
@@ -108,10 +109,11 @@ function OwnerFilters({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const subFieldOptions = useSubFieldFilterOptions();
+  const hasActiveFilters = Boolean(filters.bookingDate || filters.subFieldId || filters.status);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
+  function applyFilters(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
     const params = new URLSearchParams();
     ["bookingDate", "subFieldId", "status"].forEach((key) => {
       const value = String(form.get(key) ?? "").trim();
@@ -122,24 +124,46 @@ function OwnerFilters({
 
   return (
     <form
-      onSubmit={submit}
-      className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_1fr_1fr_auto_auto]"
+      onSubmit={(event) => {
+        event.preventDefault();
+        applyFilters(event.currentTarget);
+      }}
+      onChange={(event) => applyFilters(event.currentTarget)}
+      className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_1fr_1fr_auto]"
     >
       <input
         name="bookingDate"
         type="date"
-        defaultValue={filters.bookingDate ?? ""}
-        className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
-      />
-      <input
-        name="subFieldId"
-        defaultValue={filters.subFieldId ?? ""}
-        placeholder="Mã sân con"
+        defaultValue={filters.bookingDate ??  new Date().toISOString().split("T")[0]}
         className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
       />
       <select
+        name="subFieldId"
+        defaultValue={filters.subFieldId ?? ""}
+        className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
+        disabled={subFieldOptions.isPending || subFieldOptions.isError}
+      >
+        <option value="">
+          {subFieldOptions.isPending
+            ? "Đang tải sân con..."
+            : subFieldOptions.isError
+              ? "Không thể tải sân con"
+              : "Tất cả sân con"}
+        </option>
+        {subFieldOptions.data?.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+      {subFieldOptions.isSuccess && subFieldOptions.data.length === 0 ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 md:col-span-5">
+          Chưa có sân con để lọc.
+        </p>
+      ) : null}
+      <select
         name="status"
-        defaultValue={filters.status ?? ""}
+        defaultValue={filters.status ?? "COMPLETED"}
         className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
       >
         <option value="">Tất cả trạng thái</option>
@@ -151,16 +175,14 @@ function OwnerFilters({
       </select>
       <button
         disabled={pending}
-        className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+        className={`rounded-lg border px-4 py-2 text-sm font-bold disabled:opacity-60 ${
+          hasActiveFilters
+            ? "border-slate-950 bg-slate-950 text-white"
+            : "border-slate-200 bg-white text-slate-700"
+        }`}
       >
         Lọc
       </button>
-      <Link
-        href="/owner/bookings"
-        className="rounded-lg border border-slate-200 px-4 py-2 text-center text-sm font-bold text-slate-700"
-      >
-        Xóa lọc
-      </Link>
     </form>
   );
 }

@@ -1,6 +1,5 @@
 package com.project.payment.service;
 
-import com.project.common.exception.BadRequestException;
 import com.project.payment.dto.CreateCheckoutRequest;
 import com.project.payment.entity.*;
 import com.project.payment.enums.*;
@@ -48,7 +47,7 @@ class PaymentServiceImplTest {
         });
     }
 
-    @Test void checkoutUsesAuthoritativeBookingAmountAndSelectedStrategy() {
+    @Test void checkoutUsesRequestedWalletTopUpAmountAndSelectedStrategy() {
         when(stripe.createCheckout(any())).thenReturn(new ProviderCheckoutResult("cs_test_1", "https://checkout.stripe.com/test", java.time.Instant.now().plusSeconds(1800)));
         var response = service.createCheckout(userId,
                 new CreateCheckoutRequest(bookingId, new BigDecimal("5000"), "vnd", PaymentProvider.STRIPE));
@@ -58,10 +57,14 @@ class PaymentServiceImplTest {
         verify(sessions).save(any(PaymentSession.class));
     }
 
-    @Test void checkoutRejectsClientControlledAmountMismatch() {
-        assertThrows(BadRequestException.class, () -> service.createCheckout(userId,
-                new CreateCheckoutRequest(bookingId, BigDecimal.ONE, "VND", PaymentProvider.STRIPE)));
-        verify(stripe, never()).createCheckout(any());
+    @Test void checkoutAllowsShortfallWalletTopUpAmount() {
+        when(stripe.createCheckout(any())).thenReturn(new ProviderCheckoutResult("cs_test_2", "https://checkout.stripe.com/shortfall", java.time.Instant.now().plusSeconds(1800)));
+
+        var response = service.createCheckout(userId,
+                new CreateCheckoutRequest(bookingId, BigDecimal.ONE, "VND", PaymentProvider.STRIPE));
+
+        assertEquals("https://checkout.stripe.com/shortfall", response.checkoutUrl());
+        verify(stripe).createCheckout(argThat(request -> request.amount().compareTo(BigDecimal.ONE) == 0));
     }
 
     @Test void successfulWebhookUpdatesPaymentAndPublishesOutboxEvent() {

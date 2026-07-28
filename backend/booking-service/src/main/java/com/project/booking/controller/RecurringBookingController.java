@@ -26,13 +26,13 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/recurring-bookings")
 @RequiredArgsConstructor
-@Tag(name = "Recurring Bookings", description = "Recurring weekly booking rules")
+@Tag(name = "Recurring Bookings", description = "Recurring interval booking rules")
 public class RecurringBookingController {
 
     private final RecurringBookingService recurringBookingService;
 
     @Operation(summary = "Create recurring booking")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PostMapping
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> create(
             @CurrentUser UserPrincipal user,
@@ -43,7 +43,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Get my recurring bookings")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PageableAsQueryParam
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<PageResponse<RecurringBookingResponse>>> getMine(
@@ -75,7 +75,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Edit recurring booking")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> update(
             @CurrentUser UserPrincipal user,
@@ -86,7 +86,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Pause recurring booking")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{id}/pause")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> pause(
             @CurrentUser UserPrincipal user,
@@ -96,7 +96,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Resume recurring booking")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{id}/resume")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> resume(
             @CurrentUser UserPrincipal user,
@@ -106,7 +106,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Cancel recurring booking")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> cancel(
             @CurrentUser UserPrincipal user,

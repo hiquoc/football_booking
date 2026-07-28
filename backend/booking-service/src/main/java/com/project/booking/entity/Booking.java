@@ -1,6 +1,7 @@
 package com.project.booking.entity;
 
 import com.project.common.enums.BookingCancelledBy;
+import com.project.common.enums.BookingPaymentStatus;
 import com.project.common.enums.BookingStatus;
 import com.project.common.enums.PaymentMethod;
 import com.project.common.entity.BaseEntity;
@@ -51,6 +52,12 @@ public class Booking extends BaseEntity {
     @Column(name = "booking_date", nullable = false)
     private LocalDate bookingDate;
 
+    @Column(name = "start_date_time", nullable = false)
+    private LocalDateTime startDateTime;
+
+    @Column(name = "end_date_time", nullable = false)
+    private LocalDateTime endDateTime;
+
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
@@ -80,12 +87,17 @@ public class Booking extends BaseEntity {
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 30, nullable = false)
-    private PaymentMethod paymentMethod = PaymentMethod.STRIPE;
+    private PaymentMethod paymentMethod = PaymentMethod.ACCOUNT_BALANCE;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     private BookingStatus status = BookingStatus.PENDING;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", length = 20, nullable = false)
+    private BookingPaymentStatus paymentStatus = BookingPaymentStatus.UNPAID;
 
     @Column(name = "note")
     private String note;
@@ -95,6 +107,9 @@ public class Booking extends BaseEntity {
 
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
+
+    @Column(name = "payment_expires_at")
+    private LocalDateTime paymentExpiresAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cancelled_by", length = 20)

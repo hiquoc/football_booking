@@ -21,4 +21,7 @@ public class OperatingHoursRequest {
 
     @Builder.Default
     private Boolean closed = false;
+
+    @Builder.Default
+    private Boolean open24Hours = false;
 }

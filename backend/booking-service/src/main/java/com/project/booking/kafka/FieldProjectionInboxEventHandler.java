@@ -11,17 +11,7 @@ import com.project.booking.repository.BookingTimePriceRuleProjectionRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
 import com.project.booking.repository.FieldOperatingHoursProjectionRepository;
 import com.project.booking.repository.SubFieldOperatingHoursProjectionRepository;
-import com.project.common.events.field.FieldClosureCreatedEvent;
-import com.project.common.events.field.FieldClosureDeletedEvent;
-import com.project.common.events.field.FieldClosureSnapshot;
-import com.project.common.events.field.FieldClosureUpdatedEvent;
-import com.project.common.events.field.FieldEventTopics;
-import com.project.common.events.field.FieldOperatingHoursUpdatedEvent;
-import com.project.common.events.field.SubFieldCreatedEvent;
-import com.project.common.events.field.SubFieldDeletedEvent;
-import com.project.common.events.field.SubFieldOperatingHoursUpdatedEvent;
-import com.project.common.events.field.SubFieldUpdatedEvent;
-import com.project.common.events.field.TimePriceRuleSnapshot;
+import com.project.common.events.field.*;
 import com.project.common.inbox.entity.InboxEvent;
 import com.project.common.inbox.handler.InboxEventHandler;
 import com.project.common.inbox.service.InboxService;
@@ -40,11 +30,12 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class FieldProjectionInboxEventHandler implements InboxEventHandler {
-
     private static final Set<String> TOPICS = Set.of(
             FieldEventTopics.SUB_FIELD_CREATED,
             FieldEventTopics.SUB_FIELD_UPDATED,
             FieldEventTopics.SUB_FIELD_DELETED,
+            FieldEventTopics.OPERATING_HOURS_CHANGED,
+            FieldEventTopics.TIME_PRICE_RULES_CHANGED,
             FieldEventTopics.FIELD_OPERATING_HOURS_UPDATED,
             FieldEventTopics.SUB_FIELD_OPERATING_HOURS_UPDATED,
             FieldEventTopics.FIELD_CLOSURE_CREATED,
@@ -74,6 +65,10 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
                     onSubFieldUpdated(inboxService.payload(event, SubFieldUpdatedEvent.class));
             case FieldEventTopics.SUB_FIELD_DELETED ->
                     onSubFieldDeleted(inboxService.payload(event, SubFieldDeletedEvent.class));
+            case FieldEventTopics.OPERATING_HOURS_CHANGED ->
+                    onOperatingHoursChanged(inboxService.payload(event, OperatingHoursChangedEvent.class));
+            case FieldEventTopics.TIME_PRICE_RULES_CHANGED ->
+                    onTimePriceRulesChanged(inboxService.payload(event, TimePriceRulesChangedEvent.class));
             case FieldEventTopics.FIELD_OPERATING_HOURS_UPDATED ->
                     onFieldOperatingHoursUpdated(inboxService.payload(event, FieldOperatingHoursUpdatedEvent.class));
             case FieldEventTopics.SUB_FIELD_OPERATING_HOURS_UPDATED ->
@@ -103,50 +98,76 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
         availabilityCacheService.evictAll();
     }
 
-    private void onFieldOperatingHoursUpdated(FieldOperatingHoursUpdatedEvent event) {
-        Map<DayOfWeek, FieldOperatingHoursProjection> existingByDay = fieldOperatingHoursRepository
-                .findByFieldId(event.fieldId())
-                .stream()
-                .collect(Collectors.toMap(FieldOperatingHoursProjection::getDayOfWeek, Function.identity()));
+    private void onOperatingHoursChanged(OperatingHoursChangedEvent event) {
+        if ("FIELD".equalsIgnoreCase(event.entityType())) {
+            upsertFieldOperatingHours(event.fieldId(), event.operatingHours());
+        } else if ("SUBFIELD".equalsIgnoreCase(event.entityType())) {
+            upsertSubFieldOperatingHours(event.entityId(), event.operatingHours());
+        } else {
+            throw new IllegalStateException("Unsupported operating hours entity type " + event.entityType());
+        }
+        availabilityCacheService.evictAll();
+    }
 
-        fieldOperatingHoursRepository.saveAll(event.operatingHours().stream()
-                .map(hours -> {
-                    FieldOperatingHoursProjection projection = existingByDay.getOrDefault(
-                            hours.dayOfWeek(),
-                            FieldOperatingHoursProjection.builder()
-                                    .fieldId(event.fieldId())
-                                    .dayOfWeek(hours.dayOfWeek())
-                                    .build());
-                    projection.setOpenTime(hours.openTime());
-                    projection.setCloseTime(hours.closeTime());
-                    projection.setClosed(Boolean.TRUE.equals(hours.closed()));
-                    return projection;
-                })
-                .toList());
+    private void onTimePriceRulesChanged(TimePriceRulesChangedEvent event) {
+        replaceTimePriceRules(event.subFieldId(), event.timePriceRules());
+        availabilityCacheService.evictAll();
+    }
+
+    private void onFieldOperatingHoursUpdated(FieldOperatingHoursUpdatedEvent event) {
+        upsertFieldOperatingHours(event.fieldId(), event.operatingHours());
         availabilityCacheService.evictAll();
     }
 
     private void onSubFieldOperatingHoursUpdated(SubFieldOperatingHoursUpdatedEvent event) {
-        Map<DayOfWeek, SubFieldOperatingHoursProjection> existingByDay = subFieldOperatingHoursRepository
-                .findBySubFieldId(event.subFieldId())
-                .stream()
-                .collect(Collectors.toMap(SubFieldOperatingHoursProjection::getDayOfWeek, Function.identity()));
+        upsertSubFieldOperatingHours(event.subFieldId(), event.operatingHours());
+        availabilityCacheService.evictAll();
+    }
 
-        subFieldOperatingHoursRepository.saveAll(event.operatingHours().stream()
+    private void upsertFieldOperatingHours(UUID fieldId, List<OperatingHoursSnapshot> operatingHours) {
+        Map<DayOfWeek, FieldOperatingHoursProjection> existingByDay = fieldOperatingHoursRepository
+                .findByFieldId(fieldId)
+                .stream()
+                .collect(Collectors.toMap(FieldOperatingHoursProjection::getDayOfWeek, Function.identity()));
+
+        fieldOperatingHoursRepository.saveAll(operatingHours.stream()
                 .map(hours -> {
-                    SubFieldOperatingHoursProjection projection = existingByDay.getOrDefault(
+                    FieldOperatingHoursProjection projection = existingByDay.getOrDefault(
                             hours.dayOfWeek(),
-                            SubFieldOperatingHoursProjection.builder()
-                                    .subFieldId(event.subFieldId())
+                            FieldOperatingHoursProjection.builder()
+                                    .fieldId(fieldId)
                                     .dayOfWeek(hours.dayOfWeek())
                                     .build());
                     projection.setOpenTime(hours.openTime());
                     projection.setCloseTime(hours.closeTime());
                     projection.setClosed(Boolean.TRUE.equals(hours.closed()));
+                    projection.setOpen24Hours(Boolean.TRUE.equals(hours.open24Hours()));
                     return projection;
                 })
                 .toList());
-        availabilityCacheService.evictAll();
+    }
+
+    private void upsertSubFieldOperatingHours(UUID subFieldId, List<OperatingHoursSnapshot> operatingHours) {
+        Map<DayOfWeek, SubFieldOperatingHoursProjection> existingByDay = subFieldOperatingHoursRepository
+                .findBySubFieldId(subFieldId)
+                .stream()
+                .collect(Collectors.toMap(SubFieldOperatingHoursProjection::getDayOfWeek, Function.identity()));
+
+        subFieldOperatingHoursRepository.saveAll(operatingHours.stream()
+                .map(hours -> {
+                    SubFieldOperatingHoursProjection projection = existingByDay.getOrDefault(
+                            hours.dayOfWeek(),
+                            SubFieldOperatingHoursProjection.builder()
+                                    .subFieldId(subFieldId)
+                                    .dayOfWeek(hours.dayOfWeek())
+                                    .build());
+                    projection.setOpenTime(hours.openTime());
+                    projection.setCloseTime(hours.closeTime());
+                    projection.setClosed(Boolean.TRUE.equals(hours.closed()));
+                    projection.setOpen24Hours(Boolean.TRUE.equals(hours.open24Hours()));
+                    return projection;
+                })
+                .toList());
     }
 
     private void onClosureCreated(FieldClosureCreatedEvent event) {
@@ -236,4 +257,5 @@ public class FieldProjectionInboxEventHandler implements InboxEventHandler {
                         .build())
                 .toList());
     }
+
 }

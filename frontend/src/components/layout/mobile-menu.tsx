@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MapPinned, CalendarRange, UserRound, Building2, ShieldCheck, Menu, X, Mail } from "lucide-react";
+import { MapPinned, CalendarRange, UserRound, Building2, ShieldCheck, Menu, X, Mail, UsersRound } from "lucide-react";
 import { useState } from "react";
 import type { User } from "@/lib/api/types";
 
@@ -9,10 +9,11 @@ export function MobileMenu({ user }: { user: User | null }) {
   const [open, setOpen] = useState(false);
   const links = [
     { href: "/fields", label: "Tìm sân", icon: MapPinned, show: true },
+    { href: "/community", label: "Cộng đồng", icon: UsersRound, show: true },
     { href: "/contact", label: "Liên hệ hợp tác", icon: Mail, show: true },
     { href: user ? "/bookings" : "/auth/login", label: "Lịch đặt của tôi", icon: CalendarRange, show: true },
     { href: "/profile", label: "Hồ sơ cá nhân", icon: UserRound, show: Boolean(user) },
-    { href: "/owner", label: "Quản lý sân", icon: Building2, show: user?.userType === "OWNER" },
+    { href: "/owner", label: "Quản lý sân", icon: Building2, show: user?.userType === "OWNER" || user?.userType === "EMPLOYEE" },
     {
       href: "/admin",
       label: "Quản trị hệ thống",

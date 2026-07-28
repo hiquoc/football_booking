@@ -76,13 +76,15 @@ public class SubFieldProjectionServiceImpl implements SubFieldProjectionService 
         return new ResolvedOperatingHours(
                 projection.getOpenTime(),
                 projection.getCloseTime(),
-                Boolean.TRUE.equals(projection.getClosed()));
+                Boolean.TRUE.equals(projection.getClosed()),
+                Boolean.TRUE.equals(projection.getOpen24Hours()));
     }
 
     private ResolvedOperatingHours toResolvedHours(FieldOperatingHoursProjection projection) {
         return new ResolvedOperatingHours(
                 projection.getOpenTime(),
                 projection.getCloseTime(),
-                Boolean.TRUE.equals(projection.getClosed()));
+                Boolean.TRUE.equals(projection.getClosed()),
+                Boolean.TRUE.equals(projection.getOpen24Hours()));
     }
 }

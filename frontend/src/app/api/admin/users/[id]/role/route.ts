@@ -3,7 +3,7 @@ import type { User } from "@/lib/api/types";
 import { updateUserRole } from "@/lib/server/users";
 import { routeError } from "@/lib/server/route-response";
 
-const roles = new Set<User["userType"]>(["CLIENT", "OWNER", "ADMIN"]);
+const roles = new Set<User["userType"]>(["CLIENT", "OWNER", "EMPLOYEE", "ADMIN"]);
 
 export async function PUT(
   request: Request,

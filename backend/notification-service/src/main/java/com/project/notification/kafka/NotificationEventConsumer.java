@@ -8,6 +8,7 @@ import com.project.common.events.notification.ModerationNotificationEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PaymentFailedEvent;
 import com.project.common.events.notification.PaymentSuccessEvent;
+import com.project.common.events.notification.UserBalanceUpdatedEvent;
 import com.project.common.events.notification.UserRequestOtpEvent;
 import com.project.common.inbox.service.InboxService;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,11 @@ public class NotificationEventConsumer {
 
     @KafkaListener(topics = NotificationEventTopics.PAYMENT_FAILED, groupId = "${spring.kafka.consumer.group-id}")
     public void onPaymentFailed(ConsumerRecord<String, PaymentFailedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = NotificationEventTopics.USER_BALANCE_UPDATED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onUserBalanceUpdated(ConsumerRecord<String, UserBalanceUpdatedEvent> record) {
         inboxService.receive(record, consumerGroup);
     }
 

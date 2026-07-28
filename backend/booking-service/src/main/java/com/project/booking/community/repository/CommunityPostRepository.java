@@ -52,6 +52,19 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, UU
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") LocalTime currentTime);
 
+    @EntityGraph(attributePaths = "applications")
+    @Query("""
+            SELECT p
+            FROM CommunityPost p
+            WHERE p.status = :openStatus
+              AND (p.bookingDate < :currentDate
+                   OR (p.bookingDate = :currentDate AND p.startTime <= :currentTime))
+            """)
+    List<CommunityPost> findStartedOpenPosts(
+            @Param("openStatus") CommunityPostStatus openStatus,
+            @Param("currentDate") LocalDate currentDate,
+            @Param("currentTime") LocalTime currentTime);
+
     List<CommunityPost> findByStatusAndBookingDateLessThanEqual(CommunityPostStatus status, LocalDate date);
 
     List<CommunityPost> findByOwnerIdAndStatusIn(UUID ownerId, Collection<CommunityPostStatus> statuses);

@@ -94,7 +94,7 @@ export function FieldCard({
         )}
         {canFavorite ? (
           <div className="absolute right-4 top-4 z-40">
-            <FavoriteButton fieldId={field.id} isFavorite={field.isFavorite} />
+            <FavoriteButton fieldId={field.id} isSaved={field.isSaved ?? field.isFavorite} />
           </div>
         ) : null}
       </div>

@@ -42,7 +42,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class FieldScheduleServiceImpl implements FieldScheduleService {
-
     private final FieldRepository fieldRepository;
     private final SubFieldRepository subFieldRepository;
     private final FieldOperatingHoursRepository fieldOperatingHoursRepository;
@@ -50,6 +49,7 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
     private final FieldClosureRepository fieldClosureRepository;
     private final FieldEventPublisher fieldEventPublisher;
     private final BookingServiceClient bookingServiceClient;
+    private final OperatingHoursPriceRuleSynchronizer operatingHoursPriceRuleSynchronizer;
 
     @Override
     @Transactional(readOnly = true)
@@ -73,6 +73,9 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
         Map<DayOfWeek, FieldOperatingHours> existingByDay = fieldOperatingHoursRepository.findByFieldId(fieldId)
                 .stream()
                 .collect(Collectors.toMap(FieldOperatingHours::getDayOfWeek, Function.identity()));
+        List<FieldOperatingHours> previousHours = existingByDay.values().stream()
+                .map(this::copyOperatingHours)
+                .toList();
 
         List<FieldOperatingHours> hours = requests.stream()
                 .map(request -> {
@@ -89,7 +92,13 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
                 .toList();
 
         List<FieldOperatingHours> saved = fieldOperatingHoursRepository.saveAll(hours);
-        fieldEventPublisher.publishFieldOperatingHoursUpdated(saved);
+        List<SubField> affectedSubFields = subFieldRepository.findByFieldId(fieldId);
+        List<SubField> updatedSubFields = operatingHoursPriceRuleSynchronizer.synchronizeFieldHours(affectedSubFields, saved);
+        List<UUID> affectedSubFieldIds = affectedSubFields.stream()
+                .map(SubField::getId)
+                .toList();
+        fieldEventPublisher.publishFieldOperatingHoursUpdated(previousHours, saved, affectedSubFieldIds);
+        updatedSubFields.forEach(fieldEventPublisher::publishTimePriceRulesChanged);
         return saved.stream().sorted(Comparator.comparing(FieldOperatingHours::getDayOfWeek)).map(this::toDto).toList();
     }
 
@@ -115,6 +124,9 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
         Map<DayOfWeek, SubFieldOperatingHours> existingByDay = subFieldOperatingHoursRepository.findBySubFieldId(subFieldId)
                 .stream()
                 .collect(Collectors.toMap(SubFieldOperatingHours::getDayOfWeek, Function.identity()));
+        List<SubFieldOperatingHours> previousHours = existingByDay.values().stream()
+                .map(this::copyOperatingHours)
+                .toList();
 
         List<SubFieldOperatingHours> hours = requests.stream()
                 .map(request -> {
@@ -131,7 +143,11 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
                 .toList();
 
         List<SubFieldOperatingHours> saved = subFieldOperatingHoursRepository.saveAll(hours);
-        fieldEventPublisher.publishSubFieldOperatingHoursUpdated(saved);
+        boolean priceRulesChanged = operatingHoursPriceRuleSynchronizer.synchronizeSubFieldHours(subField, saved);
+        fieldEventPublisher.publishSubFieldOperatingHoursUpdated(previousHours, saved, subField.getField().getId());
+        if (priceRulesChanged) {
+            fieldEventPublisher.publishTimePriceRulesChanged(subField);
+        }
         return saved.stream().sorted(Comparator.comparing(SubFieldOperatingHours::getDayOfWeek)).map(this::toDto).toList();
     }
 
@@ -252,8 +268,14 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
             throw new BadRequestException("Day of week is required");
         }
         if (Boolean.TRUE.equals(request.getClosed())) {
-            if (request.getOpenTime() != null || request.getCloseTime() != null) {
+            if (request.getOpenTime() != null || request.getCloseTime() != null || Boolean.TRUE.equals(request.getOpen24Hours())) {
                 throw new BadRequestException("Closed days must not include open time or close time");
+            }
+            return;
+        }
+        if (Boolean.TRUE.equals(request.getOpen24Hours())) {
+            if (request.getOpenTime() != null || request.getCloseTime() != null) {
+                throw new BadRequestException("24-hour operating days must not include open time or close time");
             }
             return;
         }
@@ -261,9 +283,6 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
         LocalTime closeTime = request.getCloseTime();
         if (openTime == null || closeTime == null) {
             throw new BadRequestException("Open time and close time are required for open days");
-        }
-        if (!closeTime.isAfter(openTime)) {
-            throw new BadRequestException("Close time must be after open time");
         }
     }
 
@@ -292,14 +311,16 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
 
     private void apply(FieldOperatingHours hours, OperatingHoursRequest request) {
         hours.setClosed(Boolean.TRUE.equals(request.getClosed()));
-        hours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getOpenTime());
-        hours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getCloseTime());
+        hours.setOpen24Hours(!Boolean.TRUE.equals(request.getClosed()) && Boolean.TRUE.equals(request.getOpen24Hours()));
+        hours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getOpenTime());
+        hours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getCloseTime());
     }
 
     private void apply(SubFieldOperatingHours hours, OperatingHoursRequest request) {
         hours.setClosed(Boolean.TRUE.equals(request.getClosed()));
-        hours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getOpenTime());
-        hours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) ? null : request.getCloseTime());
+        hours.setOpen24Hours(!Boolean.TRUE.equals(request.getClosed()) && Boolean.TRUE.equals(request.getOpen24Hours()));
+        hours.setOpenTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getOpenTime());
+        hours.setCloseTime(Boolean.TRUE.equals(request.getClosed()) || Boolean.TRUE.equals(request.getOpen24Hours()) ? null : request.getCloseTime());
     }
 
     private OperatingHoursDto toDto(FieldOperatingHours hours) {
@@ -310,6 +331,19 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
                 .openTime(hours.getOpenTime())
                 .closeTime(hours.getCloseTime())
                 .closed(hours.getClosed())
+                .open24Hours(hours.getOpen24Hours())
+                .build();
+    }
+
+    private FieldOperatingHours copyOperatingHours(FieldOperatingHours hours) {
+        return FieldOperatingHours.builder()
+                .id(hours.getId())
+                .fieldId(hours.getFieldId())
+                .dayOfWeek(hours.getDayOfWeek())
+                .openTime(hours.getOpenTime())
+                .closeTime(hours.getCloseTime())
+                .closed(hours.getClosed())
+                .open24Hours(hours.getOpen24Hours())
                 .build();
     }
 
@@ -321,6 +355,19 @@ public class FieldScheduleServiceImpl implements FieldScheduleService {
                 .openTime(hours.getOpenTime())
                 .closeTime(hours.getCloseTime())
                 .closed(hours.getClosed())
+                .open24Hours(hours.getOpen24Hours())
+                .build();
+    }
+
+    private SubFieldOperatingHours copyOperatingHours(SubFieldOperatingHours hours) {
+        return SubFieldOperatingHours.builder()
+                .id(hours.getId())
+                .subFieldId(hours.getSubFieldId())
+                .dayOfWeek(hours.getDayOfWeek())
+                .openTime(hours.getOpenTime())
+                .closeTime(hours.getCloseTime())
+                .closed(hours.getClosed())
+                .open24Hours(hours.getOpen24Hours())
                 .build();
     }
 

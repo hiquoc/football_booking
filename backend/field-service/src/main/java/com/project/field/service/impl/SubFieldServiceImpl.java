@@ -4,6 +4,7 @@ import com.project.common.enums.SubFieldType;
 import com.project.common.cache.CacheNames;
 import com.project.common.exception.BadRequestException;
 import com.project.field.dto.SubFieldDto;
+import com.project.field.dto.SubFieldFilterOptionDto;
 import com.project.field.dto.SubFieldRequest;
 import com.project.field.dto.TimePriceRuleDto;
 import com.project.field.dto.response.SubFieldResponse;
@@ -35,6 +36,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SubFieldServiceImpl implements SubFieldService {
+    private static final int MINUTES_PER_DAY = 24 * 60;
+    private static final LocalTime END_OF_DAY_TIME = LocalTime.of(23, 59);
 
     private final SubFieldRepository subFieldRepository;
     private final FieldRepository fieldRepository;
@@ -161,6 +164,25 @@ public class SubFieldServiceImpl implements SubFieldService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<SubFieldFilterOptionDto> getFilterOptions(String search) {
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        System.out.println(normalizedSearch);
+        return subFieldRepository.findFilterOptions(normalizedSearch).stream()
+                .map(subField -> {
+                    Field field = subField.getField();
+                    String fieldName = field != null ? field.getName() : null;
+                    return SubFieldFilterOptionDto.builder()
+                            .id(subField.getId())
+                            .fieldName(fieldName)
+                            .type(subField.getSubFieldType())
+                            .name(displayName(fieldName, subField.getName(), subField.getSubFieldType()))
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public SubFieldResponse getInternalSubFieldResponse(UUID subFieldId) {
         SubField subField = subFieldRepository.findWithFieldById(subFieldId)
                 .orElseThrow(() -> new SubFieldNotFoundException(subFieldId));
@@ -204,6 +226,15 @@ public class SubFieldServiceImpl implements SubFieldService {
         if (request.getTimePriceRules() == null || request.getTimePriceRules().isEmpty()) {
             throw new BadRequestException("Time price rules are required");
         }
+    }
+
+    private String displayName(String fieldName, String subFieldName, SubFieldType type) {
+        String typeText = type != null ? type.name().replace("FOOTBALL_", "").replace("V", "v") : null;
+        String baseName = fieldName != null && !fieldName.isBlank() ? fieldName : subFieldName;
+        if (typeText == null || typeText.isBlank()) {
+            return baseName;
+        }
+        return baseName + " - " + typeText;
     }
 
     private void validateSubFieldUpdate(
@@ -261,23 +292,54 @@ public class SubFieldServiceImpl implements SubFieldService {
             }
         }
 
-        List<TimePriceRuleDto> sortedRules = request.getTimePriceRules().stream()
-                .sorted((left, right) -> left.getStartTime().compareTo(right.getStartTime()))
-                .collect(Collectors.toList());
-
-        for (int i = 0; i < sortedRules.size(); i++) {
-            TimePriceRuleDto rule = sortedRules.get(i);
-            if (!rule.getEndTime().isAfter(rule.getStartTime())) {
-                throw new BadRequestException("Time price rule end time must be after start time");
+        for (TimePriceRuleDto rule : request.getTimePriceRules()) {
+            if (rule.getStartTime().equals(rule.getEndTime())) {
+                throw new BadRequestException("Time price rule start time and end time cannot be the same");
             }
             if (rule.getHourlyPrice() == null || rule.getHourlyPrice().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new BadRequestException("Time price rule hourly price must be greater than 0");
             }
+        }
+
+        boolean[] coveredMinutes = new boolean[MINUTES_PER_DAY];
+        for (TimePriceRuleDto rule : request.getTimePriceRules()) {
+            markRuleCoverage(coveredMinutes, rule, true);
+        }
+
+        List<TimePriceRuleDto> sortedRules = request.getTimePriceRules().stream()
+                .sorted((left, right) -> left.getStartTime().compareTo(right.getStartTime()))
+                .collect(Collectors.toList());
+        validateTimePriceRuleCoverage(field, sortedRules);
+    }
+
+    private void markRuleCoverage(boolean[] coveredMinutes, TimePriceRuleDto rule, boolean rejectOverlap) {
+        int start = toMinuteOfDay(rule.getStartTime());
+        int end = endMinuteOfDay(rule.getEndTime());
+        int length = end > start ? end - start : MINUTES_PER_DAY - start + end;
+        for (int offset = 0; offset < length; offset++) {
+            int minute = (start + offset) % MINUTES_PER_DAY;
+            if (rejectOverlap && coveredMinutes[minute]) {
+                throw new BadRequestException("Time price rules cannot overlap");
+            }
+            coveredMinutes[minute] = true;
+        }
+    }
+
+    private int toMinuteOfDay(LocalTime time) {
+        return time.getHour() * 60 + time.getMinute();
+    }
+
+    private int endMinuteOfDay(LocalTime time) {
+        return END_OF_DAY_TIME.equals(time) ? MINUTES_PER_DAY : toMinuteOfDay(time);
+    }
+
+    private void validateLegacySortedRulesDoNotOverlap(List<TimePriceRuleDto> sortedRules) {
+        for (int i = 0; i < sortedRules.size(); i++) {
+            TimePriceRuleDto rule = sortedRules.get(i);
             if (i > 0 && rule.getStartTime().isBefore(sortedRules.get(i - 1).getEndTime())) {
                 throw new BadRequestException("Time price rules cannot overlap");
             }
         }
-        validateTimePriceRuleCoverage(field, sortedRules);
     }
 
     private void validateTimePriceRuleCoverage(Field field, List<TimePriceRuleDto> sortedRules) {
@@ -294,7 +356,11 @@ public class SubFieldServiceImpl implements SubFieldService {
         }
 
         for (FieldOperatingHours hours : openHours) {
-            validateRulesCoverInterval(sortedRules, hours.getOpenTime(), hours.getCloseTime());
+            if (Boolean.TRUE.equals(hours.getOpen24Hours())) {
+                validateRulesCoverInterval(sortedRules, LocalTime.MIDNIGHT, END_OF_DAY_TIME);
+            } else {
+                validateRulesCoverInterval(sortedRules, hours.getOpenTime(), hours.getCloseTime());
+            }
         }
     }
 
@@ -303,18 +369,17 @@ public class SubFieldServiceImpl implements SubFieldService {
             throw new BadRequestException("Open field operating days must include open time and close time");
         }
 
-        LocalTime cursor = openTime;
-        for (TimePriceRuleDto rule : sortedRules) {
-            if (!rule.getEndTime().isAfter(cursor) || rule.getStartTime().isAfter(cursor)) {
-                continue;
-            }
-            cursor = rule.getEndTime();
-            if (!cursor.isBefore(closeTime)) {
-                return;
+        boolean[] coveredMinutes = new boolean[MINUTES_PER_DAY];
+        sortedRules.forEach(rule -> markRuleCoverage(coveredMinutes, rule, false));
+
+        int start = toMinuteOfDay(openTime);
+        int end = endMinuteOfDay(closeTime);
+        int length = end > start ? end - start : MINUTES_PER_DAY - start + end;
+        for (int offset = 0; offset < length; offset++) {
+            if (!coveredMinutes[(start + offset) % MINUTES_PER_DAY]) {
+                throw new BadRequestException("Time price rules must cover all field operating hours");
             }
         }
-
-        throw new BadRequestException("Time price rules must cover all field operating hours");
     }
 
 }

@@ -149,6 +149,9 @@ export async function getCurrentUser(): Promise<User | null> {
       userType: "OWNER",
       status: "ACTIVE",
       balance: 0,
+      isBookingBanned: false,
+      banExpiresAt: null,
+      isPermanentBan: false,
     };
   }
   const accessToken = await getAccessToken();

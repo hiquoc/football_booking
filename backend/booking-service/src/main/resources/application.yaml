@@ -33,7 +33,7 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     client-id: booking-service
     admin:
       auto-create: true
@@ -52,9 +52,13 @@ spring:
       properties:
         spring.json.trusted.packages: com.project.common.events.field,com.project.common.events.notification
         spring.json.use.type.headers: true
-    listener:
+  listener:
       ack-mode: record
       missing-topics-fatal: false
+  task:
+    scheduling:
+      pool:
+        size: 4
 
 eureka:
   client:
@@ -64,7 +68,7 @@ eureka:
     prefer-ip-address: true
 
 booking:
-  payment-timeout-minutes: 35
+  payment-timeout-minutes: 5
   expiration-scheduler-fixed-delay-ms: 60000
   completion-scheduler-fixed-delay-ms: 300000
   recurring-scheduler-fixed-delay-ms: 43200000
@@ -79,10 +83,12 @@ community:
 internal:
   gateway:
     secret: ${INTERNAL_GATEWAY_SECRET:dev-internal-gateway-secret}
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
 
 outbox:
   batch-size: 50
-  poll-interval: 5000
+  poll-interval: 1000
   max-retries: 5
   scheduler-concurrency: 8
   retry-delays:
@@ -97,7 +103,7 @@ outbox:
 
 inbox:
   batch-size: 50
-  poll-interval: 5000
+  poll-interval: 1000
   max-retries: 5
   scheduler-concurrency: 1
   retry-delays:

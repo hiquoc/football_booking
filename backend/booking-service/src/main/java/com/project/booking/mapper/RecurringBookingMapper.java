@@ -10,5 +10,8 @@ public interface RecurringBookingMapper {
 
     @Mapping(target = "fieldName", source = "subField.fieldName")
     @Mapping(target = "subFieldName", source = "subField.name")
+    @Mapping(target = "nextMatchAt", ignore = true)
+    @Mapping(target = "firstBooking", ignore = true)
+    @Mapping(target = "latestBooking", ignore = true)
     RecurringBookingResponse toResponse(RecurringBooking recurringBooking);
 }

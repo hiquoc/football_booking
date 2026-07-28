@@ -34,7 +34,7 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -50,9 +50,13 @@ spring:
       properties:
         spring.json.trusted.packages: com.project.common.events.notification
         spring.json.use.type.headers: true
-    listener:
+  listener:
       ack-mode: record
       missing-topics-fatal: false
+  task:
+    scheduling:
+      pool:
+        size: 4
   security:
     oauth2:
       client:
@@ -96,7 +100,7 @@ cloudinary:
 
 outbox:
   batch-size: 50
-  poll-interval: 5000
+  poll-interval: 1000
   max-retries: 5
   scheduler-concurrency: 8
   retry-delays:
@@ -111,7 +115,7 @@ outbox:
 
 inbox:
   batch-size: 50
-  poll-interval: 5000
+  poll-interval: 1000
   max-retries: 5
   scheduler-concurrency: 1
   retry-delays:

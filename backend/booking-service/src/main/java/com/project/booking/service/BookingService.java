@@ -24,6 +24,8 @@ public interface BookingService {
 
     BookingResponse createRecurringOccurrence(UUID userId, UUID recurringBookingId, CreateBookingRequest request);
 
+    void validateRecurringOccurrence(UUID userId, CreateBookingRequest request, UUID recurringBookingId);
+
     /**
      * Cancels an existing booking owned by the requesting client.
      *
@@ -36,11 +38,11 @@ public interface BookingService {
     /**
      * Cancels an existing booking owned by the requesting field owner.
      *
-     * @param ownerId the authenticated owner's ID
+     * @param managerId the authenticated owner's ID
      * @param request contains booking ID and optional cancellation reason
      * @return the updated booking response
      */
-    BookingResponse cancelBookingByOwner(UUID ownerId, CancelBookingRequest request);
+    BookingResponse cancelBookingByManager(UUID managerId, String managerRole, CancelBookingRequest request);
 
     /**
      * Expires pending bookings older than the configured payment timeout.
@@ -67,10 +69,10 @@ public interface BookingService {
     /**
      * Returns all bookings for a field owner across their sub-fields.
      *
-     * @param ownerId the authenticated owner's ID
+     * @param managerId the authenticated owner's ID
      * @return page of bookings for that owner
      */
-    PageResponse<BookingResponse> getOwnerBookings(UUID ownerId, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable);
+    PageResponse<BookingResponse> getManagerBookings(UUID managerId, String managerRole, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable);
 
     /**
      * Returns a booking by ID.

@@ -30,7 +30,7 @@ public class OutboxScheduler {
         this.outboxPublisherExecutor = outboxPublisherExecutor;
     }
 
-    @Scheduled(fixedDelayString = "${outbox.poll-interval:5000}")
+    @Scheduled(fixedDelayString = "${outbox.poll-interval:1000}")
     public void publishPendingEvents() {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {

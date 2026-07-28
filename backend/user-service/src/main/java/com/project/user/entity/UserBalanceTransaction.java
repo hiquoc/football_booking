@@ -31,7 +31,7 @@ public class UserBalanceTransaction extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "booking_id", nullable = false)
+    @Column(name = "booking_id")
     private UUID bookingId;
 
     @Column(name = "operation_key", nullable = false, unique = true, length = 120)

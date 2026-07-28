@@ -10,6 +10,7 @@ import type {
   FieldClosure,
   FieldImage,
   FieldInput,
+  FieldEmployee,
   FavoriteCheckResponse,
   ImageUploadSlot,
   CloudinaryUploadResult,
@@ -17,6 +18,7 @@ import type {
   PageResponse,
   Review,
   SubField,
+  SubFieldFilterOption,
   SubFieldInput,
 } from "@/lib/api/types";
 import {
@@ -76,6 +78,37 @@ export async function getOwnerFields(page = 0, size = 10) {
   );
 }
 
+export async function getAssignedFields(page = 0, size = 10) {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "createdAt,desc",
+  });
+  return authenticatedGatewayRequest<PageResponse<Field>>(
+    `/api/v1/fields/employee/assigned?${query}`,
+  );
+}
+
+export function getFieldEmployees(fieldId: string) {
+  return authenticatedGatewayRequest<FieldEmployee[]>(
+    `/api/v1/fields/${encodeURIComponent(fieldId)}/employees`,
+  );
+}
+
+export function assignFieldEmployee(fieldId: string, employeeId: string) {
+  return authenticatedGatewayRequest<FieldEmployee>(
+    `/api/v1/fields/${encodeURIComponent(fieldId)}/employees`,
+    { method: "POST", body: JSON.stringify({ employeeId }) },
+  );
+}
+
+export function removeFieldEmployee(fieldId: string, employeeId: string) {
+  return authenticatedGatewayRequest<null>(
+    `/api/v1/fields/${encodeURIComponent(fieldId)}/employees/${encodeURIComponent(employeeId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function getField(id: string) {
   return sessionGatewayRequest<Field>(`/api/v1/fields/${encodeURIComponent(id)}`, {
     next: { revalidate: 60, tags: [fieldCacheTag(id)] },
@@ -102,6 +135,14 @@ export async function getSubFields(id: string) {
     {
       next: { revalidate: 60 },
     },
+  );
+}
+
+export function getSubFieldFilterOptions(search?: string) {
+  const query = new URLSearchParams();
+  if (search?.trim()) query.set("search", search.trim());
+  return authenticatedGatewayRequest<SubFieldFilterOption[]>(
+    `/api/v1/subfields/filter-options${query.size ? `?${query}` : ""}`,
   );
 }
 
@@ -269,8 +310,15 @@ export async function changeFieldImageOrder(
   return images;
 }
 
-export function getFavoriteFields() {
-  return authenticatedGatewayRequest<Field[]>("/api/v1/users/me/favorites");
+export function getFavoriteFields(page = 0, size = 4) {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "createdAt,desc",
+  });
+  return authenticatedGatewayRequest<PageResponse<Field>>(
+    `/api/v1/users/me/favorites?${query}`,
+  );
 }
 
 export async function addFavoriteField(fieldId: string) {

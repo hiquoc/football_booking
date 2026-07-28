@@ -54,7 +54,7 @@ export function FieldListContent({
               <FieldCard
                 key={field.id}
                 field={field}
-                canFavorite={viewerRole === "CLIENT"}
+                canFavorite={viewerRole === "CLIENT" || viewerRole === "EMPLOYEE"}
               />
             ))}
           </div>

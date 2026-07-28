@@ -40,11 +40,11 @@ spring:
             - id: field-service-api
               uri: lb://field-service
               predicates:
-                - Path=/api/v1/fields/**, /api/v1/sub-fields/**, /api/v1/field-types/**, /api/v1/reviews/**
+                - Path=/api/v1/fields/**, /api/v1/sub-fields/**, /api/v1/subfields/**, /api/v1/field-types/**, /api/v1/reviews/**
             - id: booking-service-api
               uri: lb://booking-service
               predicates:
-                - Path=/api/v1/bookings/**,/api/v1/community-posts/**,/api/v1/admin/community-moderation/**,/api/v1/admin/booking-config
+                - Path=/api/v1/bookings/**,/api/v1/recurring-bookings,/api/v1/recurring-bookings/**,/api/v1/community-posts,/api/v1/community-posts/**,/api/v1/admin/community-moderation/**,/api/v1/admin/booking-config
             - id: notification-service-api
               uri: lb://notification-service
               predicates:

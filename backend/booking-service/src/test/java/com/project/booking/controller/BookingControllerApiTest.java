@@ -174,7 +174,7 @@ class BookingControllerApiTest {
     @Test
     void ownerCancelBookingWithOwnerHeaderReturnsOk() throws Exception {
         CancelBookingRequest request = CancelBookingRequest.builder().bookingId(BOOKING_ID).reason("Maintenance").build();
-        when(bookingService.cancelBookingByOwner(eq(USER_ID), org.mockito.ArgumentMatchers.any(CancelBookingRequest.class)))
+        when(bookingService.cancelBookingByManager(eq(USER_ID), eq("OWNER"), org.mockito.ArgumentMatchers.any(CancelBookingRequest.class)))
                 .thenReturn(bookingResponse());
 
         mockMvc.perform(patch("/api/v1/bookings/owner/cancel")
@@ -197,7 +197,7 @@ class BookingControllerApiTest {
 
     @Test
     void getOwnerBookingsWithOwnerHeaderReturnsList() throws Exception {
-        when(bookingService.getOwnerBookings(eq(USER_ID),
+        when(bookingService.getManagerBookings(eq(USER_ID), eq("OWNER"),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
@@ -216,10 +216,10 @@ class BookingControllerApiTest {
     @Test
     void ownerUpsertMatchResultReturnsBooking() throws Exception {
         UpsertMatchResultRequest request = new UpsertMatchResultRequest();
-        request.setWinningTeam(WinningTeam.TEAM_A);
+        request.setResult(WinningTeam.BOOKER_WIN);
         request.setTeamAPercentage(70);
         request.setTeamBPercentage(30);
-        when(matchResultService.upsert(eq(USER_ID), eq(BOOKING_ID), org.mockito.ArgumentMatchers.any(UpsertMatchResultRequest.class)))
+        when(matchResultService.upsert(eq(USER_ID), eq("OWNER"), eq(BOOKING_ID), org.mockito.ArgumentMatchers.any(UpsertMatchResultRequest.class)))
                 .thenReturn(bookingResponse());
 
         mockMvc.perform(put("/api/v1/bookings/owner/{bookingId}/match-result", BOOKING_ID)

@@ -62,6 +62,7 @@ export interface Field {
   status: FieldStatus;
   ratingAverage: number;
   totalReviews: number;
+  isSaved?: boolean;
   isFavorite?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -104,6 +105,7 @@ export interface FieldCardData {
   primaryImageUrl: string | null;
   fieldTypes: string[];
   distanceKm: number | null;
+  isSaved?: boolean;
   isFavorite?: boolean;
 }
 
@@ -178,6 +180,13 @@ export interface SubField {
   updatedAt: string;
 }
 
+export interface SubFieldFilterOption {
+  id: string;
+  name: string;
+  fieldName: string | null;
+  type: string | null;
+}
+
 export interface Review {
   id: string;
   fieldId: string;
@@ -203,10 +212,13 @@ export interface User {
   noCancelRate?: number;
   onTimeRate?: number;
   fairPlayRate?: number;
-  userType: "CLIENT" | "OWNER" | "ADMIN";
+  userType: "CLIENT" | "OWNER" | "EMPLOYEE" | "ADMIN";
   status: string;
   balance: number;
   completedBookingCount?: number;
+  isBookingBanned?: boolean;
+  banExpiresAt?: string | null;
+  isPermanentBan?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -259,11 +271,13 @@ export type BookingStatus =
 
 export type BookingPaymentStatus = "UNPAID" | "PAID" | "REFUNDED" | "FAILED";
 
-export type WinningTeam = "TEAM_A" | "TEAM_B" | "DRAW";
+export type MatchResultOutcome = "BOOKER_WIN" | "BOOKER_LOSS" | "DRAW";
+export type WinningTeam = MatchResultOutcome | "TEAM_A" | "TEAM_B";
 
 export interface MatchResult {
   id: string;
   bookingId: string;
+  result?: MatchResultOutcome;
   winningTeam: WinningTeam;
   teamAPercentage: number;
   teamBPercentage: number;
@@ -275,7 +289,7 @@ export interface MatchResult {
 }
 
 export interface MatchResultInput {
-  winningTeam: WinningTeam;
+  result: MatchResultOutcome;
   teamAPercentage: number;
   teamBPercentage: number;
 }
@@ -284,6 +298,9 @@ export interface Booking {
   id: string;
   bookingCode: string;
   clientId: string;
+  clientName: string | null;
+  clientPhoneNumber: string | null;
+  clientAvatarUrl: string | null;
   subFieldId: string;
   subFieldName: string;
   fieldName: string;
@@ -352,7 +369,7 @@ export interface CreateBookingInput {
   paymentMethod?: PaymentMethod;
 }
 
-export type RecurringBookingStatus = "ACTIVE" | "PAUSED" | "CANCELLED";
+export type RecurringBookingStatus = "ACTIVE" | "PAUSED" | "CANCELLED" | "COMPLETED";
 
 export interface RecurringBooking {
   id: string;
@@ -367,7 +384,8 @@ export interface RecurringBooking {
   endDate: string;
   intervalDays: number;
   status: RecurringBookingStatus;
-  nextProcessAt: string;
+  nextProcessAt: string | null;
+  nextMatchAt?: string | null;
   firstBooking?: Booking | null;
   latestBooking?: Booking | null;
   createdAt: string;
@@ -392,6 +410,13 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
   readAt: string | null;
+}
+
+export interface UserBalanceUpdateMessage {
+  userId: string;
+  balance: number;
+  reason: string | null;
+  occurredAt: string;
 }
 
 export interface FieldTypeInput {
@@ -459,6 +484,17 @@ export interface UpdateProfileInput {
   skillLevel?: SkillLevel;
 }
 
+export interface FieldEmployee {
+  assignmentId: string;
+  fieldId: string;
+  employeeId: string;
+  phoneNumber: string | null;
+  fullName: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  assignedAt: string;
+}
+
 export type PaymentStatus = "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED";
 export type PaymentProvider = "STRIPE";
 export type PaymentPurpose = "WALLET_TOP_UP";
@@ -488,7 +524,8 @@ export interface MutationSuccessResponse {
 }
 
 export interface FavoriteCheckResponse {
-  favorite: boolean;
+  saved: boolean;
+  favorite?: boolean;
 }
 
 export type CommunityPostType = "LOOKING_OPPONENT" | "LOOKING_PLAYER";

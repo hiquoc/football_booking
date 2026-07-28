@@ -51,7 +51,8 @@ class FieldImageBatchOrderTest {
                 new FieldMapper(mock(FieldTypeMapper.class), mock(SubFieldMapper.class)),
                 mock(UserServiceClient.class),
                 cloudinaryService,
-                mock(FieldEventPublisher.class));
+                mock(FieldEventPublisher.class),
+                new OperatingHoursPriceRuleSynchronizer());
 
         assertThatThrownBy(() -> service.uploadImages(fieldId, List.of(mock(MultipartFile.class))))
                 .isInstanceOf(FieldNotFoundException.class);
@@ -82,7 +83,8 @@ class FieldImageBatchOrderTest {
                 new FieldMapper(mock(FieldTypeMapper.class), mock(SubFieldMapper.class)),
                 mock(UserServiceClient.class),
                 mock(CloudinaryService.class),
-                mock(FieldEventPublisher.class));
+                mock(FieldEventPublisher.class),
+                new OperatingHoursPriceRuleSynchronizer());
 
         List<FieldImageDto> result = service.addImages(
                 fieldId,
@@ -116,7 +118,8 @@ class FieldImageBatchOrderTest {
                 new FieldMapper(mock(FieldTypeMapper.class), mock(SubFieldMapper.class)),
                 mock(UserServiceClient.class),
                 mock(CloudinaryService.class),
-                mock(FieldEventPublisher.class));
+                mock(FieldEventPublisher.class),
+                new OperatingHoursPriceRuleSynchronizer());
 
         List<FieldImageDto> result = service.updateImageOrder(
                 fieldId,

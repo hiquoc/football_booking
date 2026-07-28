@@ -69,6 +69,11 @@ public class KafkaTopicConfig {
     }
 
     @Bean
+    public NewTopic userProfileUpdatedTopic() {
+        return topic(NotificationEventTopics.USER_PROFILE_UPDATED);
+    }
+
+    @Bean
     public NewTopic moderationNotificationTopic() {
         return topic(NotificationEventTopics.MODERATION_NOTIFICATION);
     }

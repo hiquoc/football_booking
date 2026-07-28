@@ -10,6 +10,6 @@ export const metadata: Metadata = {
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  const profile = user?.userType === "CLIENT" ? await getMyPublicProfile().catch(() => null) : null;
+  const profile = user?.userType === "CLIENT" || user?.userType === "EMPLOYEE" ? await getMyPublicProfile().catch(() => null) : null;
   return <CommunityDetailContent postId={id} viewer={user} profile={profile} />;
 }

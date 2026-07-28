@@ -11,6 +11,12 @@ import type {
 import { authenticatedGatewayRequest } from "./authenticated-gateway";
 import { gatewayRequest } from "./gateway";
 
+function todayInVietnam() {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
 export function getMyBookings(page = 0, size = 10) {
   return authenticatedGatewayRequest<PageResponse<Booking>>(
     `/api/v1/bookings/my?page=${page}&size=${size}&sort=createdAt,desc`,
@@ -25,8 +31,10 @@ export function getOwnerBookings(
   const query = new URLSearchParams({
     page: String(page),
     size: String(size),
-    sort: "createdAt,desc",
+    sort: "startDateTime,asc",
   });
+  query.set("bookingDate", filters.bookingDate ?? todayInVietnam());
+  query.set("status", filters.status ?? "COMPLETED");
   Object.entries(filters).forEach(([key, value]) => {
     if (value) query.set(key, value);
   });

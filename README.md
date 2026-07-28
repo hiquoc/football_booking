@@ -201,14 +201,22 @@ NEXT_PUBLIC_GATEWAY_WS_URL=wss://your-domain.example/ws
 
 ### 2. Run With Docker Compose
 
-Start the full local stack using Docker Compose.
+Start the full local stack using Docker Compose. The local file binds browser-facing services to localhost ports:
+frontend `8000`, gateway `8080`, services `8081`-`8085`, discovery `8071`, and Mailpit `8025`.
 
 ```bash
 cd backend/
-docker-compose up -d
+docker compose -f docker-compose.local.yml up -d
 ```
 
-The frontend is available at `http://localhost:3000`, and the API Gateway is available at `http://localhost:8080`.
+The frontend is available at `http://localhost:8000`, and the API Gateway is available at `http://localhost:8080`.
+
+For production, provide the required production environment variables and run:
+
+```bash
+cd backend/
+docker compose -f docker-compose.prd.yml up -d --build
+```
 
 ### 3. Run Services Manually
 

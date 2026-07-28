@@ -17,10 +17,10 @@ import com.project.booking.community.service.CommunityPostMaintenanceService;
 import com.project.booking.community.service.CommunityPostService;
 import com.project.booking.community.service.CommunityModerationService;
 import com.project.booking.entity.Booking;
-import com.project.booking.entity.UserReplica;
+import com.project.booking.entity.UserProjection;
 import com.project.booking.exception.BookingNotFoundException;
 import com.project.booking.repository.BookingRepository;
-import com.project.booking.repository.UserReplicaRepository;
+import com.project.booking.repository.UserProjectionRepository;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
 import com.project.common.exception.BadRequestException;
@@ -52,7 +52,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     private final CommunityNotificationEventPublisher notifications;
     private final MatchEvaluationEventPublisher evaluationEvents;
     private final CommunityModerationService moderationService;
-    private final UserReplicaRepository userReplicaRepository;
+    private final UserProjectionRepository userProjectionRepository;
 
     @Override
     @Transactional
@@ -273,8 +273,14 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     @Transactional
     public int closeStartedOpenPosts() {
         LocalDateTime now = LocalDateTime.now();
-        return postRepository.closeStartedOpenPosts(
-                CommunityPostStatus.OPEN, CommunityPostStatus.CLOSED, now.toLocalDate(), now.toLocalTime());
+        List<CommunityPost> posts = postRepository.findStartedOpenPosts(
+                CommunityPostStatus.OPEN, now.toLocalDate(), now.toLocalTime());
+        posts.forEach(post -> {
+            post.setStatus(CommunityPostStatus.CLOSED);
+            post.setClosedAt(now);
+            notifyApplicants(post, "COMMUNITY_POST_CLOSED", "Bai dang da dong");
+        });
+        return posts.size();
     }
 
     private void validatePlayersNeeded(CommunityPostType postType, Integer playersNeeded) {
@@ -365,15 +371,15 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         if (response.getPostType() != CommunityPostType.LOOKING_OPPONENT) {
             return response;
         }
-        userReplicaRepository.findById(response.getOwnerId())
+        userProjectionRepository.findById(response.getOwnerId())
                 .map(this::toStatistics)
                 .ifPresent(response::setOwnerStatistics);
         return response;
     }
 
-    private CommunityPlayerStatisticsResponse toStatistics(UserReplica replica) {
-        int totalMatches = replica.getTotalMatches() == null ? 0 : replica.getTotalMatches();
-        int wins = replica.getWins() == null ? 0 : replica.getWins();
+    private CommunityPlayerStatisticsResponse toStatistics(UserProjection projection) {
+        int totalMatches = projection.getTotalMatches() == null ? 0 : projection.getTotalMatches();
+        int wins = projection.getWins() == null ? 0 : projection.getWins();
         BigDecimal winRate = totalMatches == 0
                 ? BigDecimal.ZERO.setScale(1)
                 : BigDecimal.valueOf(wins)
@@ -382,10 +388,10 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         return CommunityPlayerStatisticsResponse.builder()
                 .totalMatches(totalMatches)
                 .winRate(winRate)
-                .onTimeRate(replica.getOnTimeRate())
-                .noCancelRate(replica.getNoCancelRate())
-                .fairPlayRate(replica.getFairPlayRate())
-                .completedBookingCount(replica.getCompletedBookingCount())
+                .onTimeRate(projection.getOnTimeRate())
+                .noCancelRate(projection.getNoCancelRate())
+                .fairPlayRate(projection.getFairPlayRate())
+                .completedBookingCount(projection.getCompletedBookingCount())
                 .build();
     }
 }

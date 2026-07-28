@@ -6,9 +6,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface BookingSubFieldProjectionRepository extends JpaRepository<SubFieldProjection, UUID> {
+    List<SubFieldProjection> findByFieldId(UUID fieldId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE SubFieldProjection s SET s.hasRecurring = :hasRecurring WHERE s.id = :subFieldId")

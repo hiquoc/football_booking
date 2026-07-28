@@ -27,7 +27,7 @@ async function OwnerAccessGate({
 }) {
   const user = await requireUser();
 
-  if (user.userType !== "OWNER") {
+  if (user.userType !== "OWNER" && user.userType !== "EMPLOYEE") {
     return <AccessDenied />;
   }
 

@@ -3,13 +3,17 @@ package com.project.field.dto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 @Getter
+@Setter
 @Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class FieldCardDto {
     private UUID id;
@@ -24,5 +28,5 @@ public class FieldCardDto {
     private String primaryImageUrl;
     private List<String> fieldTypes;
     private Double distanceKm;
-    private Boolean isFavorite;
+    private Boolean isSaved;
 }

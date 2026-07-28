@@ -19,6 +19,7 @@ public class RateLimitEndpointMatcher {
     public RateLimitEndpointMatcher(RateLimitProperties properties) {
         PathPatternParser parser = PathPatternParser.defaultInstance;
         this.endpoints = properties.getEndpoints().stream()
+                .filter(RateLimitProperties.Endpoint::isEnabled)
                 .map(endpoint -> new CompiledEndpoint(endpoint, endpoint.getPaths().stream()
                         .map(parser::parse)
                         .toList()))

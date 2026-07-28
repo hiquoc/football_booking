@@ -4,7 +4,7 @@ import { upsertMatchResult } from "@/lib/server/bookings";
 import { assertSameOrigin, routeError } from "@/lib/server/route-response";
 
 const schema = z.object({
-  winningTeam: z.enum(["TEAM_A", "TEAM_B", "DRAW"]),
+  result: z.enum(["BOOKER_WIN", "BOOKER_LOSS", "DRAW"]),
   teamAPercentage: z.number().int().min(0).max(100),
   teamBPercentage: z.number().int().min(0).max(100),
 });

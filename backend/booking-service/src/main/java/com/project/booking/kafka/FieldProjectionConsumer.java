@@ -32,6 +32,16 @@ public class FieldProjectionConsumer {
         inboxService.receive(record, consumerGroup);
     }
 
+    @KafkaListener(topics = FieldEventTopics.OPERATING_HOURS_CHANGED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onOperatingHoursChanged(ConsumerRecord<String, OperatingHoursChangedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = FieldEventTopics.TIME_PRICE_RULES_CHANGED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onTimePriceRulesChanged(ConsumerRecord<String, TimePriceRulesChangedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
     @KafkaListener(topics = FieldEventTopics.FIELD_OPERATING_HOURS_UPDATED, groupId = "${spring.kafka.consumer.group-id}")
     public void onFieldOperatingHoursUpdated(ConsumerRecord<String, FieldOperatingHoursUpdatedEvent> record) {
         inboxService.receive(record, consumerGroup);

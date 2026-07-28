@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import { Client } from "@stomp/stompjs";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Notification, PageResponse } from "@/lib/api/types";
+import type { Notification, PageResponse, User, UserBalanceUpdateMessage } from "@/lib/api/types";
 import { fetchNotificationSocketTicket } from "@/lib/client/notifications";
-import { notificationQueryKeys } from "@/lib/query-keys";
+import { notificationQueryKeys, userQueryKeys } from "@/lib/query-keys";
 
 const gatewaySocketUrl = process.env.NEXT_PUBLIC_GATEWAY_WS_URL ?? "ws://localhost:8080/ws";
 
@@ -17,6 +17,12 @@ function isNotificationList(data: unknown): data is PageResponse<Notification> {
 
 function isNotificationListQueryKey(queryKey: readonly unknown[]) {
   return queryKey[0] === notificationQueryKeys.all[0] && queryKey[1] === "list";
+}
+
+function isUserList(data: unknown): data is PageResponse<User> {
+  return typeof data === "object"
+    && data !== null
+    && Array.isArray((data as PageResponse<User>).content);
 }
 
 export function useNotificationSocket(enabled = true) {
@@ -72,6 +78,25 @@ export function useNotificationSocket(enabled = true) {
               queryClient.setQueryData<{ count: number }>(
                 notificationQueryKeys.unreadCount,
                 (old) => ({ count: (old?.count ?? 0) + (!notification.isRead && !isCachedNotification ? 1 : 0) }),
+              );
+            });
+            client?.subscribe("/user/queue/balance", (message) => {
+              const balanceUpdate = JSON.parse(message.body) as UserBalanceUpdateMessage;
+              queryClient.setQueryData<User>(userQueryKeys.mePrivate, (old) =>
+                old ? { ...old, balance: balanceUpdate.balance } : old,
+              );
+              queryClient.setQueriesData<PageResponse<User>>(
+                { queryKey: userQueryKeys.all },
+                (old) => isUserList(old)
+                  ? {
+                    ...old,
+                    content: old.content.map((user) =>
+                      user.id === balanceUpdate.userId
+                        ? { ...user, balance: balanceUpdate.balance }
+                        : user,
+                    ),
+                  }
+                  : old,
               );
             });
           },

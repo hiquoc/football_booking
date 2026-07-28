@@ -42,6 +42,8 @@ class FieldServiceOwnerListingTest {
     private CloudinaryService cloudinaryService;
     @Mock
     private FieldEventPublisher fieldEventPublisher;
+    @Mock
+    private OperatingHoursPriceRuleSynchronizer operatingHoursPriceRuleSynchronizer;
     @InjectMocks
     private FieldServiceImpl fieldService;
 

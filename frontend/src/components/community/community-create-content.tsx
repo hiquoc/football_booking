@@ -68,7 +68,7 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input name="skillLevel" label="Trình độ" defaultValue={profile?.personal.skillLevel ?? "AVERAGE"} required />
-          <Input name="contactPhone" label="Contact Zalo" defaultValue={profile?.personal.phoneNumber ?? ""} required />
+          <Input name="contactPhone" label="Zalo" defaultValue={profile?.personal.phoneNumber ?? ""} required />
         </div>
         {postType === "LOOKING_PLAYER" ? <Input name="playersNeeded" label="Số cầu thủ cần thêm" type="number" min={1} required /> : null}
         <button disabled={create.isPending || bookings.isPending} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default async function NewCommunityPostPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/auth/login");
-  if (user.userType !== "CLIENT") redirect("/community");
+  if (user.userType !== "CLIENT" && user.userType !== "EMPLOYEE") redirect("/community");
   const profile = await getMyPublicProfile().catch(() => null);
   return <CommunityCreateContent profile={profile} />;
 }

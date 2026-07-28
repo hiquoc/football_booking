@@ -40,4 +40,8 @@ public class SubFieldOperatingHours {
 
     @Column(name = "closed", nullable = false)
     private Boolean closed;
+
+    @Builder.Default
+    @Column(name = "open_24_hours", nullable = false)
+    private Boolean open24Hours = false;
 }

@@ -9,7 +9,17 @@ import lombok.Data;
 @Data
 public class UpsertMatchResultRequest {
     @NotNull
-    private WinningTeam winningTeam;
+    private WinningTeam result;
+
+    @Deprecated
+    public WinningTeam getWinningTeam() {
+        return result;
+    }
+
+    @Deprecated
+    public void setWinningTeam(WinningTeam winningTeam) {
+        this.result = winningTeam;
+    }
 
     @NotNull
     @Min(0)

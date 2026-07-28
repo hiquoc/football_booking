@@ -1,6 +1,7 @@
 package com.project.field.service.impl;
 
 import com.project.common.cache.CacheNames;
+import com.project.common.dto.PageResponse;
 import com.project.field.dto.FavoriteCheckResponse;
 import com.project.field.dto.FieldDto;
 import com.project.field.entity.Field;
@@ -13,10 +14,10 @@ import com.project.field.service.FavoriteFieldService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -29,11 +30,10 @@ public class FavoriteFieldServiceImpl implements FavoriteFieldService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FieldDto> getFavorites(UUID userId) {
-        return favoriteRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+    public PageResponse<FieldDto> getFavorites(UUID userId, Pageable pageable) {
+        return PageResponse.from(favoriteRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
                 .map(FieldFavorite::getField)
-                .map(field -> fieldMapper.toDto(field, true))
-                .toList();
+                .map(field -> fieldMapper.toDto(field, true)));
     }
 
     @Override

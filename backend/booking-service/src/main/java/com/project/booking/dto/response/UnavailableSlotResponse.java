@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -14,4 +15,6 @@ import java.time.LocalTime;
 public class UnavailableSlotResponse {
     private LocalTime startTime;
     private LocalTime endTime;
+    private LocalDateTime startDateTime;
+    private LocalDateTime endDateTime;
 }

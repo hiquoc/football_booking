@@ -4,10 +4,13 @@ import { Plus } from "lucide-react";
 import { OwnerFieldsPanel } from "@/components/owner/owner-fields-panel";
 import { PageHeading } from "@/components/ui/page-heading";
 import { BackLink } from "@/components/ui/back-link";
+import { requireUser } from "@/lib/server/guards";
 
 export const metadata: Metadata = { title: "Sân của tôi" };
 
-export default function OwnerFieldsPage() {
+export default async function OwnerFieldsPage() {
+  const user = await requireUser();
+  const role = user.userType === "EMPLOYEE" ? "EMPLOYEE" : "OWNER";
   return (
     <>
       <BackLink href="/owner" className="mb-5">
@@ -26,7 +29,7 @@ export default function OwnerFieldsPage() {
         }
       />
       <div className="mt-8">
-        <OwnerFieldsPanel />
+        <OwnerFieldsPanel role={role} />
       </div>
     </>
   );

@@ -6,6 +6,7 @@ import com.project.common.cache.CacheNames;
 import com.project.common.exception.*;
 import com.project.user.dto.*;
 import com.project.user.entity.*;
+import com.project.user.kafka.UserProfileEventPublisher;
 import com.project.user.mapper.UserMapper;
 import com.project.user.repository.*;
 import com.project.user.service.AvatarUploadService;
@@ -26,6 +27,7 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
     private final IssuedAvatarPublicIdRepository issuedIds;
     private final UserMapper mapper;
     private final Cloudinary cloudinary;
+    private final UserProfileEventPublisher userProfileEventPublisher;
 
     @Override @Transactional
     public AvatarUploadSlotDto issueSlot(UUID userId, AvatarUploadSlotRequest request) {
@@ -43,7 +45,10 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
             String publicId;
             do publicId = folder + UUID.randomUUID(); while (issuedIds.existsById(publicId));
             issuedIds.save(new IssuedAvatarPublicId(publicId, LocalDateTime.now()));
-            return slot(uploads.save(AvatarUpload.builder().userId(userId).requestId(request.requestId())
+            return slot(uploads.save(
+                    AvatarUpload.builder()
+                    .userId(userId)
+                    .requestId(request.requestId())
                     .publicId(publicId).uploadTimestamp(Instant.now().getEpochSecond())
                     .createdAt(LocalDateTime.now()).build()));
         });
@@ -82,9 +87,11 @@ public class AvatarUploadServiceImpl implements AvatarUploadService {
             user.setAvatarUrl(request.secureUrl());
             user.setAvatarPublicId(request.publicId());
         }
-        uploads.save(upload); users.save(user);
+        uploads.save(upload);
+        User saved = users.save(user);
+        userProfileEventPublisher.publishUpdated(saved);
         if (oldPublicId != null && !oldPublicId.equals(request.publicId())) destroy(oldPublicId);
-        return mapper.toDto(user);
+        return mapper.toDto(saved);
     }
 
     @Override @Transactional

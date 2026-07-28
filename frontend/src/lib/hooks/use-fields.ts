@@ -11,6 +11,7 @@ import {
   fetchFavoriteFields,
   removeFavoriteField,
   fetchSubFields,
+  fetchSubFieldFilterOptions,
   submitFieldReview,
   submitFieldStatus,
 } from "@/lib/client/fields";
@@ -55,10 +56,10 @@ export function useFieldCards(
   });
 }
 
-export function useFavoriteFields() {
+export function useFavoriteFields(page: number, size = 4) {
   return useQuery({
-    queryKey: fieldQueryKeys.favorites,
-    queryFn: fetchFavoriteFields,
+    queryKey: fieldQueryKeys.favorites(page, size),
+    queryFn: () => fetchFavoriteFields(page, size),
   });
 }
 
@@ -69,14 +70,14 @@ export function useToggleFavoriteField(fieldId: string) {
   type Snapshot = Array<[QueryKey, unknown]>;
 
   return useMutation<Field | void, Error, boolean, Snapshot>({
-    mutationFn: (favorite: boolean) =>
-      favorite ? addFavoriteField(fieldId) : removeFavoriteField(fieldId),
-    onMutate: async (favorite) => {
+    mutationFn: (saved: boolean) =>
+      saved ? addFavoriteField(fieldId) : removeFavoriteField(fieldId),
+    onMutate: async (saved) => {
       await queryClient.cancelQueries({ queryKey: fieldQueryKeys.all });
       const snapshot = queryClient.getQueriesData({ queryKey: fieldQueryKeys.all }) as Snapshot;
 
-      const patchField = <T extends { id: string; isFavorite?: boolean }>(item: T): T =>
-        item.id === fieldId ? { ...item, isFavorite: favorite } : item;
+      const patchField = <T extends { id: string; isSaved?: boolean; isFavorite?: boolean }>(item: T): T =>
+        item.id === fieldId ? { ...item, isSaved: saved, isFavorite: saved } : item;
 
       queryClient.setQueriesData<PageResponse<Field>>(
         { queryKey: fieldQueryKeys.all },
@@ -91,21 +92,21 @@ export function useToggleFavoriteField(fieldId: string) {
           : old,
       );
       queryClient.setQueryData<Field>(fieldQueryKeys.detail(fieldId), (old) =>
-        old ? { ...old, isFavorite: favorite } : old,
+        old ? { ...old, isSaved: saved, isFavorite: saved } : old,
       );
       queryClient.setQueryData<FieldDetails>(fieldQueryKeys.details(fieldId), (old) =>
-        old ? { ...old, field: { ...old.field, isFavorite: favorite } } : old,
+        old ? { ...old, field: { ...old.field, isSaved: saved, isFavorite: saved } } : old,
       );
 
       return snapshot;
     },
-    onError: (_error, _favorite, snapshot) => {
+    onError: (_error, _saved, snapshot) => {
       snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      showToast("Khong the cap nhat yeu thich. Vui long thu lai.", "error");
+      showToast("Could not update saved field. Please try again.", "error");
     },
-    onSuccess: (_result, favorite) => {
+    onSuccess: (_result, saved) => {
       showToast(
-        favorite ? "Da them san vao yeu thich." : "Da bo san khoi yeu thich.",
+        saved ? "Field saved." : "Field removed from saved fields.",
         "success",
       );
       void queryClient.invalidateQueries({ queryKey: fieldQueryKeys.all });
@@ -117,6 +118,14 @@ export function useFieldDetails(id: string) {
   return useQuery({
     queryKey: fieldQueryKeys.details(id),
     queryFn: () => fetchFieldDetails(id),
+  });
+}
+
+export function useSubFieldFilterOptions(search = "") {
+  return useQuery({
+    queryKey: fieldQueryKeys.subFieldFilterOptions(search),
+    queryFn: () => fetchSubFieldFilterOptions(search),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

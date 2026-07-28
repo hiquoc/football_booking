@@ -1,0 +1,36 @@
+package com.project.booking.kafka;
+
+import com.project.common.events.notification.NotificationEventTopics;
+import com.project.common.events.notification.PlayerMatchStatisticsAdjustedEvent;
+import com.project.common.events.notification.UserCompletedBookingCountChangedEvent;
+import com.project.common.events.notification.UserProfileUpdatedEvent;
+import com.project.common.inbox.service.InboxService;
+import lombok.RequiredArgsConstructor;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+public class UserProjectionEventConsumer {
+    private final InboxService inboxService;
+
+    @Value("${spring.kafka.consumer.group-id}")
+    private String consumerGroup;
+
+    @KafkaListener(topics = NotificationEventTopics.USER_COMPLETED_BOOKING_COUNT_CHANGED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onCompletedBookingCountChanged(ConsumerRecord<String, UserCompletedBookingCountChangedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = NotificationEventTopics.USER_PROFILE_UPDATED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onUserProfileUpdated(ConsumerRecord<String, UserProfileUpdatedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = NotificationEventTopics.PLAYER_MATCH_STATISTICS_ADJUSTED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onPlayerMatchStatisticsAdjusted(ConsumerRecord<String, PlayerMatchStatisticsAdjustedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+}

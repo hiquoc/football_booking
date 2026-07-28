@@ -1,0 +1,204 @@
+name: football-prd
+
+x-backend-environment: &backend-environment
+  APP_MODE: PROD
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
+  USER_SERVICE_URL: http://user-service:8081
+  USER_DB_URL: ${USER_DB_URL:-jdbc:postgresql://postgres:5432/user_db}
+  USER_DB_USERNAME: ${USER_DB_USERNAME:-football}
+  USER_DB_PASSWORD: ${USER_DB_PASSWORD:-football}
+  FIELD_DB_URL: ${FIELD_DB_URL:-jdbc:postgresql://postgres:5432/field_db}
+  FIELD_DB_USERNAME: ${FIELD_DB_USERNAME:-football}
+  FIELD_DB_PASSWORD: ${FIELD_DB_PASSWORD:-football}
+  BOOKING_DB_URL: ${BOOKING_DB_URL:-jdbc:postgresql://postgres:5432/booking_db}
+  BOOKING_DB_USERNAME: ${BOOKING_DB_USERNAME:-football}
+  BOOKING_DB_PASSWORD: ${BOOKING_DB_PASSWORD:-football}
+  NOTIFICATION_DB_URL: ${NOTIFICATION_DB_URL:-jdbc:postgresql://postgres:5432/notification_db}
+  NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-football}
+  NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-football}
+  PAYMENT_DB_URL: ${PAYMENT_DB_URL:-jdbc:postgresql://postgres:5432/payment_db}
+  PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME:-football}
+  PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-football}
+  INTERNAL_GATEWAY_SECRET: ${INTERNAL_GATEWAY_SECRET:?Set INTERNAL_GATEWAY_SECRET for production}
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET for production}
+  CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME for production}
+  CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY for production}
+  CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET for production}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-}
+  FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-}
+  SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST for production}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  N8N_URL: ${N8N_URL:-}
+  N8N_KEY: ${N8N_KEY:-}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?Set STRIPE_SECRET_KEY for production}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Set STRIPE_WEBHOOK_SECRET for production}
+  FRONTEND_URL: ${FRONTEND_URL:?Set FRONTEND_URL for production}
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: Dockerfile
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-football}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-football}
+      POSTGRES_DB: ${POSTGRES_DB:-football}
+      POSTGRES_MULTIPLE_DATABASES: user_db,field_db,booking_db,notification_db,payment_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    restart: unless-stopped
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  discovery-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: discovery-service
+        ARTIFACT_ID: discovery
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+    environment:
+      APP_MODE: PROD
+      EUREKA_HOSTNAME: discovery-service
+      EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
+
+  gateway-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: gateway-service
+        ARTIFACT_ID: gateway
+    restart: unless-stopped
+    depends_on:
+      - discovery-service
+      - redis
+    ports:
+      - "${PRD_GATEWAY_BIND:-0.0.0.0}:${PRD_GATEWAY_PORT:-8080}:8080"
+    environment:
+      <<: *backend-environment
+
+  user-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: user-service
+        ARTIFACT_ID: user
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - discovery-service
+    environment:
+      <<: *backend-environment
+
+  field-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: field-service
+        ARTIFACT_ID: field
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - discovery-service
+    environment:
+      <<: *backend-environment
+
+  booking-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: booking-service
+        ARTIFACT_ID: booking
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - discovery-service
+    environment:
+      <<: *backend-environment
+
+  notification-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: notification-service
+        ARTIFACT_ID: notification
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - discovery-service
+    environment:
+      <<: *backend-environment
+
+  payment-service:
+    build:
+      <<: *backend-build
+      args:
+        SERVICE_DIR: payment-service
+        ARTIFACT_ID: payment
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - kafka
+      - discovery-service
+    environment:
+      <<: *backend-environment
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${FRONTEND_URL:?Set FRONTEND_URL for production}
+        NEXT_PUBLIC_GATEWAY_WS_URL: ${NEXT_PUBLIC_GATEWAY_WS_URL:?Set NEXT_PUBLIC_GATEWAY_WS_URL for production}
+    restart: unless-stopped
+    depends_on:
+      - gateway-service
+    ports:
+      - "${PRD_FRONTEND_BIND:-0.0.0.0}:${PRD_FRONTEND_PORT:-80}:3000"
+    environment:
+      API_BASE_URL: http://gateway-service:8080
+      NEXT_PUBLIC_APP_URL: ${FRONTEND_URL:?Set FRONTEND_URL for production}
+      NEXT_PUBLIC_GATEWAY_WS_URL: ${NEXT_PUBLIC_GATEWAY_WS_URL:?Set NEXT_PUBLIC_GATEWAY_WS_URL for production}
+
+volumes:
+  postgres_data:

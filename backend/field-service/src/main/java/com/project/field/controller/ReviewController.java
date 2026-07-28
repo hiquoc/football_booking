@@ -65,7 +65,7 @@ public class ReviewController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Field not found", content = @Content)
     })
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PostMapping
     public ApiResponse<ReviewDto> create(
             @CurrentUser UserPrincipal user,

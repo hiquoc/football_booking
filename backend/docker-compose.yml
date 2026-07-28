@@ -5,6 +5,7 @@ x-backend-environment: &backend-environment
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
   INTERNAL_GATEWAY_SECRET: ${INTERNAL_GATEWAY_SECRET:-dev-internal-gateway-secret}
+  USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
   JWT_SECRET: ${JWT_SECRET:-ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==}
   USER_DB_URL: ${USER_DB_URL:-jdbc:postgresql://postgres:5432/user_db}
   USER_DB_USERNAME: ${USER_DB_USERNAME:-football}
@@ -94,6 +95,8 @@ services:
       - "8025:8025"
 
   discovery-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -109,6 +112,8 @@ services:
       EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
 
   gateway-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -125,6 +130,8 @@ services:
       <<: *backend-environment
 
   user-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -143,6 +150,8 @@ services:
       <<: *backend-environment
 
   field-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -161,6 +170,8 @@ services:
       <<: *backend-environment
 
   booking-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -179,6 +190,8 @@ services:
       <<: *backend-environment
 
   notification-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -197,6 +210,8 @@ services:
       <<: *backend-environment
 
   payment-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
@@ -214,6 +229,8 @@ services:
       <<: *backend-environment
 
   frontend:
+    profiles:
+      - app
     build:
       context: ../frontend
       dockerfile: Dockerfile
@@ -233,19 +250,19 @@ services:
 
   stripe-cli:
     image: stripe/stripe-cli:latest
-    profiles:
-      - stripe
+#    profiles:
+#      - stripe
     container_name: stripe-cli
     restart: unless-stopped
-    environment:
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    env_file:
+      - ./common/.env-dev.properties
     volumes:
       - stripe_cli_config:/root/.config/stripe
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
         if test -n "$$STRIPE_SECRET_KEY"; then API_KEY_ARGS="--api-key $$STRIPE_SECRET_KEY"; else API_KEY_ARGS=""; fi;
-        exec stripe listen $$API_KEY_ARGS --forward-to http://gateway-service:8080/api/v1/payments/webhook --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
+        exec stripe listen $$API_KEY_ARGS --forward-to http://host.docker.internal:8080/api/v1/payments/webhook --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
 
 volumes:
   postgres_data:

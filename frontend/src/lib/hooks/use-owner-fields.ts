@@ -2,12 +2,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Field, FieldImage, FieldInput, SubFieldInput } from "@/lib/api/types";
 import {
+  fetchAssignedFields,
   fetchClosures,
+  fetchFieldEmployees,
   fetchOwnerFields,
   submitClosure,
   submitClosureDelete,
   submitClosureUpdate,
   submitField,
+  submitFieldEmployee,
+  submitFieldEmployeeRemoval,
   submitFieldUpdate,
   submitImageOrderChange,
   submitImageDelete,
@@ -21,6 +25,39 @@ export function useOwnerFields(page: number, size = 10) {
   return useQuery({
     queryKey: ownerFieldQueryKeys.list(page, size),
     queryFn: () => fetchOwnerFields(page, size),
+  });
+}
+export function useManagedFields(role: "OWNER" | "EMPLOYEE", page: number, size = 10) {
+  return useQuery({
+    queryKey: role === "EMPLOYEE" ? ownerFieldQueryKeys.assigned(page, size) : ownerFieldQueryKeys.list(page, size),
+    queryFn: () => role === "EMPLOYEE" ? fetchAssignedFields(page, size) : fetchOwnerFields(page, size),
+  });
+}
+export function useAssignedFields(page: number, size = 10) {
+  return useQuery({
+    queryKey: ownerFieldQueryKeys.assigned(page, size),
+    queryFn: () => fetchAssignedFields(page, size),
+  });
+}
+export function useFieldEmployees(fieldId: string) {
+  return useQuery({
+    queryKey: ownerFieldQueryKeys.employees(fieldId),
+    queryFn: () => fetchFieldEmployees(fieldId),
+    enabled: Boolean(fieldId),
+  });
+}
+export function useAssignFieldEmployee(fieldId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (employeeId: string) => submitFieldEmployee(fieldId, employeeId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ownerFieldQueryKeys.employees(fieldId) }),
+  });
+}
+export function useRemoveFieldEmployee(fieldId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (employeeId: string) => submitFieldEmployeeRemoval(fieldId, employeeId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ownerFieldQueryKeys.employees(fieldId) }),
   });
 }
 export function useCreateField() {

@@ -35,7 +35,7 @@ public class FieldDto {
     private FieldStatus status;
     private BigDecimal ratingAverage;
     private Integer totalReviews;
-    private Boolean isFavorite;
+    private Boolean isSaved;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<FieldImageDto> images;

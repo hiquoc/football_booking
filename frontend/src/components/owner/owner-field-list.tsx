@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, MapPin, Pencil, Settings2 } from "lucide-react";
+import { Eye, MapPin, Pencil, Settings2, Users } from "lucide-react";
 import type { FieldStatus } from "@/lib/api/types";
 import { formatFieldAddress } from "@/lib/field-format";
-import { useOwnerFields } from "@/lib/hooks/use-owner-fields";
+import { useManagedFields } from "@/lib/hooks/use-owner-fields";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 import { AdminPagination } from "@/components/admin/admin-pagination";
 
@@ -20,8 +20,8 @@ const statusStyles: Record<FieldStatus, string> = {
   REJECTED: "bg-rose-100 text-rose-700",
 };
 
-export function OwnerFieldList({ page }: { page: number }) {
-  const query = useOwnerFields(page);
+export function OwnerFieldList({ page, role }: { page: number; role: "OWNER" | "EMPLOYEE" }) {
+  const query = useManagedFields(role, page);
 
   if (query.isPending) return <ListSkeleton />;
   if (query.isError) return <DataError title="Không thể tải danh sách sân" />;
@@ -65,6 +65,12 @@ export function OwnerFieldList({ page }: { page: number }) {
                   <MapPin className="mt-0.5 size-4 shrink-0 text-sky-600" />
                   {formatFieldAddress(field)}
                 </p>
+                <Link
+                  href={`/owner/fields/${field.id}/employees`}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-sky-400 hover:text-sky-700"
+                >
+                  <Users className="size-4" /> NhÃ¢n viÃªn
+                </Link>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Link

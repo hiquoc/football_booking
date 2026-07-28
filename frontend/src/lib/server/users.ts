@@ -31,6 +31,13 @@ export function getUsers(page = 0, size = 10) {
   );
 }
 
+export function findEmployeeByPhone(phoneNumber: string) {
+  const params = new URLSearchParams({ phoneNumber });
+  return authenticatedGatewayRequest<User>(
+    `/api/v1/users/employees/by-phone?${params}`,
+  );
+}
+
 export function updateMyProfile(input: UpdateProfileInput) {
   return authenticatedGatewayRequest<PublicProfile>("/api/v1/users/me/profile", {
     method: "PATCH",

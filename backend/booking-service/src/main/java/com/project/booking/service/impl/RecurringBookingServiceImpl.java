@@ -1,19 +1,21 @@
 package com.project.booking.service.impl;
 
 import com.project.booking.cache.AvailabilityCacheService;
+import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
 import com.project.booking.dto.request.CreateRecurringBookingRequest;
 import com.project.booking.dto.request.UpdateRecurringBookingRequest;
+import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.dto.response.RecurringBookingResponse;
 import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.entity.RecurringBooking;
+import com.project.booking.mapper.BookingMapper;
 import com.project.booking.mapper.RecurringBookingMapper;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.BookingSubFieldProjectionRepository;
 import com.project.booking.repository.RecurringBookingRepository;
 import com.project.booking.service.BookingService;
 import com.project.booking.service.RecurringBookingService;
-import com.project.booking.service.ResolvedOperatingHours;
 import com.project.booking.service.SubFieldProjectionService;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
@@ -32,11 +34,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.temporal.TemporalAdjusters;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -46,12 +49,15 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
     private static final String ELIGIBILITY_MESSAGE =
             "You must complete at least one booking at this field before creating recurring bookings.";
+    private static final String IMMUTABLE_UPDATE_MESSAGE =
+            "Only the recurring booking end date can be changed.";
 
     private final RecurringBookingRepository recurringBookingRepository;
     private final BookingRepository bookingRepository;
     private final BookingSubFieldProjectionRepository subFieldRepository;
     private final SubFieldProjectionService subFieldProjectionService;
     private final RecurringBookingMapper recurringBookingMapper;
+    private final BookingMapper bookingMapper;
     private final BookingService bookingService;
     private final AvailabilityCacheService availabilityCacheService;
 
@@ -62,78 +68,94 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     @Transactional
     public RecurringBookingResponse create(UUID userId, CreateRecurringBookingRequest request) {
         SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
-        validateRule(request.getDayOfWeek(), request.getStartTime(), request.getEndTime(), request.getStartDate(), request.getEndDate(), subField);
+        validateRule(request.getStartTime(), request.getEndTime(), request.getStartDate(), request.getEndDate(),
+                request.getIntervalDays());
         validateEligibility(userId, subField.getFieldId());
-        validateNoRecurringConflicts(userId, request.getSubFieldId(), request.getDayOfWeek(),
-                request.getStartTime(), request.getEndTime(), request.getStartDate(), request.getEndDate(), null);
+        List<CreateBookingRequest> occurrences = generateOccurrences(request.getSubFieldId(), request.getStartTime(),
+                request.getEndTime(), request.getStartDate(), request.getEndDate(), request.getIntervalDays());
+        RecurringBooking replayed = findExactActiveRule(userId, request).orElse(null);
+        if (replayed != null) {
+            return toResponseWithFirstBooking(replayed,
+                    bookingRepository.findFirstBySourceRecurringBookingIdOrderByStartDateTimeAsc(replayed.getId())
+                            .map(bookingMapper::toResponse)
+                            .orElse(null));
+        }
+        validateNoRecurringConflicts(userId, request.getSubFieldId(), request.getStartTime(), request.getEndTime(),
+                request.getStartDate(), request.getEndDate(), request.getIntervalDays(), null);
+        validateOccurrences(userId, occurrences, null);
+
+        LocalDate firstOccurrenceDate = occurrences.getFirst().getBookingDate();
+        LocalDate nextOccurrenceDate = firstOccurrenceDate.plusDays(request.getIntervalDays());
+        boolean completedAfterFirstBooking = nextOccurrenceDate.isAfter(request.getEndDate());
 
         RecurringBooking recurringBooking = RecurringBooking.builder()
                 .userId(userId)
                 .fieldId(subField.getFieldId())
                 .subFieldId(subField.getId())
-                .dayOfWeek(request.getDayOfWeek())
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
-                .status(RecurringBookingStatus.ACTIVE)
-                .nextProcessAt(nextProcessAt(request.getStartDate(), request.getDayOfWeek()))
+                .intervalDays(request.getIntervalDays())
+                .status(completedAfterFirstBooking ? RecurringBookingStatus.COMPLETED : RecurringBookingStatus.ACTIVE)
+                .nextProcessAt(completedAfterFirstBooking ? null : nextProcessAt(nextOccurrenceDate))
                 .build();
 
         RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
+        BookingResponse firstBooking = bookingService.createRecurringOccurrence(
+                userId,
+                saved.getId(),
+                CreateBookingRequest.builder()
+                        .subFieldId(saved.getSubFieldId())
+                        .bookingDate(firstOccurrenceDate)
+                        .startTime(saved.getStartTime())
+                        .durationMinutes((int) Duration.between(saved.getStartTime(), saved.getEndTime()).toMinutes())
+                        .paymentMethod(PaymentMethod.ACCOUNT_BALANCE)
+                        .note("Đặt sân định kì " + saved.getId())
+                        .build());
         refreshHasRecurring(saved.getSubFieldId());
         availabilityCacheService.evictAll();
-        return recurringBookingMapper.toResponse(saved);
+        return toResponseWithFirstBooking(saved, firstBooking);
     }
 
     @Override
     @Transactional
     public RecurringBookingResponse update(UUID userId, UUID id, UpdateRecurringBookingRequest request) {
         RecurringBooking recurringBooking = getOwned(userId, id);
-        UUID previousSubFieldId = recurringBooking.getSubFieldId();
-        SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
-        validateRule(request.getDayOfWeek(), request.getStartTime(), request.getEndTime(), request.getStartDate(), request.getEndDate(), subField);
-        validateNoRecurringConflicts(userId, request.getSubFieldId(), request.getDayOfWeek(),
-                request.getStartTime(), request.getEndTime(), request.getStartDate(), request.getEndDate(), id);
-
-        recurringBooking.setFieldId(subField.getFieldId());
-        recurringBooking.setSubFieldId(subField.getId());
-        recurringBooking.setDayOfWeek(request.getDayOfWeek());
-        recurringBooking.setStartTime(request.getStartTime());
-        recurringBooking.setEndTime(request.getEndTime());
-        recurringBooking.setStartDate(request.getStartDate());
+        validateEndDateOnlyUpdate(recurringBooking, request);
+        validateEndDate(recurringBooking.getStartDate(), request.getEndDate());
+        validateNewOccurrencesForEndDate(userId, recurringBooking, request.getEndDate());
         recurringBooking.setEndDate(request.getEndDate());
-        recurringBooking.setNextProcessAt(nextProcessAt(request.getStartDate(), request.getDayOfWeek()));
 
         RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
-        refreshHasRecurring(previousSubFieldId);
         refreshHasRecurring(saved.getSubFieldId());
         availabilityCacheService.evictAll();
-        return recurringBookingMapper.toResponse(saved);
+        return toResponseWithLatestBooking(saved);
     }
 
     @Override
     @Transactional
     public RecurringBookingResponse pause(UUID userId, UUID id) {
-        return changeOwnedStatus(userId, id, RecurringBookingStatus.PAUSED);
+        return changeOwnedStatus(userId, id, RecurringBookingStatus.PAUSED, false);
     }
 
     @Override
     @Transactional
     public RecurringBookingResponse resume(UUID userId, UUID id) {
         RecurringBooking recurringBooking = getOwned(userId, id);
+        validateCanResume(recurringBooking);
         recurringBooking.setStatus(RecurringBookingStatus.ACTIVE);
-        recurringBooking.setNextProcessAt(nextProcessAt(LocalDate.now(), recurringBooking.getDayOfWeek()));
+        recurringBooking.setNextProcessAt(nextProcessAt(nextOccurrenceOnOrAfter(recurringBooking, LocalDate.now())));
         RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
         refreshHasRecurring(saved.getSubFieldId());
         availabilityCacheService.evictAll();
-        return recurringBookingMapper.toResponse(saved);
+        return toResponseWithLatestBooking(saved);
     }
 
     @Override
     @Transactional
     public RecurringBookingResponse cancel(UUID userId, UUID id) {
-        return changeOwnedStatus(userId, id, RecurringBookingStatus.CANCELLED);
+        return changeOwnedStatus(userId, id, RecurringBookingStatus.CANCELLED, true);
     }
 
     @Override
@@ -146,12 +168,13 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     @Transactional
     public RecurringBookingResponse adminResume(UUID id) {
         RecurringBooking recurringBooking = getRequired(id);
+        validateCanResume(recurringBooking);
         recurringBooking.setStatus(RecurringBookingStatus.ACTIVE);
-        recurringBooking.setNextProcessAt(nextProcessAt(LocalDate.now(), recurringBooking.getDayOfWeek()));
+        recurringBooking.setNextProcessAt(nextProcessAt(nextOccurrenceOnOrAfter(recurringBooking, LocalDate.now())));
         RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
         refreshHasRecurring(saved.getSubFieldId());
         availabilityCacheService.evictAll();
-        return recurringBookingMapper.toResponse(saved);
+        return toResponseWithLatestBooking(saved);
     }
 
     @Override
@@ -166,7 +189,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         var page = status == null
                 ? recurringBookingRepository.findByUserId(userId, pageable)
                 : recurringBookingRepository.findByUserIdAndStatus(userId, status, pageable);
-        return PageResponse.from(page.map(recurringBookingMapper::toResponse));
+        return PageResponse.from(page.map(this::toResponseWithLatestBooking));
     }
 
     @Override
@@ -175,7 +198,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         var page = status == null
                 ? recurringBookingRepository.findBySubFieldOwnerId(ownerId, pageable)
                 : recurringBookingRepository.findBySubFieldOwnerIdAndStatus(ownerId, status, pageable);
-        return PageResponse.from(page.map(recurringBookingMapper::toResponse));
+        return PageResponse.from(page.map(this::toResponseWithLatestBooking));
     }
 
     @Override
@@ -184,7 +207,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         var page = status == null
                 ? recurringBookingRepository.findAll(pageable)
                 : recurringBookingRepository.findByStatus(status, pageable);
-        return PageResponse.from(page.map(recurringBookingMapper::toResponse));
+        return PageResponse.from(page.map(this::toResponseWithLatestBooking));
     }
 
     @Override
@@ -204,18 +227,19 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     public void processOne(UUID id) {
         RecurringBooking recurringBooking = getRequired(id);
         if (recurringBooking.getStatus() != RecurringBookingStatus.ACTIVE
+                || recurringBooking.getNextProcessAt() == null
                 || recurringBooking.getNextProcessAt().isAfter(LocalDateTime.now())) {
             return;
         }
         LocalDate playDate = recurringBooking.getNextProcessAt().toLocalDate().plusDays(generationLeadDays);
         if (playDate.isAfter(recurringBooking.getEndDate())) {
-            recurringBooking.setStatus(RecurringBookingStatus.CANCELLED);
+            completeRecurringBooking(recurringBooking);
             recurringBookingRepository.save(recurringBooking);
             refreshHasRecurring(recurringBooking.getSubFieldId());
             return;
         }
         if (!bookingRepository.existsBySourceRecurringBookingIdAndBookingDate(recurringBooking.getId(), playDate)) {
-            int durationMinutes = (int) java.time.Duration.between(
+            int durationMinutes = (int) Duration.between(
                     recurringBooking.getStartTime(),
                     recurringBooking.getEndTime()).toMinutes();
             bookingService.createRecurringOccurrence(
@@ -226,21 +250,31 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                             .bookingDate(playDate)
                             .startTime(recurringBooking.getStartTime())
                             .durationMinutes(durationMinutes)
-                            .paymentMethod(PaymentMethod.STRIPE)
+                            .paymentMethod(PaymentMethod.ACCOUNT_BALANCE)
                             .note("Generated from recurring booking " + recurringBooking.getId())
                             .build());
         }
-        recurringBooking.setNextProcessAt(recurringBooking.getNextProcessAt().plusDays(7));
-        recurringBookingRepository.save(recurringBooking);
+        LocalDate nextOccurrenceDate = playDate.plusDays(recurringBooking.getIntervalDays());
+        if (nextOccurrenceDate.isAfter(recurringBooking.getEndDate())) {
+            completeRecurringBooking(recurringBooking);
+            recurringBookingRepository.save(recurringBooking);
+            refreshHasRecurring(recurringBooking.getSubFieldId());
+        } else {
+            recurringBooking.setNextProcessAt(nextProcessAt(nextOccurrenceDate));
+            recurringBookingRepository.save(recurringBooking);
+        }
     }
 
-    private RecurringBookingResponse changeOwnedStatus(UUID userId, UUID id, RecurringBookingStatus status) {
+    private RecurringBookingResponse changeOwnedStatus(UUID userId, UUID id, RecurringBookingStatus status, boolean cancelLatestConfirmedBooking) {
         RecurringBooking recurringBooking = getOwned(userId, id);
+        if (cancelLatestConfirmedBooking) {
+            cancelLatestConfirmedBooking(userId, recurringBooking);
+        }
         recurringBooking.setStatus(status);
         RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
         refreshHasRecurring(saved.getSubFieldId());
         availabilityCacheService.evictAll();
-        return recurringBookingMapper.toResponse(saved);
+        return toResponseWithLatestBooking(saved);
     }
 
     private RecurringBookingResponse changeAdminStatus(UUID id, RecurringBookingStatus status) {
@@ -249,7 +283,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
         refreshHasRecurring(saved.getSubFieldId());
         availabilityCacheService.evictAll();
-        return recurringBookingMapper.toResponse(saved);
+        return toResponseWithLatestBooking(saved);
     }
 
     private RecurringBooking getOwned(UUID userId, UUID id) {
@@ -265,22 +299,19 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                 .orElseThrow(() -> new NotFoundException("Recurring booking not found with id: " + id));
     }
 
-    private void validateRule(DayOfWeek dayOfWeek, LocalTime startTime, LocalTime endTime,
-                              LocalDate startDate, LocalDate endDate, SubFieldResponse subField) {
+    private void validateRule(LocalTime startTime, LocalTime endTime, LocalDate startDate, LocalDate endDate,
+                              Integer intervalDays) {
         if (!endTime.isAfter(startTime)) {
             throw new BadRequestException("End time must be after start time");
         }
-        if (endDate.isBefore(startDate)) {
-            throw new BadRequestException("End date must be on or after start date");
+        if (!endDate.isAfter(startDate)) {
+            throw new BadRequestException("End date must be after start date");
         }
-        LocalDate firstOccurrence = firstOccurrenceOnOrAfter(startDate, dayOfWeek);
-        if (firstOccurrence.isAfter(endDate)) {
-            throw new BadRequestException("Date range must include the selected weekday");
+        if (intervalDays == null || intervalDays < 1 || intervalDays > 7) {
+            throw new BadRequestException("Interval days must be between 1 and 7");
         }
-        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(subField.getId(), dayOfWeek);
-        if (hours.closed() || hours.openTime() == null || hours.closeTime() == null
-                || startTime.isBefore(hours.openTime()) || endTime.isAfter(hours.closeTime())) {
-            throw new BadRequestException("Recurring booking time must be within operating hours");
+        if (generateOccurrenceDates(startDate, endDate, intervalDays).isEmpty()) {
+            throw new BadRequestException("Recurring booking must generate at least one occurrence");
         }
     }
 
@@ -291,28 +322,156 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         }
     }
 
-    private void validateNoRecurringConflicts(UUID userId, UUID subFieldId, DayOfWeek dayOfWeek,
-                                              LocalTime startTime, LocalTime endTime,
-                                              LocalDate startDate, LocalDate endDate, UUID excludeId) {
-        boolean userOverlap = recurringBookingRepository.existsUserOverlap(
-                userId, dayOfWeek, startTime, endTime, startDate, endDate, RecurringBookingStatus.ACTIVE, excludeId);
-        boolean subFieldOverlap = recurringBookingRepository.existsSubFieldOverlap(
-                subFieldId, dayOfWeek, startTime, endTime, startDate, endDate, RecurringBookingStatus.ACTIVE, excludeId);
+    private void validateNoRecurringConflicts(UUID userId, UUID subFieldId, LocalTime startTime, LocalTime endTime,
+                                              LocalDate startDate, LocalDate endDate, int intervalDays, UUID excludeId) {
+        boolean userOverlap = recurringBookingRepository.overlapsAnyGeneratedOccurrence(
+                recurringBookingRepository.findUserOverlapCandidates(
+                        userId, startTime, endTime, startDate, endDate, RecurringBookingStatus.ACTIVE, excludeId),
+                startDate, endDate, intervalDays);
+        boolean subFieldOverlap = recurringBookingRepository.overlapsAnyGeneratedOccurrence(
+                recurringBookingRepository.findSubFieldOverlapCandidates(
+                        subFieldId, startTime, endTime, startDate, endDate, RecurringBookingStatus.ACTIVE, excludeId),
+                startDate, endDate, intervalDays);
         if (userOverlap || subFieldOverlap) {
             throw new ConflictException("Recurring booking overlaps an existing recurring booking.");
         }
     }
 
-    private LocalDateTime nextProcessAt(LocalDate startDate, DayOfWeek dayOfWeek) {
-        return firstOccurrenceOnOrAfter(startDate, dayOfWeek)
-                .minusDays(generationLeadDays)
-                .atStartOfDay();
+    private void validateEndDateOnlyUpdate(RecurringBooking recurringBooking, UpdateRecurringBookingRequest request) {
+        if (!recurringBooking.getSubFieldId().equals(request.getSubFieldId())
+                || !recurringBooking.getStartTime().equals(request.getStartTime())
+                || !recurringBooking.getEndTime().equals(request.getEndTime())
+                || !recurringBooking.getStartDate().equals(request.getStartDate())
+                || !recurringBooking.getIntervalDays().equals(request.getIntervalDays())) {
+            throw new BadRequestException(IMMUTABLE_UPDATE_MESSAGE);
+        }
     }
 
-    private LocalDate firstOccurrenceOnOrAfter(LocalDate startDate, DayOfWeek dayOfWeek) {
-        return startDate.getDayOfWeek() == dayOfWeek
-                ? startDate
-                : startDate.with(TemporalAdjusters.next(dayOfWeek));
+    private void validateEndDate(LocalDate startDate, LocalDate endDate) {
+        if (endDate == null) {
+            throw new BadRequestException("End date is required");
+        }
+        if (endDate.isBefore(LocalDate.now())) {
+            throw new BadRequestException("End date must be today or in the future");
+        }
+        if (!endDate.isAfter(startDate)) {
+            throw new BadRequestException("End date must be after start date");
+        }
+    }
+
+    private void validateNewOccurrencesForEndDate(UUID userId, RecurringBooking recurringBooking, LocalDate endDate) {
+        if (!endDate.isAfter(recurringBooking.getEndDate())) {
+            return;
+        }
+        LocalDate firstNewDate = recurringBooking.getEndDate().plusDays(recurringBooking.getIntervalDays());
+        if (firstNewDate.isAfter(endDate)) {
+            return;
+        }
+        List<CreateBookingRequest> newOccurrences = generateOccurrences(
+                recurringBooking.getSubFieldId(),
+                recurringBooking.getStartTime(),
+                recurringBooking.getEndTime(),
+                firstNewDate,
+                endDate,
+                recurringBooking.getIntervalDays());
+        validateNoRecurringConflicts(userId, recurringBooking.getSubFieldId(), recurringBooking.getStartTime(),
+                recurringBooking.getEndTime(), firstNewDate, endDate, recurringBooking.getIntervalDays(), recurringBooking.getId());
+        validateOccurrences(userId, newOccurrences, recurringBooking.getId());
+    }
+
+    private void cancelLatestConfirmedBooking(UUID userId, RecurringBooking recurringBooking) {
+        bookingRepository.findFirstBySourceRecurringBookingIdOrderByStartDateTimeDesc(recurringBooking.getId())
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .ifPresent(booking -> bookingService.cancelBooking(userId, CancelBookingRequest.builder()
+                        .bookingId(booking.getId())
+                        .reason("Recurring booking cancelled")
+                        .build()));
+    }
+
+    private void validateCanResume(RecurringBooking recurringBooking) {
+        if (recurringBooking.getStatus() == RecurringBookingStatus.COMPLETED) {
+            throw new BadRequestException("Completed recurring bookings cannot be resumed");
+        }
+    }
+
+    private void completeRecurringBooking(RecurringBooking recurringBooking) {
+        recurringBooking.setStatus(RecurringBookingStatus.COMPLETED);
+        recurringBooking.setNextProcessAt(null);
+    }
+
+    private Optional<RecurringBooking> findExactActiveRule(UUID userId, CreateRecurringBookingRequest request) {
+        return recurringBookingRepository
+                .findFirstByUserIdAndSubFieldIdAndStartTimeAndEndTimeAndStartDateAndEndDateAndIntervalDaysAndStatus(
+                        userId,
+                        request.getSubFieldId(),
+                        request.getStartTime(),
+                        request.getEndTime(),
+                        request.getStartDate(),
+                        request.getEndDate(),
+                        request.getIntervalDays(),
+                        RecurringBookingStatus.ACTIVE);
+    }
+
+    private RecurringBookingResponse toResponseWithFirstBooking(RecurringBooking recurringBooking, BookingResponse firstBooking) {
+        RecurringBookingResponse response = toResponseWithLatestBooking(recurringBooking);
+        response.setFirstBooking(firstBooking);
+        return response;
+    }
+
+    private RecurringBookingResponse toResponseWithLatestBooking(RecurringBooking recurringBooking) {
+        RecurringBookingResponse response = recurringBookingMapper.toResponse(recurringBooking);
+        response.setNextMatchAt(nextMatchAt(recurringBooking));
+        Optional.ofNullable(bookingRepository.findFirstBySourceRecurringBookingIdOrderByStartDateTimeDesc(recurringBooking.getId()))
+                .flatMap(optional -> optional)
+                .map(bookingMapper::toResponse)
+                .ifPresent(response::setLatestBooking);
+        return response;
+    }
+
+    private void validateOccurrences(UUID userId, List<CreateBookingRequest> occurrences, UUID recurringBookingId) {
+        occurrences.forEach(occurrence -> bookingService.validateRecurringOccurrence(userId, occurrence, recurringBookingId));
+    }
+
+    private List<CreateBookingRequest> generateOccurrences(UUID subFieldId, LocalTime startTime, LocalTime endTime,
+                                                           LocalDate startDate, LocalDate endDate, int intervalDays) {
+        int durationMinutes = (int) Duration.between(startTime, endTime).toMinutes();
+        return generateOccurrenceDates(startDate, endDate, intervalDays)
+                .stream()
+                .map(occurrenceDate -> CreateBookingRequest.builder()
+                        .subFieldId(subFieldId)
+                        .bookingDate(occurrenceDate)
+                        .startTime(startTime)
+                        .durationMinutes(durationMinutes)
+                        .paymentMethod(PaymentMethod.ACCOUNT_BALANCE)
+                        .build())
+                .toList();
+    }
+
+    private List<LocalDate> generateOccurrenceDates(LocalDate startDate, LocalDate endDate, int intervalDays) {
+        return startDate.datesUntil(endDate.plusDays(1), java.time.Period.ofDays(intervalDays)).toList();
+    }
+
+    private LocalDateTime nextProcessAt(LocalDate occurrenceDate) {
+        return occurrenceDate.minusDays(generationLeadDays).atStartOfDay();
+    }
+
+    private LocalDateTime nextMatchAt(RecurringBooking recurringBooking) {
+        if (recurringBooking.getNextProcessAt() == null) {
+            return null;
+        }
+        LocalDate matchDate = recurringBooking.getNextProcessAt().toLocalDate().plusDays(generationLeadDays);
+        if (matchDate.isAfter(recurringBooking.getEndDate())) {
+            return null;
+        }
+        return LocalDateTime.of(matchDate, recurringBooking.getStartTime());
+    }
+
+    private LocalDate nextOccurrenceOnOrAfter(RecurringBooking recurringBooking, LocalDate date) {
+        LocalDate occurrence = recurringBooking.getStartDate();
+        while (occurrence.isBefore(date)) {
+            occurrence = occurrence.plusDays(recurringBooking.getIntervalDays());
+        }
+        return occurrence;
     }
 
     private void refreshHasRecurring(UUID subFieldId) {

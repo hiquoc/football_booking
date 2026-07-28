@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -23,13 +22,16 @@ public class RecurringBookingResponse {
     private String fieldName;
     private UUID subFieldId;
     private String subFieldName;
-    private DayOfWeek dayOfWeek;
     private LocalTime startTime;
     private LocalTime endTime;
     private LocalDate startDate;
     private LocalDate endDate;
+    private Integer intervalDays;
     private RecurringBookingStatus status;
     private LocalDateTime nextProcessAt;
+    private LocalDateTime nextMatchAt;
+    private BookingResponse firstBooking;
+    private BookingResponse latestBooking;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

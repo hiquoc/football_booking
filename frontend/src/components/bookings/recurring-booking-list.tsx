@@ -12,7 +12,7 @@ import {
 } from "@/lib/hooks/use-recurring-bookings";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 
-const statuses: Array<RecurringBookingStatus | "ALL"> = ["ALL", "ACTIVE", "PAUSED", "CANCELLED"];
+const statuses: Array<RecurringBookingStatus | "ALL"> = ["ALL", "ACTIVE", "PAUSED", "CANCELLED", "COMPLETED"];
 
 type ConfirmAction =
   | { id: string; action: "pause" | "cancel" }
@@ -31,11 +31,10 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
   const readonly = scope === "owner";
 
   if (bookings.isPending) return <ListSkeleton count={4} />;
-  if (bookings.isError) return <DataError title="Unable to load recurring bookings" />;
+  if (bookings.isError) return <DataError title="Không thể tải lịch đặt định kỳ" />;
   if (!bookings.data.content.length) {
-    return <DataEmpty title="No recurring bookings" description="Recurring reservations will appear here." />;
+    return <DataEmpty title="Chưa có lịch đặt định kỳ" description="Các lịch đặt sân định kỳ sẽ hiển thị tại đây." />;
   }
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -47,7 +46,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
             onClick={() => setStatus(item)}
             className={`rounded-full border px-3 py-1.5 text-xs font-bold ${status === item ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600"}`}
           >
-            {item}
+            {statusFilterLabel(item)}
           </button>
         ))}
       </div>
@@ -56,22 +55,25 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
         {bookings.data.content.map((item) => {
           const latestBooking = item.latestBooking;
           const showAbortLatest = item.status === "PAUSED" && latestBooking?.status === "CONFIRMED";
+          const canManage = !readonly && item.status !== "CANCELLED" && item.status !== "COMPLETED";
           return (
             <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <CalendarClock className="size-5 text-sky-600" />
-                    <h2 className="font-black text-slate-950">{item.fieldName ?? "Field"} - {item.subFieldName ?? "Sub-field"}</h2>
+                    <h2 className="font-black text-slate-950">{item.fieldName ?? "Sân"} - {item.subFieldName ?? "Sân con"}</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-600">
-                    Every {item.intervalDays} day(s) {item.startTime.slice(0, 5)}-{item.endTime.slice(0, 5)}
-                    {" "}from {item.startDate} to {item.endDate}
+                    Lặp lại mỗi {item.intervalDays} ngày, {item.startTime.slice(0, 5)}-{item.endTime.slice(0, 5)}
+                    {" "}từ {item.startDate} đến {item.endDate}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">Next execution: {new Date(item.nextProcessAt).toLocaleString()}</p>
+                  {item.nextMatchAt ? (
+                    <p className="mt-1 text-xs text-slate-500">{formatMatchDateTime(item.nextMatchAt)}</p>
+                  ) : null}
                 </div>
                 <span className={`w-fit rounded-full px-3 py-1 text-xs font-black ${badgeClass(item.status)}`}>
-                  {item.status}
+                  {statusLabel(item.status)}
                 </span>
               </div>
 
@@ -79,7 +81,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                 <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="font-bold">Latest confirmed booking</p>
+                      <p className="font-bold">Lượt đặt gần nhất đã xác nhận</p>
                       <p className="mt-1 text-xs">
                         {latestBooking.bookingDate} {latestBooking.startTime.slice(0, 5)}-{latestBooking.endTime.slice(0, 5)}
                         {" "}· {formatCurrency(Number(latestBooking.bookingPrice ?? latestBooking.platformBookingFee ?? 0))}
@@ -91,11 +93,11 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                         disabled={abortBooking.isPending}
                         onClick={() => abortBooking.mutate({
                           id: confirmAction.bookingId,
-                          reason: "Recurring booking paused by client",
+                          reason: "Lịch đặt định kỳ đã bị tạm dừng bởi khách hàng",
                         }, { onSuccess: () => setConfirmAction(null) })}
                         className="action-button bg-rose-500 px-4 text-white"
                       >
-                        Confirm abort
+                        Xác nhận hủy lượt đặt
                       </button>
                     ) : (
                       <button
@@ -103,17 +105,17 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                         onClick={() => setConfirmAction({ id: item.id, action: "abort", bookingId: latestBooking.id })}
                         className="action-button bg-white px-4 text-rose-700"
                       >
-                        Abort latest booking
+                        Hủy lượt đặt gần nhất
                       </button>
                     )}
                   </div>
                 </div>
               ) : null}
 
-              {!readonly ? (
+              {canManage ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setEditingId(editingId === item.id ? null : item.id)} className="action-button bg-slate-100 px-4 text-slate-700">
-                    <Pencil className="size-4" /> Edit end date
+                    <Pencil className="size-4" /> Sửa ngày kết thúc
                   </button>
                   {item.status === "ACTIVE" ? (
                     <ConfirmableAction
@@ -121,8 +123,8 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                       actionName="pause"
                       confirmAction={confirmAction}
                       disabled={action.isPending}
-                      pendingLabel="Confirm pause"
-                      label="Pause"
+                      pendingLabel="Xác nhận tạm dừng"
+                      label="Tạm dừng"
                       className="action-button bg-slate-100 px-4 text-slate-700"
                       onAsk={() => setConfirmAction({ id: item.id, action: "pause" })}
                       onConfirm={() => action.mutate({ id: item.id, action: "pause" }, { onSuccess: () => setConfirmAction(null) })}
@@ -131,7 +133,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                   ) : null}
                   {item.status === "PAUSED" ? (
                     <button type="button" onClick={() => action.mutate({ id: item.id, action: "resume" })} className="action-button bg-emerald-500 px-4 text-white">
-                      <Play className="size-4" /> Resume
+                      <Play className="size-4" /> Tiếp tục
                     </button>
                   ) : null}
                   {item.status !== "CANCELLED" ? (
@@ -140,8 +142,8 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                       actionName="cancel"
                       confirmAction={confirmAction}
                       disabled={action.isPending}
-                      pendingLabel="Confirm cancel"
-                      label="Cancel"
+                      pendingLabel="Xác nhận hủy"
+                      label="Hủy"
                       className="action-button bg-rose-50 px-4 text-rose-700"
                       onAsk={() => setConfirmAction({ id: item.id, action: "cancel" })}
                       onConfirm={() => action.mutate({ id: item.id, action: "cancel" }, { onSuccess: () => setConfirmAction(null) })}
@@ -172,7 +174,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                 >
                   <input name="endDate" type="date" min={item.startDate} defaultValue={item.endDate} className="input-field" />
                   <button type="submit" className="action-button bg-sky-500 px-4 text-white">
-                    <Save className="size-4" /> Save end date
+                    <Save className="size-4" /> Lưu ngày kết thúc
                   </button>
                 </form>
               ) : null}
@@ -228,5 +230,24 @@ function ConfirmableAction({
 function badgeClass(status: RecurringBookingStatus) {
   if (status === "ACTIVE") return "bg-emerald-50 text-emerald-700";
   if (status === "PAUSED") return "bg-amber-50 text-amber-700";
+  if (status === "COMPLETED") return "bg-sky-50 text-sky-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function statusFilterLabel(status: RecurringBookingStatus | "ALL") {
+  if (status === "ALL") return "Tất cả";
+  return statusLabel(status);
+}
+
+function statusLabel(status: RecurringBookingStatus) {
+  if (status === "ACTIVE") return "Đang hoạt động";
+  if (status === "PAUSED") return "Tạm dừng";
+  if (status === "COMPLETED") return "Hoàn thành";
+  return "Đã hủy";
+}
+
+function formatMatchDateTime(value: string) {
+  const [datePart, timePart = ""] = value.split(/[T ]/);
+  const [year, month, day] = datePart.split("-");
+  return `${timePart.slice(0, 5)} ${Number(day)}/${Number(month)}/${year}`;
 }

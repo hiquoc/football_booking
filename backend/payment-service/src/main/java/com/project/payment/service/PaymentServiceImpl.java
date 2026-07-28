@@ -27,24 +27,18 @@ public class PaymentServiceImpl implements PaymentService {
     //Boc try catch voi tao payment moi de tra ve ket qua cu khi request chay nhieu lan
     @Override @Transactional
     public CheckoutResponse createCheckout(UUID userId, CreateCheckoutRequest request) {
-        BookingPaymentProjection booking = bookingRepository.findById(request.bookingId())
-                .orElseThrow(() -> new NotFoundException("Booking is not available for payment"));
-        if (!booking.getUserId().equals(userId)) throw new ForbiddenException("You are not authorised to pay for this booking");
-        java.math.BigDecimal payableAmount = java.math.BigDecimal.valueOf(booking.getBookingPrice() == null ? 0L : booking.getBookingPrice());
-        if (payableAmount.compareTo(request.amount()) != 0) throw new BadRequestException("Payment amount does not match booking total");
+        BookingPaymentProjection booking = request.bookingId() == null ? null : bookingRepository.findById(request.bookingId())
+                .orElseThrow(() -> new NotFoundException("Booking is not available for wallet top-up"));
+        if (booking != null && !booking.getUserId().equals(userId)) throw new ForbiddenException("You are not authorised to top up for this booking");
+        java.math.BigDecimal payableAmount = request.amount();
         String currency = request.currency().toUpperCase(Locale.ROOT);
         PaymentProvider provider = request.provider() == null ? PaymentProvider.STRIPE : request.provider();
-        Payment payment = paymentRepository.findByBookingId(request.bookingId()).orElseGet(() -> paymentRepository.save(
-                Payment.builder().bookingId(request.bookingId()).userId(userId).provider(provider)
-                        .amount(payableAmount).currency(currency).status(PaymentStatus.PENDING).build()));
-        if (payment.getStatus() == PaymentStatus.SUCCESS) throw new ConflictException("Booking has already been paid");
-        if (payment.getProvider() != provider || !payment.getCurrency().equals(currency))
-            throw new ConflictException("An existing payment uses a different provider or currency");
-        if (payment.getProviderSessionId() != null && payment.getStatus() == PaymentStatus.PENDING)
-            return new CheckoutResponse(payment.getId(), strategyFactory.get(provider).checkoutUrl(payment.getProviderSessionId()));
+        Payment payment = paymentRepository.save(Payment.builder().bookingId(request.bookingId()).userId(userId).provider(provider)
+                .purpose(PaymentPurpose.WALLET_TOP_UP).amount(payableAmount).currency(currency).status(PaymentStatus.PENDING).build());
         payment.setStatus(PaymentStatus.PENDING); payment.setFailureReason(null); payment.setCheckoutAttempt(payment.getCheckoutAttempt() + 1);
         ProviderCheckoutResult result = strategyFactory.get(provider).createCheckout(new ProviderCheckoutRequest(
-                payment.getId(), payment.getBookingId(), payment.getCheckoutAttempt(), booking.getBookingCode(), payment.getAmount(), currency, booking.getUserEmail()));
+                payment.getId(), payment.getBookingId(), payment.getCheckoutAttempt(), booking == null ? null : booking.getBookingCode(),
+                payment.getAmount(), currency, booking == null ? null : booking.getUserEmail()));
         payment.setProviderSessionId(result.sessionId()); payment.setExpiresAt(result.expiresAt()); paymentRepository.save(payment);
         paymentSessionRepository.save(PaymentSession.builder().providerSessionId(result.sessionId()).paymentId(payment.getId()).attempt(payment.getCheckoutAttempt()).build());
         log.info("Created {} checkout: paymentId={}, bookingId={}, sessionId={}", provider, payment.getId(), payment.getBookingId(), result.sessionId());
@@ -53,7 +47,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override @Transactional(readOnly=true)
     public PaymentResponse getByBookingId(UUID userId, UUID bookingId) {
-        Payment payment = paymentRepository.findByBookingId(bookingId)
+        Payment payment = paymentRepository.findTopByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseThrow(() -> new NotFoundException("Payment not found for booking " + bookingId));
         if (!payment.getUserId().equals(userId)) throw new ForbiddenException("You are not authorised to view this payment");
         return toResponse(payment);
@@ -76,12 +70,12 @@ public class PaymentServiceImpl implements PaymentService {
         if (payment.getStatus() == PaymentStatus.SUCCESS) return;
         payment.setStatus(result.status()); payment.setProviderPaymentId(result.providerPaymentId());
         payment.setFailureReason(result.failureReason()); paymentRepository.save(payment);
-        BookingPaymentProjection booking = bookingRepository.findById(payment.getBookingId()).orElseThrow();
+        BookingPaymentProjection booking = payment.getBookingId() == null ? null : bookingRepository.findById(payment.getBookingId()).orElse(null);
         if (result.status() == PaymentStatus.SUCCESS || result.status() == PaymentStatus.FAILED || result.status() == PaymentStatus.CANCELLED)
             eventPublisher.publish(payment, booking);
         log.info("Processed webhook: eventId={}, paymentId={}, status={}", result.eventId(), payment.getId(), payment.getStatus());
     }
 
-    private PaymentResponse toResponse(Payment p) { return new PaymentResponse(p.getId(), p.getBookingId(), p.getProvider(),
+    private PaymentResponse toResponse(Payment p) { return new PaymentResponse(p.getId(), p.getBookingId(), p.getProvider(), p.getPurpose(),
             p.getAmount(), p.getCurrency(), p.getStatus(), p.getFailureReason(), p.getExpiresAt(), p.getCreatedAt(), p.getUpdatedAt()); }
 }

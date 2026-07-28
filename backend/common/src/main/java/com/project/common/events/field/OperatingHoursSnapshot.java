@@ -7,6 +7,7 @@ public record OperatingHoursSnapshot(
         DayOfWeek dayOfWeek,
         LocalTime openTime,
         LocalTime closeTime,
-        Boolean closed
+        Boolean closed,
+        Boolean open24Hours
 ) {
 }

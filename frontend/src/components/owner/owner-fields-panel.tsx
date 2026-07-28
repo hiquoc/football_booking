@@ -3,11 +3,11 @@
 import { useSearchParams } from "next/navigation";
 import { OwnerFieldList } from "@/components/owner/owner-field-list";
 
-export function OwnerFieldsPanel() {
+export function OwnerFieldsPanel({ role }: { role: "OWNER" | "EMPLOYEE" }) {
   const searchParams = useSearchParams();
   const page = parsePage(searchParams.get("page"));
 
-  return <OwnerFieldList page={page} />;
+  return <OwnerFieldList page={page} role={role} />;
 }
 
 function parsePage(value: string | null) {

@@ -3,6 +3,7 @@ package com.project.user.kafka;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.UserBalanceDeductionRequestedEvent;
 import com.project.common.events.notification.UserBalanceRefundRequestedEvent;
+import com.project.common.events.notification.WalletTopUpSucceededEvent;
 import com.project.common.inbox.service.InboxService;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -25,6 +26,11 @@ public class UserBalanceEventConsumer {
 
     @KafkaListener(topics = NotificationEventTopics.USER_BALANCE_DEDUCTION_REQUESTED, groupId = "${spring.kafka.consumer.group-id}")
     public void onDeductionRequested(ConsumerRecord<String, UserBalanceDeductionRequestedEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = NotificationEventTopics.USER_BALANCE_TOP_UP_SUCCEEDED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onTopUpSucceeded(ConsumerRecord<String, WalletTopUpSucceededEvent> record) {
         inboxService.receive(record, consumerGroup);
     }
 }

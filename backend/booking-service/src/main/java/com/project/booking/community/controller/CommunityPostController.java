@@ -36,7 +36,7 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Create a community post")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PostMapping
     public ResponseEntity<ApiResponse<CommunityPostResponse>> create(
             @CurrentUser UserPrincipal user,
@@ -52,7 +52,7 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Report an inappropriate community post")
-    @PreAuthorize("hasAnyRole('CLIENT','OWNER','ADMIN')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER','ADMIN')")
     @PostMapping("/{postId}/reports")
     public ResponseEntity<ApiResponse<CommunityReportResponse>> report(
             @CurrentUser UserPrincipal user,
@@ -73,7 +73,7 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Edit own open post")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PutMapping("/{postId}")
     public ApiResponse<CommunityPostResponse> update(
             @CurrentUser UserPrincipal user,
@@ -83,21 +83,21 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Close own open post")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/close")
     public ApiResponse<CommunityPostResponse> close(@CurrentUser UserPrincipal user, @PathVariable UUID postId) {
         return ApiResponse.success(service.close(user.id(), postId));
     }
 
     @Operation(summary = "Mark player recruitment as full")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/full")
     public ApiResponse<CommunityPostResponse> markFull(@CurrentUser UserPrincipal user, @PathVariable UUID postId) {
         return ApiResponse.success(service.markFull(user.id(), postId));
     }
 
     @Operation(summary = "Apply to a community post")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PostMapping("/{postId}/applications")
     public ResponseEntity<ApiResponse<CommunityApplicationResponse>> apply(
             @CurrentUser UserPrincipal user,
@@ -108,14 +108,14 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Withdraw own pending application")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/applications/withdraw")
     public ApiResponse<CommunityApplicationResponse> withdraw(@CurrentUser UserPrincipal user, @PathVariable UUID postId) {
         return ApiResponse.success(service.withdraw(user.id(), postId));
     }
 
     @Operation(summary = "Accept an application")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/applications/{applicationId}/accept")
     public ApiResponse<CommunityApplicationResponse> accept(
             @CurrentUser UserPrincipal user,
@@ -125,7 +125,7 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Reject an application")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/applications/{applicationId}/reject")
     public ApiResponse<CommunityApplicationResponse> reject(
             @CurrentUser UserPrincipal user,
@@ -135,7 +135,7 @@ public class CommunityPostController {
     }
 
     @Operation(summary = "Submit opponent match evaluation")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PostMapping("/{postId}/evaluations")
     public ResponseEntity<ApiResponse<MatchEvaluationResponse>> evaluate(
             @CurrentUser UserPrincipal user,

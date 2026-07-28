@@ -8,16 +8,19 @@ import com.project.common.events.notification.ModerationNotificationEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PaymentFailedEvent;
 import com.project.common.events.notification.PaymentSuccessEvent;
+import com.project.common.events.notification.UserBalanceUpdatedEvent;
 import com.project.common.events.notification.UserRequestOtpEvent;
 import com.project.common.inbox.entity.InboxEvent;
 import com.project.common.inbox.handler.InboxEventHandler;
 import com.project.common.inbox.service.InboxService;
 import com.project.notification.dto.NotificationRequest;
+import com.project.notification.dto.UserBalanceUpdateMessage;
 import com.project.notification.enums.NotificationChannel;
 import com.project.notification.enums.NotificationCode;
 import com.project.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,11 +41,13 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
             NotificationEventTopics.BOOKING_CANCELLED,
             NotificationEventTopics.PAYMENT_SUCCESS,
             NotificationEventTopics.PAYMENT_FAILED,
+            NotificationEventTopics.USER_BALANCE_UPDATED,
             NotificationEventTopics.COMMUNITY_NOTIFICATION,
             NotificationEventTopics.MODERATION_NOTIFICATION);
 
     private final InboxService inboxService;
     private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Override
     public boolean supports(String topic) {
@@ -65,6 +70,8 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                     handlePaymentSuccess(inboxService.payload(event, PaymentSuccessEvent.class));
             case NotificationEventTopics.PAYMENT_FAILED ->
                     handlePaymentFailed(inboxService.payload(event, PaymentFailedEvent.class));
+            case NotificationEventTopics.USER_BALANCE_UPDATED ->
+                    handleUserBalanceUpdated(inboxService.payload(event, UserBalanceUpdatedEvent.class));
             case NotificationEventTopics.COMMUNITY_NOTIFICATION ->
                     handleCommunityNotification(inboxService.payload(event, CommunityNotificationEvent.class));
             case NotificationEventTopics.MODERATION_NOTIFICATION ->
@@ -145,6 +152,13 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                         "reason", event.reason()))
                 .channels(List.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL))
                 .build());
+    }
+
+    private void handleUserBalanceUpdated(UserBalanceUpdatedEvent event) {
+        messagingTemplate.convertAndSendToUser(
+                event.userId().toString(),
+                "/queue/balance",
+                new UserBalanceUpdateMessage(event.userId(), event.balance(), event.reason(), event.occurredAt()));
     }
 
     private void handleCommunityNotification(CommunityNotificationEvent event) {

@@ -8,6 +8,12 @@ import type {
 } from "@/lib/api/types";
 import { jsonBody, requestJson } from "./http";
 
+function todayInVietnam() {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
 export function fetchMyBookings(page: number, size = 10) {
   return requestJson<PageResponse<Booking>>(
     `/api/bookings?page=${page}&size=${size}`,
@@ -20,6 +26,8 @@ export function fetchOwnerBookings(
   filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
 ) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
+  query.set("bookingDate", filters.bookingDate ?? todayInVietnam());
+  query.set("status", filters.status ?? "COMPLETED");
   Object.entries(filters).forEach(([key, value]) => {
     if (value) query.set(key, value);
   });

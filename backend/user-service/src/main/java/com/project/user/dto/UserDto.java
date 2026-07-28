@@ -37,6 +37,9 @@ public class UserDto {
     private String status;
     private Long balance;
     private Integer completedBookingCount;
+    private Boolean isBookingBanned;
+    private LocalDateTime banExpiresAt;
+    private Boolean isPermanentBan;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -47,7 +47,7 @@ class FavoriteFieldServiceImplTest {
     @Test
     void addFavoriteIsIdempotentWhenFavoriteAlreadyExists() {
         Field field = field();
-        FieldDto dto = FieldDto.builder().id(FIELD_ID).isFavorite(true).build();
+        FieldDto dto = FieldDto.builder().id(FIELD_ID).isSaved(true).build();
         when(fieldRepository.findById(FIELD_ID)).thenReturn(Optional.of(field));
         when(favoriteRepository.existsByUserIdAndFieldId(USER_ID, FIELD_ID)).thenReturn(true);
         when(fieldMapper.toDto(field, true)).thenReturn(dto);
@@ -61,7 +61,7 @@ class FavoriteFieldServiceImplTest {
     @Test
     void addFavoriteTreatsConcurrentDuplicateAsSuccess() {
         Field field = field();
-        FieldDto dto = FieldDto.builder().id(FIELD_ID).isFavorite(true).build();
+        FieldDto dto = FieldDto.builder().id(FIELD_ID).isSaved(true).build();
         when(fieldRepository.findById(FIELD_ID)).thenReturn(Optional.of(field));
         when(favoriteRepository.existsByUserIdAndFieldId(USER_ID, FIELD_ID)).thenReturn(false);
         when(favoriteRepository.save(any(FieldFavorite.class))).thenThrow(new DataIntegrityViolationException("duplicate"));
