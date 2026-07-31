@@ -8,10 +8,15 @@ export const metadata: Metadata = { title: "Lich dat cua toi" };
 export default async function BookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; bookingDate?: string; status?: string }>;
 }) {
-  const requested = Number((await searchParams).page) || 1;
+  const query = await searchParams;
+  const requested = Number(query.page) || 1;
   const page = Math.max(0, requested - 1);
+  const filters = {
+    bookingDate: query.bookingDate,
+    status: query.status,
+  };
   return (
     <div className="mx-auto min-h-[70vh] w-full max-w-[90rem] px-5 py-12 sm:px-8">
       <PageHeading
@@ -28,7 +33,7 @@ export default async function BookingsPage({
         }
       />
       <div className="mt-8">
-        <BookingListContent page={page} />
+        <BookingListContent page={page} filters={filters} />
       </div>
     </div>
   );

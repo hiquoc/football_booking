@@ -54,7 +54,7 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
       <div className={`overflow-hidden border border-slate-200 bg-white ${compact ? "rounded-2xl" : "rounded-[1.5rem]"}`}>
         {notifications.data.content.map((item) => {
           const content = formatNotification(item);
-          const bookingId = typeof item.payload.bookingId === "string" ? item.payload.bookingId : null;
+          const detailHref = notificationDetailHref(item);
           return (
             <article
               key={item.id}
@@ -90,10 +90,10 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
                   </span>
                 )}
 
-                {bookingId ? (
+                {detailHref ? (
                   <Link
                     onClick={onNavigate}
-                    href={`/bookings/${encodeURIComponent(bookingId)}`}
+                    href={detailHref}
                     className="action-button !min-h-0 h-8 bg-slate-950 p-1 text-xs text-white hover:bg-slate-800"
                   >
                     Chi tiết <ArrowUpRight className="size-3.5" />
@@ -107,4 +107,13 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
       {mutationError ? <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">Không thể cập nhật trạng thái thông báo</p> : null}
     </div>
   );
+}
+
+function notificationDetailHref(item: { code: string; payload: Record<string, unknown> }) {
+  const postId = typeof item.payload.postId === "string" ? item.payload.postId : null;
+  if (item.code.startsWith("COMMUNITY_") && postId) {
+    return `/community/${encodeURIComponent(postId)}`;
+  }
+  const bookingId = typeof item.payload.bookingId === "string" ? item.payload.bookingId : null;
+  return bookingId ? `/bookings/${encodeURIComponent(bookingId)}` : null;
 }

@@ -5,7 +5,8 @@ public final class GlobalConstants {
         // Prevent instantiation
     }
 
-    public static final String CORRELATION_HEADER_NAME = "X-Correlation-Id";
+    public static final String REQUEST_ID_HEADER_NAME = "X-Request-ID";
+    public static final String CORRELATION_HEADER_NAME = REQUEST_ID_HEADER_NAME;
     
     // Gateway-forwarded headers
     public static final String HEADER_INTERNAL_SECRET = "X-Internal-Gateway-Secret";

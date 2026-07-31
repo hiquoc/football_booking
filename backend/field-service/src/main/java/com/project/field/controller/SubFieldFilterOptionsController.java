@@ -1,6 +1,8 @@
 package com.project.field.controller;
 
 import com.project.common.dto.ApiResponse;
+import com.project.common.security.CurrentUser;
+import com.project.common.security.UserPrincipal;
 import com.project.field.dto.SubFieldFilterOptionDto;
 import com.project.field.service.SubFieldService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,7 +23,8 @@ public class SubFieldFilterOptionsController {
     @Operation(summary = "Get sub-field filter options", description = "Returns lightweight active sub-field options for booking filters.")
     @GetMapping("/filter-options")
     public ApiResponse<List<SubFieldFilterOptionDto>> getFilterOptions(
+            @CurrentUser UserPrincipal currentUser,
             @RequestParam(required = false) String search) {
-        return ApiResponse.success(subFieldService.getFilterOptions(search));
+        return ApiResponse.success(subFieldService.getFilterOptions(search, currentUser));
     }
 }

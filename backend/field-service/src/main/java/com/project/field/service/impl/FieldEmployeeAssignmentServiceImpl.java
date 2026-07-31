@@ -13,6 +13,7 @@ import com.project.field.dto.UserDto;
 import com.project.field.entity.Field;
 import com.project.field.entity.FieldEmployeeAssignment;
 import com.project.field.exceptions.FieldNotFoundException;
+import com.project.field.kafka.FieldEventPublisher;
 import com.project.field.mapper.FieldMapper;
 import com.project.field.repository.FieldEmployeeAssignmentRepository;
 import com.project.field.repository.FieldRepository;
@@ -34,13 +35,14 @@ public class FieldEmployeeAssignmentServiceImpl implements FieldEmployeeAssignme
     private final FieldEmployeeAssignmentRepository assignmentRepository;
     private final UserServiceClient userServiceClient;
     private final FieldMapper fieldMapper;
+    private final FieldEventPublisher fieldEventPublisher;
 
     @Override
     @Transactional
     @CacheEvict(cacheNames = {"field-detail", "field-search"}, allEntries = true)
     public FieldEmployeeDto assign(UUID ownerId, UUID fieldId, UUID employeeId) {
         Field field = requireOwnedField(ownerId, fieldId);
-        UserDto employee = requireEmployee(employeeId);
+        UserDto employee = requireAssignableUser(employeeId);
         if (assignmentRepository.existsByFieldIdAndEmployeeId(fieldId, employeeId)) {
             throw new BadRequestException("Employee is already assigned to this field");
         }
@@ -48,6 +50,10 @@ public class FieldEmployeeAssignmentServiceImpl implements FieldEmployeeAssignme
                 .field(field)
                 .employeeId(employeeId)
                 .build());
+        if (employee.getUserType() != UserType.EMPLOYEE) {
+            employee = changeUserRole(employeeId, UserType.EMPLOYEE);
+        }
+        fieldEventPublisher.publishFieldEmployeeAssigned(saved, employee.getEmail());
         return toDto(saved, employee);
     }
 
@@ -59,6 +65,10 @@ public class FieldEmployeeAssignmentServiceImpl implements FieldEmployeeAssignme
         FieldEmployeeAssignment assignment = assignmentRepository.findByFieldIdAndEmployeeId(fieldId, employeeId)
                 .orElseThrow(() -> new NotFoundException("Employee assignment not found"));
         assignmentRepository.delete(assignment);
+        assignmentRepository.flush();
+        if (!assignmentRepository.existsByEmployeeId(employeeId) && getUser(employeeId).getUserType() == UserType.EMPLOYEE) {
+            changeUserRole(employeeId, UserType.CLIENT);
+        }
     }
 
     @Override
@@ -105,18 +115,26 @@ public class FieldEmployeeAssignmentServiceImpl implements FieldEmployeeAssignme
         return field;
     }
 
-    private UserDto requireEmployee(UUID employeeId) {
-        UserDto employee = getUser(employeeId);
-        if (employee.getUserType() != UserType.EMPLOYEE) {
-            throw new BadRequestException("Only users with the EMPLOYEE role can be assigned");
+    private UserDto requireAssignableUser(UUID employeeId) {
+        UserDto user = getUser(employeeId);
+        if (user.getUserType() == UserType.ADMIN || user.getUserType() == UserType.OWNER) {
+            throw new BadRequestException("Only CLIENT or EMPLOYEE users can be assigned");
         }
-        return employee;
+        return user;
     }
 
     private UserDto getUser(UUID userId) {
         ApiResponse<UserDto> response = userServiceClient.getUserProfile(userId);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             throw new NotFoundException("User not found with id " + userId);
+        }
+        return response.getData();
+    }
+
+    private UserDto changeUserRole(UUID userId, UserType userType) {
+        ApiResponse<UserDto> response = userServiceClient.changeUserRoleInternal(userId, userType.name());
+        if (response == null || !response.isSuccess() || response.getData() == null) {
+            throw new BadRequestException("Unable to update user role for id " + userId);
         }
         return response.getData();
     }

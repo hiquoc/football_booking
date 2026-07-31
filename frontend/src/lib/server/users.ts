@@ -24,8 +24,31 @@ export function getPublicProfile(id: string) {
   );
 }
 
+export async function getPublicProfilesById(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  const profiles = await Promise.all(
+    uniqueIds.map(async (id) => {
+      try {
+        return [id, await getPublicProfile(id)] as const;
+      } catch {
+        return [id, null] as const;
+      }
+    }),
+  );
+  return new Map(profiles);
+}
+
 export function getUsers(page = 0, size = 10) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return authenticatedGatewayRequest<PageResponse<User>>(
+    `/api/v1/users?${query}`,
+  );
+}
+
+export function searchUsers(page = 0, size = 10, phoneNumber = "") {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  const trimmedPhone = phoneNumber.trim();
+  if (trimmedPhone) query.set("phoneNumber", trimmedPhone);
   return authenticatedGatewayRequest<PageResponse<User>>(
     `/api/v1/users?${query}`,
   );
@@ -77,5 +100,12 @@ export function updateUserRole(id: string, userType: User["userType"]) {
   return authenticatedGatewayRequest<User>(
     `/api/v1/users/${encodeURIComponent(id)}/role`,
     { method: "PUT", body: JSON.stringify({ userType }) },
+  );
+}
+
+export function updateUserStatus(id: string, status: "ACTIVE" | "PLATFORM_BANNED") {
+  return authenticatedGatewayRequest<User>(
+    `/api/v1/users/${encodeURIComponent(id)}/status`,
+    { method: "PATCH", body: JSON.stringify({ status }) },
   );
 }

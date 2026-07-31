@@ -55,14 +55,16 @@ public class BookingLockManager {
             boolean complete = true;
             for (String key : keys) {
                 try {
+                    log.debug("redis_lock_acquire_attempt key={} attempt={} ttlMs={}", key, attempt, lockTtlMs);
                     if (lockService.tryAcquire(key, ownerId, Duration.ofMillis(lockTtlMs))) {
                         acquiredKeys.add(key);
+                        log.info("redis_lock_acquired key={} attempt={}", key, attempt);
                     } else {
                         complete = false;
                         break;
                     }
                 } catch (RuntimeException ex) {
-                    log.warn("Failed to acquire booking lock key={}", key, ex);
+                    log.error("redis_lock_failure key={} attempt={}", key, attempt, ex);
                     releaseAll(acquiredKeys, ownerId);
                     throw new BookingInProgressException();
                 }
@@ -76,6 +78,7 @@ public class BookingLockManager {
                 backoffMs *= 2;
             }
         }
+        log.warn("redis_lock_acquisition_timeout keys={} attempts={}", keys, maxAttempts);
         return false;
     }
 
@@ -84,8 +87,9 @@ public class BookingLockManager {
             String key = keys.get(i);
             try {
                 lockService.release(key, ownerId);
+                log.info("redis_lock_released key={}", key);
             } catch (RuntimeException ex) {
-                log.warn("Failed to release booking lock key={}", key, ex);
+                log.error("redis_lock_release_failure key={}", key, ex);
             }
         }
         keys.clear();

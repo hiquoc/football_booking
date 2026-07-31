@@ -4,12 +4,14 @@ import com.project.common.events.notification.BookingCancelledEvent;
 import com.project.common.events.notification.BookingConfirmedEvent;
 import com.project.common.events.notification.BookingCreatedEvent;
 import com.project.common.events.notification.CommunityNotificationEvent;
+import com.project.common.events.notification.FieldEmployeeAssignedEvent;
 import com.project.common.events.notification.ModerationNotificationEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PaymentFailedEvent;
 import com.project.common.events.notification.PaymentSuccessEvent;
 import com.project.common.events.notification.UserBalanceUpdatedEvent;
 import com.project.common.events.notification.UserRequestOtpEvent;
+import com.project.common.events.notification.WalletTopUpSucceededEvent;
 import com.project.common.inbox.entity.InboxEvent;
 import com.project.common.inbox.handler.InboxEventHandler;
 import com.project.common.inbox.service.InboxService;
@@ -41,8 +43,10 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
             NotificationEventTopics.BOOKING_CANCELLED,
             NotificationEventTopics.PAYMENT_SUCCESS,
             NotificationEventTopics.PAYMENT_FAILED,
+            NotificationEventTopics.USER_BALANCE_TOP_UP_SUCCEEDED,
             NotificationEventTopics.USER_BALANCE_UPDATED,
             NotificationEventTopics.COMMUNITY_NOTIFICATION,
+            NotificationEventTopics.FIELD_EMPLOYEE_ASSIGNED,
             NotificationEventTopics.MODERATION_NOTIFICATION);
 
     private final InboxService inboxService;
@@ -70,10 +74,14 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                     handlePaymentSuccess(inboxService.payload(event, PaymentSuccessEvent.class));
             case NotificationEventTopics.PAYMENT_FAILED ->
                     handlePaymentFailed(inboxService.payload(event, PaymentFailedEvent.class));
+            case NotificationEventTopics.USER_BALANCE_TOP_UP_SUCCEEDED ->
+                    handleWalletTopUpSucceeded(inboxService.payload(event, WalletTopUpSucceededEvent.class));
             case NotificationEventTopics.USER_BALANCE_UPDATED ->
                     handleUserBalanceUpdated(inboxService.payload(event, UserBalanceUpdatedEvent.class));
             case NotificationEventTopics.COMMUNITY_NOTIFICATION ->
                     handleCommunityNotification(inboxService.payload(event, CommunityNotificationEvent.class));
+            case NotificationEventTopics.FIELD_EMPLOYEE_ASSIGNED ->
+                    handleFieldEmployeeAssigned(inboxService.payload(event, FieldEmployeeAssignedEvent.class));
             case NotificationEventTopics.MODERATION_NOTIFICATION ->
                     handleModerationNotification(inboxService.payload(event, ModerationNotificationEvent.class));
             default -> throw new IllegalStateException("Unsupported topic " + event.getTopic());
@@ -154,6 +162,27 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .build());
     }
 
+    private void handleWalletTopUpSucceeded(WalletTopUpSucceededEvent event) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("paymentId", event.paymentId());
+        payload.put("amount", event.amount());
+        payload.put("currency", event.currency());
+        if (event.bookingId() != null) {
+            payload.put("bookingId", event.bookingId());
+        }
+        if (event.bookingCode() != null) {
+            payload.put("bookingCode", event.bookingCode());
+        }
+        notificationService.create(NotificationRequest.builder()
+                .userId(event.userId())
+                .recipientEmail(event.userEmail())
+                .code(NotificationCode.WALLET_TOP_UP_SUCCEEDED)
+                .title("Nap vi thanh cong")
+                .payload(payload)
+                .channels(List.of(NotificationChannel.IN_APP))
+                .build());
+    }
+
     private void handleUserBalanceUpdated(UserBalanceUpdatedEvent event) {
         messagingTemplate.convertAndSendToUser(
                 event.userId().toString(),
@@ -168,6 +197,21 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .code(NotificationCode.valueOf(event.code()))
                 .title(event.title())
                 .payload(event.payload())
+                .channels(List.of(NotificationChannel.IN_APP))
+                .build());
+    }
+
+    private void handleFieldEmployeeAssigned(FieldEmployeeAssignedEvent event) {
+        notificationService.create(NotificationRequest.builder()
+                .userId(event.employeeId())
+                .recipientEmail(event.employeeEmail())
+                .code(NotificationCode.FIELD_EMPLOYEE_ASSIGNED)
+                .title("Ban da duoc phan cong quan ly san")
+                .payload(Map.of(
+                        "assignmentId", event.assignmentId(),
+                        "fieldId", event.fieldId(),
+                        "fieldName", event.fieldName(),
+                        "ownerId", event.ownerId()))
                 .channels(List.of(NotificationChannel.IN_APP))
                 .build());
     }

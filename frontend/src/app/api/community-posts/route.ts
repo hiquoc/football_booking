@@ -26,9 +26,9 @@ export async function GET(request: Request) {
     const page = Math.max(0, Number(query.get("page")) || 0);
     const size = Math.min(30, Math.max(1, Number(query.get("size")) || 10));
     const filters = Object.fromEntries(
-      ["postType", "skillLevel", "date", "fieldType", "district", "status", "keyword", "sortBy"]
+      ["ownerId", "applicantId", "postType", "skillLevel", "date", "fieldType", "city", "district", "fieldName", "status", "keyword", "sortBy"]
         .map((key) => [key, query.get(key) || undefined])
-        .filter(([, value]) => value),
+        .filter(([key, value]) => value && !(key === "status" && value === "all")),
     );
     return NextResponse.json(await getCommunityPosts(page, size, filters));
   } catch (error) {

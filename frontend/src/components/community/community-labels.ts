@@ -25,6 +25,8 @@ export const skillLabels: Record<SkillLevel, string> = {
   PRO: "Chuyên nghiệp",
 };
 
+export const skillLevelOptions = Object.entries(skillLabels) as Array<[SkillLevel, string]>;
+
 export function skillLabel(value: string | null | undefined) {
   return value && value in skillLabels ? skillLabels[value as SkillLevel] : value ?? "Chưa cập nhật";
 }

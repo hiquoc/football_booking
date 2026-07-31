@@ -27,6 +27,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
+    private static final String ACTIVE_STATUS = "ACTIVE";
+    private static final String PLATFORM_BANNED_STATUS = "PLATFORM_BANNED";
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
@@ -40,13 +42,27 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<UserDto> getUsers(String phoneNumber, Pageable pageable) {
+        String value = phoneNumber == null ? "" : phoneNumber.trim();
+        if (value.isBlank()) {
+            return getUsers(pageable);
+        }
+        return PageResponse.from(userRepository.findByPhoneNumberContainingIgnoreCase(value, pageable)
+                .map(userMapper::toDtoWithBan));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public UserDto getEmployeeByPhone(String phoneNumber) {
+        return getAssignableUserByPhone(phoneNumber);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserDto getAssignableUserByPhone(String phoneNumber) {
         String value = phoneNumber == null ? "" : phoneNumber.trim();
         User user = userRepository.findByPhoneNumber(value)
-                .orElseThrow(() -> new NotFoundException("Employee not found with phone number: " + value));
-        if (user.getUserType() != UserType.EMPLOYEE) {
-            throw new NotFoundException("Employee not found with phone number: " + value);
-        }
+                .orElseThrow(() -> new NotFoundException("User not found with phone number: " + value));
         return userMapper.toDtoWithBan(user);
     }
 
@@ -115,10 +131,39 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
+    public UserDto changeUserRole(UUID actorId, UUID targetUserId, UserType newRole) {
+        if (targetUserId.equals(actorId)) {
+            throw new ForbiddenException("Admins cannot change their own role");
+        }
+        return changeUserRole(targetUserId, newRole);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
     public UserDto changeUserRole(UUID targetUserId, UserType newRole) {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));
         user.setUserType(newRole);
+        User saved = userRepository.save(user);
+        userProfileEventPublisher.publishUpdated(saved);
+        return userMapper.toDtoWithBan(saved);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
+    public UserDto changeUserStatus(UUID actorId, UUID targetUserId, String status) {
+        if (targetUserId.equals(actorId)) {
+            throw new ForbiddenException("Admins cannot change their own ban status");
+        }
+        String normalized = status == null ? "" : status.trim().toUpperCase();
+        if (!ACTIVE_STATUS.equals(normalized) && !PLATFORM_BANNED_STATUS.equals(normalized)) {
+            throw new ForbiddenException("Unsupported user status");
+        }
+        User user = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));
+        user.setStatus(normalized);
         User saved = userRepository.save(user);
         userProfileEventPublisher.publishUpdated(saved);
         return userMapper.toDtoWithBan(saved);

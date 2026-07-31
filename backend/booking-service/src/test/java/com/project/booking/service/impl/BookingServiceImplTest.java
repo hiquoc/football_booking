@@ -502,6 +502,32 @@ class BookingServiceImplTest {
     }
 
     @Test
+    void createBookingSkipsRecurringConflictQueryWhenSubFieldHasNoRecurringBooking() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder().build());
+
+        bookingService.createBooking(userId, request);
+
+        verify(recurringBookingRepository, never()).findActiveConflictsForDate(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void createBookingMapsDatabaseOverlapConstraintViolationToBookingConflict() {
         UUID userId = UUID.randomUUID();
         UUID subFieldId = UUID.randomUUID();
@@ -723,6 +749,8 @@ class BookingServiceImplTest {
 
         verify(bookingBalanceEventPublisher).publishRefundRequested(cancelled, 2000L, "BOOKING_PAYMENT_REFUND");
         verify(bookingRepository).markPaymentRefunded(bookingId, BookingPaymentStatus.REFUNDED);
+        verify(communityPostMaintenanceService, never()).cancelOpenPostForBooking(any());
+        verify(bookingNotificationEventPublisher).publishBookingCancelled(cancelled, null);
     }
 
     @Test

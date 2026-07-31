@@ -33,6 +33,7 @@ public class SecurityConfig {
                                 "/api/v1/bookings/availability",
                                 "/api/v1/bookings/config").permitAll()
                         .pathMatchers(HttpMethod.PUT, "/api/v1/users/*/role").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.PATCH, "/api/v1/users/*/status").hasRole("ADMIN")
                         .anyExchange().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((exchange, exception) -> {

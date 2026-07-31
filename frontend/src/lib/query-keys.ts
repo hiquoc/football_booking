@@ -18,8 +18,8 @@ export const fieldQueryKeys = {
 
 export const bookingQueryKeys = {
   all: ["bookings"] as const,
-  mine: (page: number, size = 10) =>
-    [...bookingQueryKeys.all, "mine", { page, size }] as const,
+  mine: (page: number, size = 10, filters: object = {}) =>
+    [...bookingQueryKeys.all, "mine", { page, size, filters }] as const,
   owner: (page: number, size = 10, filters: object = {}) =>
     [...bookingQueryKeys.all, "owner", { page, size, filters }] as const,
   detail: (id: string) => [...bookingQueryKeys.all, id] as const,
@@ -48,8 +48,9 @@ export const userQueryKeys = {
   me: ["user", "me"] as const,
   mePrivate: ["user", "me", "private"] as const,
   profile: (id: string) => [...userQueryKeys.all, "profile", id] as const,
-  list: (page: number, size = 10) =>
-    [...userQueryKeys.all, "list", { page, size }] as const,
+  list: (page: number, size = 10, phoneNumber = "") =>
+    [...userQueryKeys.all, "list", { page, size, phoneNumber }] as const,
+  violations: (id: string) => [...userQueryKeys.all, "violations", id] as const,
 };
 
 export const notificationQueryKeys = {

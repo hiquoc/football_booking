@@ -205,7 +205,7 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success("Booking cancelled successfully", response));
     }
 
-    @Operation(summary = "Get my bookings", description = "Returns paginated booking history for the authenticated client. Supports page, size, and sort query parameters.")
+    @Operation(summary = "Get my bookings", description = "Returns paginated booking history for the authenticated client. Supports bookingDate, status, page, size, and sort query parameters.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
@@ -237,10 +237,12 @@ public class BookingController {
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getMyBookings(
             @Parameter(hidden = true) @CurrentUser UserPrincipal user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bookingDate,
+            @RequestParam(required = false) BookingStatus status,
             @Parameter(hidden = true)
             Pageable pageable) {
 
-        PageResponse<BookingResponse> bookings = bookingService.getMyBookings(user.id(), pageable);
+        PageResponse<BookingResponse> bookings = bookingService.getMyBookings(user.id(), bookingDate, status, pageable);
         return ResponseEntity.ok(ApiResponse.success(bookings));
     }
 

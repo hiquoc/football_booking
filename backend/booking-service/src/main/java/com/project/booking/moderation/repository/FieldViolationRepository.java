@@ -19,6 +19,7 @@ public interface FieldViolationRepository extends JpaRepository<FieldViolation, 
     Optional<FieldViolation> findByUserIdAndFieldId(UUID userId, UUID fieldId);
     boolean existsByUserIdAndFieldIdAndBannedTrue(UUID userId, UUID fieldId);
     long countByUserIdAndBannedTrue(UUID userId);
+    Page<FieldViolation> findByUserIdOrderByUpdatedAtDesc(UUID userId, Pageable pageable);
     Page<FieldViolation> findByFieldIdAndBannedTrueOrderByBanDateDesc(UUID fieldId, Pageable pageable);
     Page<FieldViolation> findByFieldIdOrderByUpdatedAtDesc(UUID fieldId, Pageable pageable);
     List<FieldViolation> findAllByBannedTrue();

@@ -1,18 +1,19 @@
 package com.project.common.security;
 
 import com.project.common.constants.GlobalConstants;
+import com.project.common.logging.LogContext;
+import com.project.common.logging.MdcFields;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.UUID;
+import java.util.Map;
 
 public class IncomingRequestLogFilter extends OncePerRequestFilter {
 
@@ -27,27 +28,40 @@ public class IncomingRequestLogFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        String previousCorrelationId = MDC.get("correlationId");
-        String correlationId = request.getHeader(GlobalConstants.CORRELATION_HEADER_NAME);
-        if (!StringUtils.hasText(correlationId)) {
-            correlationId = UUID.randomUUID().toString();
-        }
+        long startedAt = System.nanoTime();
+        Map<String, String> previousContext = org.slf4j.MDC.getCopyOfContextMap();
+        String requestId = LogContext.requestIdOrNew(request.getHeader(GlobalConstants.REQUEST_ID_HEADER_NAME));
 
-        MDC.put("correlationId", correlationId);
-        response.setHeader(GlobalConstants.CORRELATION_HEADER_NAME, correlationId);
+        LogContext.putRequestContext(requestId, serviceName);
+        response.setHeader(GlobalConstants.REQUEST_ID_HEADER_NAME, requestId);
 
-        log.info("incoming_request service={} method={} path={} remoteIp={}",
-                serviceName, request.getMethod(), request.getRequestURI(), clientIp(request));
+        log.info("request_started service={} method={} path={} remoteIp={} userId={}",
+                serviceName, request.getMethod(), request.getRequestURI(), clientIp(request), userId(request));
 
         try {
             filterChain.doFilter(request, response);
         } finally {
-            if (previousCorrelationId == null) {
-                MDC.remove("correlationId");
+            long durationMs = (System.nanoTime() - startedAt) / 1_000_000;
+            int status = response.getStatus();
+            String userId = userId(request);
+            LogContext.putIfPresent(MdcFields.USER_ID, userId);
+            if (status >= 500) {
+                log.error("request_completed service={} method={} path={} status={} durationMs={} userId={}",
+                        serviceName, request.getMethod(), request.getRequestURI(), status, durationMs, userId);
+            } else if (status >= 400) {
+                log.warn("request_completed service={} method={} path={} status={} durationMs={} userId={}",
+                        serviceName, request.getMethod(), request.getRequestURI(), status, durationMs, userId);
             } else {
-                MDC.put("correlationId", previousCorrelationId);
+                log.info("request_completed service={} method={} path={} status={} durationMs={} userId={}",
+                        serviceName, request.getMethod(), request.getRequestURI(), status, durationMs, userId);
             }
+            LogContext.restore(previousContext);
         }
+    }
+
+    private String userId(HttpServletRequest request) {
+        String headerUserId = request.getHeader(GlobalConstants.HEADER_USER_ID);
+        return StringUtils.hasText(headerUserId) ? headerUserId : "anonymous";
     }
 
     private String clientIp(HttpServletRequest request) {

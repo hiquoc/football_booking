@@ -64,7 +64,7 @@ public interface BookingService {
      * @param userId the authenticated user's ID
      * @return page of bookings for that client
      */
-    PageResponse<BookingResponse> getMyBookings(UUID userId, Pageable pageable);
+    PageResponse<BookingResponse> getMyBookings(UUID userId, LocalDate bookingDate, BookingStatus status, Pageable pageable);
 
     /**
      * Returns all bookings for a field owner across their sub-fields.

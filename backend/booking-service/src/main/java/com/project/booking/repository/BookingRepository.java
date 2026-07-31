@@ -168,6 +168,21 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         Page<Booking> findByClientId(UUID clientId, Pageable pageable);
 
         @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.clientId = :clientId
+                      AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
+                      AND (CAST(:status AS string) IS NULL OR b.status = :status)
+                """)
+        Page<Booking> findClientBookings(
+                @Param("clientId") UUID clientId,
+                @Param("bookingDateStart") LocalDateTime bookingDateStart,
+                @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
+                @Param("status") BookingStatus status,
+                Pageable pageable);
+
+        @EntityGraph(attributePaths = "subField")
         Page<Booking> findByOwnerId(UUID ownerId, Pageable pageable);
 
         @EntityGraph(attributePaths = "subField")

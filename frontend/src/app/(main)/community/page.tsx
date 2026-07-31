@@ -19,6 +19,7 @@ export default async function CommunityPage({
     <CommunityFeedContent
       pageNumber={parsePage(single(params.page))}
       filters={parseFilters(params)}
+      viewerId={user?.id ?? null}
       canCreate={user?.userType === "CLIENT" || user?.userType === "EMPLOYEE"}
     />
   );
@@ -35,14 +36,31 @@ function single(value: string | string[] | undefined) {
 
 function parseFilters(params: Record<string, string | string[] | undefined>): CommunityPostFilters {
   const value = (key: string) => single(params[key])?.trim() || undefined;
+  const ownerId = value("ownerId");
+  const applicantId = value("applicantId");
+  const status = value("status");
   return {
+    ownerId,
+    applicantId,
     postType: value("postType") as CommunityPostFilters["postType"],
     skillLevel: value("skillLevel"),
-    date: value("date"),
+    date: value("date") ?? tomorrowDate(),
     fieldType: value("fieldType"),
+    city: value("city"),
     district: value("district"),
-    status: value("status") as CommunityPostFilters["status"],
+    fieldName: value("fieldName"),
+    status: (status === "all" ? "all" : status ?? (ownerId || applicantId ? "all" : "OPEN")) as CommunityPostFilters["status"],
     keyword: value("keyword"),
-    sortBy: value("sortBy") === "upcoming" ? "upcoming" : "newest",
+    sortBy: value("sortBy") === "newest" ? "newest" : "upcoming",
   };
+}
+
+function tomorrowDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }

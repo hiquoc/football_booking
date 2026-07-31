@@ -7,6 +7,7 @@ import type {
   CommunityReportReason,
   CommunityReportStatus,
   CreateCommunityPostInput,
+  MatchEvaluationInput,
   UpdateCommunityPostInput,
 } from "@/lib/api/types";
 import {
@@ -20,6 +21,7 @@ import {
   submitCommunityPostAction,
   submitCommunityPostUpdate,
   submitCommunityReport,
+  submitCommunityMatchEvaluation,
   submitCommunityWithdraw,
   submitOwnerHideCommunityPost,
 } from "@/lib/client/community";
@@ -80,7 +82,11 @@ export function useApplyCommunityPost(id: string) {
   return useMutation({
     mutationFn: (body: Record<string, unknown>) => submitCommunityApplication(id, body),
     retry: false,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: communityQueryKeys.detail(id) }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: communityQueryKeys.detail(id) });
+      await queryClient.refetchQueries({ queryKey: communityQueryKeys.detail(id), type: "active" });
+      void queryClient.invalidateQueries({ queryKey: communityQueryKeys.all });
+    },
     onError: (error) => {
       console.error("Error applying to community post:", error);
     },
@@ -123,6 +129,13 @@ export function useOwnerHideCommunityPost(id: string) {
       queryClient.setQueryData(communityQueryKeys.detail(post.id), post);
       void queryClient.invalidateQueries({ queryKey: communityQueryKeys.all });
     },
+  });
+}
+
+export function useSubmitMatchEvaluation(id: string) {
+  return useMutation({
+    mutationFn: (input: MatchEvaluationInput) => submitCommunityMatchEvaluation(id, input),
+    retry: false,
   });
 }
 

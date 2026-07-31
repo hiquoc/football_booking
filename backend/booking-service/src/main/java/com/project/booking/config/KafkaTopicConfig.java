@@ -64,6 +64,11 @@ public class KafkaTopicConfig {
     }
 
     @Bean
+    public NewTopic bookingCancelledTopic() {
+        return topic(NotificationEventTopics.BOOKING_CANCELLED);
+    }
+
+    @Bean
     public NewTopic userCompletedBookingCountChangedTopic() {
         return topic(NotificationEventTopics.USER_COMPLETED_BOOKING_COUNT_CHANGED);
     }

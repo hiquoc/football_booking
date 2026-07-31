@@ -24,42 +24,60 @@ import java.util.UUID;
 public class BookingModerationController {
     private final BookingModerationService service;
 
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PostMapping("/owner/no-shows")
     public ResponseEntity<ApiResponse<FieldViolationResponse>> reportNoShow(
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody ReportNoShowRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("No-show reported", service.reportNoShow(user.id(), request)));
+                .body(ApiResponse.success("No-show reported", service.reportNoShow(user.id(), user.role(), request)));
     }
 
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PageableAsQueryParam
+    @GetMapping("/admin/users/{userId}/field-violations")
+    public ResponseEntity<ApiResponse<PageResponse<FieldViolationResponse>>> userFieldViolations(
+            @PathVariable UUID userId,
+            Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(service.getUserFieldViolations(userId, pageable)));
+    }
+
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PageableAsQueryParam
     @GetMapping("/owner/fields/{fieldId}/violations")
     public ResponseEntity<ApiResponse<PageResponse<FieldViolationResponse>>> violations(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID fieldId,
             Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success(service.getViolations(user.id(), fieldId, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(service.getViolations(user.id(), user.role(), fieldId, pageable)));
     }
 
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PageableAsQueryParam
     @GetMapping("/owner/fields/{fieldId}/banned-clients")
     public ResponseEntity<ApiResponse<PageResponse<FieldViolationResponse>>> bannedClients(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID fieldId,
             Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.success(service.getBannedClients(user.id(), fieldId, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(service.getBannedClients(user.id(), user.role(), fieldId, pageable)));
     }
 
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
+    @PatchMapping("/owner/fields/{fieldId}/banned-clients/{userId}/ban")
+    public ResponseEntity<ApiResponse<FieldViolationResponse>> ban(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID fieldId,
+            @PathVariable UUID userId) {
+        return ResponseEntity.ok(ApiResponse.success("Client banned", service.ban(user.id(), user.role(), fieldId, userId)));
+    }
+
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PatchMapping("/owner/fields/{fieldId}/banned-clients/{userId}/unban")
     public ResponseEntity<ApiResponse<FieldViolationResponse>> unban(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID fieldId,
             @PathVariable UUID userId) {
-        return ResponseEntity.ok(ApiResponse.success("Client unbanned", service.unban(user.id(), fieldId, userId)));
+        return ResponseEntity.ok(ApiResponse.success("Client unbanned", service.unban(user.id(), user.role(), fieldId, userId)));
     }
 
     @PreAuthorize("hasRole('OWNER')")

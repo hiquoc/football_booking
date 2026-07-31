@@ -1,7 +1,10 @@
 package com.project.field.kafka;
 
 import com.project.common.events.field.*;
+import com.project.common.events.notification.FieldEmployeeAssignedEvent;
+import com.project.common.events.notification.NotificationEventTopics;
 import com.project.field.entity.BookingRule;
+import com.project.field.entity.FieldEmployeeAssignment;
 import com.project.field.entity.SubFieldClosure;
 import com.project.field.entity.FieldOperatingHours;
 import com.project.field.entity.SubField;
@@ -153,7 +156,21 @@ public class FieldEventPublisher {
                 closure.getId().toString(),
                 new FieldClosureDeletedEvent(
                         closure.getId(),
-                        closure.getSubFieldId()));
+                closure.getSubFieldId()));
+    }
+
+    public void publishFieldEmployeeAssigned(FieldEmployeeAssignment assignment, String employeeEmail) {
+        save("FieldEmployeeAssignment", assignment.getId().toString(),
+                NotificationEventTopics.FIELD_EMPLOYEE_ASSIGNED,
+                assignment.getEmployeeId().toString(),
+                new FieldEmployeeAssignedEvent(
+                        assignment.getId(),
+                        assignment.getField().getId(),
+                        assignment.getField().getName(),
+                        assignment.getField().getOwnerId(),
+                        assignment.getEmployeeId(),
+                        employeeEmail,
+                        Instant.now()));
     }
 
     private void save(String aggregateType, String aggregateId, String topic, String key, Object payload) {

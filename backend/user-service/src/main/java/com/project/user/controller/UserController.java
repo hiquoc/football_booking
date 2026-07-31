@@ -58,15 +58,17 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     @PageableAsQueryParam
     @GetMapping
-    public ApiResponse<PageResponse<UserDto>> getUsers(Pageable pageable) {
-        return ApiResponse.success(userService.getUsers(pageable));
+    public ApiResponse<PageResponse<UserDto>> getUsers(
+            @RequestParam(required = false) String phoneNumber,
+            Pageable pageable) {
+        return ApiResponse.success(userService.getUsers(phoneNumber, pageable));
     }
 
     @Operation(summary = "Find employee by phone", description = "Returns one EMPLOYEE profile matching an exact phone number for field assignment.")
     @PreAuthorize("hasRole('OWNER')")
     @GetMapping("/employees/by-phone")
     public ApiResponse<UserDto> findEmployeeByPhone(@RequestParam String phoneNumber) {
-        return ApiResponse.success(userService.getEmployeeByPhone(phoneNumber));
+        return ApiResponse.success(userService.getAssignableUserByPhone(phoneNumber));
     }
 
     @Operation(summary = "Get my profile", description = "Returns the profile of the currently authenticated user")
@@ -215,8 +217,38 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/role")
     public ApiResponse<UserDto> changeUserRole(
+            @CurrentUser UserPrincipal user,
             @PathVariable UUID id,
             @Valid @RequestBody ChangeRoleRequest request) {
-        return ApiResponse.success("Role updated successfully", userService.changeUserRole(id, request.getUserType()));
+        return ApiResponse.success("Role updated successfully", userService.changeUserRole(user.id(), id, request.getUserType()));
+    }
+
+    @Operation(summary = "Change user status (Admin only)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/status")
+    public ApiResponse<UserDto> changeUserStatus(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID id,
+            @RequestBody ChangeStatusRequest request) {
+        return ApiResponse.success("Status updated successfully", userService.changeUserStatus(user.id(), id, request.getStatus()));
+    }
+
+    @lombok.Data
+    public static class ChangeStatusRequest {
+        private String status;
+    }
+
+    @Operation(summary = "Change user role internally")
+    @PutMapping("/internal/{id}/role")
+    public ApiResponse<UserDto> changeUserRoleInternal(
+            @PathVariable UUID id,
+            @RequestParam UserType userType) {
+        return ApiResponse.success("Role updated successfully", userService.changeUserRole(id, userType));
+    }
+
+    @Operation(summary = "Get user profile internally")
+    @GetMapping("/internal/{id}")
+    public ApiResponse<UserDto> getUserProfileInternal(@PathVariable UUID id) {
+        return ApiResponse.success("Profile retrieved successfully", userService.getUserById(id));
     }
 }

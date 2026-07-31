@@ -33,12 +33,23 @@ public class InboxScheduler {
     }
 
     private void process(InboxEvent event) {
+        long startedAt = System.nanoTime();
         try {
             processingService.handle(event);
             processingService.markProcessed(event.getId());
+            long processingTimeMs = (System.nanoTime() - startedAt) / 1_000_000;
+            log.info("kafka_consumer_processed eventId={} topic={} partition={} offset={} processingTimeMs={}",
+                    event.getEventId(), event.getTopic(), event.getPartition(), event.getOffset(), processingTimeMs);
         } catch (Exception ex) {
             processingService.markFailed(event.getId(), ex.getMessage());
-            log.error("Failed to process inbox event: eventId={}, topic={}", event.getId(), event.getTopic(), ex);
+            log.error("kafka_consumer_processing_failed eventId={} topic={} partition={} offset={} retryCount={} reason={}",
+                    event.getEventId(),
+                    event.getTopic(),
+                    event.getPartition(),
+                    event.getOffset(),
+                    event.getRetryCount() + 1,
+                    ex.getMessage(),
+                    ex);
         }
     }
 }

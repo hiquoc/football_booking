@@ -40,4 +40,9 @@ public interface CommunityUserViolationRepository extends JpaRepository<Communit
             @Param("activeStatus") CommunityViolationStatus activeStatus,
             @Param("expiredStatus") CommunityViolationStatus expiredStatus,
             @Param("now") LocalDateTime now);
+
+    boolean existsByUserIdAndSourcePostIdAndAction(
+            UUID userId,
+            UUID sourcePostId,
+            CommunityModerationAction action);
 }

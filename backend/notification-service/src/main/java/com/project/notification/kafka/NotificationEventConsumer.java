@@ -4,12 +4,14 @@ import com.project.common.events.notification.BookingCancelledEvent;
 import com.project.common.events.notification.BookingConfirmedEvent;
 import com.project.common.events.notification.BookingCreatedEvent;
 import com.project.common.events.notification.CommunityNotificationEvent;
+import com.project.common.events.notification.FieldEmployeeAssignedEvent;
 import com.project.common.events.notification.ModerationNotificationEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PaymentFailedEvent;
 import com.project.common.events.notification.PaymentSuccessEvent;
 import com.project.common.events.notification.UserBalanceUpdatedEvent;
 import com.project.common.events.notification.UserRequestOtpEvent;
+import com.project.common.events.notification.WalletTopUpSucceededEvent;
 import com.project.common.inbox.service.InboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +60,11 @@ public class NotificationEventConsumer {
         inboxService.receive(record, consumerGroup);
     }
 
+    @KafkaListener(topics = NotificationEventTopics.USER_BALANCE_TOP_UP_SUCCEEDED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onWalletTopUpSucceeded(ConsumerRecord<String, WalletTopUpSucceededEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
     @KafkaListener(topics = NotificationEventTopics.USER_BALANCE_UPDATED, groupId = "${spring.kafka.consumer.group-id}")
     public void onUserBalanceUpdated(ConsumerRecord<String, UserBalanceUpdatedEvent> record) {
         inboxService.receive(record, consumerGroup);
@@ -65,6 +72,11 @@ public class NotificationEventConsumer {
 
     @KafkaListener(topics = NotificationEventTopics.COMMUNITY_NOTIFICATION, groupId = "${spring.kafka.consumer.group-id}")
     public void onCommunityNotification(ConsumerRecord<String, CommunityNotificationEvent> record) {
+        inboxService.receive(record, consumerGroup);
+    }
+
+    @KafkaListener(topics = NotificationEventTopics.FIELD_EMPLOYEE_ASSIGNED, groupId = "${spring.kafka.consumer.group-id}")
+    public void onFieldEmployeeAssigned(ConsumerRecord<String, FieldEmployeeAssignedEvent> record) {
         inboxService.receive(record, consumerGroup);
     }
 

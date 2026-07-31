@@ -45,6 +45,7 @@ export function BookingForm({
   const [note, setNote] = useState("");
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringIntervalDays, setRecurringIntervalDays] = useState(7);
+  const [isProcessing, setIsProcessing] = useState(false);
   const addDays = (dateString: string, days: number) => {
     if (!dateString || !days) return dateString;
     const d = new Date(dateString);
@@ -139,6 +140,7 @@ export function BookingForm({
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setIsProcessing(true);
     if (createMutation.isPending || createRecurringMutation.isPending) return;
     if (!selectedSubField || !selectedSlot || !isFeeReady) return;
     try {
@@ -175,6 +177,7 @@ export function BookingForm({
       });
       window.location.assign(hasEnoughBalance ? `/bookings/${booking.id}` : `/bookings/${booking.id}/payment`);
     } catch {
+      setIsProcessing(false);
       // React Query exposes the booking conflict below.
     }
   }
@@ -514,7 +517,8 @@ export function BookingForm({
             !selectedStartTime ||
             !isFeeReady ||
             createMutation.isPending ||
-            createRecurringMutation.isPending
+            createRecurringMutation.isPending ||
+            isProcessing
           }
           className="action-button mt-6 w-full bg-sky-500 px-5 text-white hover:bg-sky-600"
         >

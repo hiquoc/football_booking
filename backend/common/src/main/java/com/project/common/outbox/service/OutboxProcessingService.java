@@ -8,6 +8,7 @@ import com.project.common.outbox.entity.OutboxEvent;
 import com.project.common.outbox.entity.OutboxEventStatus;
 import com.project.common.outbox.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,10 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OutboxProcessingService {
 
     private final OutboxEventRepository outboxEventRepository;
@@ -45,6 +49,8 @@ public class OutboxProcessingService {
         if (!properties.dlq().enabled()) {
             return;
         }
+        Map<String, String> headers = new LinkedHashMap<>(outboxService.headers(event));
+        headers.put("originalTopic", event.getTopic());
         kafkaProducerService.publishDlq(
                 KafkaTopics.dlqTopic(event.getTopic(), properties.dlq().topicSuffix()),
                 event.getEventKey(),
@@ -58,7 +64,7 @@ public class OutboxProcessingService {
                         event.getRetryCount(),
                         Instant.now(),
                         errorMessage),
-                outboxService.headers(event));
+                headers);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -83,10 +89,15 @@ public class OutboxProcessingService {
         event.setErrorMessage(errorMessage);
         if (event.getRetryCount() >= properties.maxRetries()) {
             event.setStatus(OutboxEventStatus.PROCESSING);
+            log.error("kafka_producer_retries_exhausted topic={} eventType={} aggregateId={} retryCount={} reason={}",
+                    event.getTopic(), event.getEventType(), event.getAggregateId(), event.getRetryCount(), errorMessage);
             return true;
         }
         event.setStatus(OutboxEventStatus.PENDING);
-        event.setNextRetryAt(Instant.now().plus(retryDelay(event.getRetryCount())));
+        Duration delay = retryDelay(event.getRetryCount());
+        event.setNextRetryAt(Instant.now().plus(delay));
+        log.warn("kafka_producer_retry_scheduled topic={} eventType={} aggregateId={} retryCount={} backoffMs={} reason={}",
+                event.getTopic(), event.getEventType(), event.getAggregateId(), event.getRetryCount(), delay.toMillis(), errorMessage);
         return false;
     }
 

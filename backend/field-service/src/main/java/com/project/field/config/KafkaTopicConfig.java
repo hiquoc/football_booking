@@ -1,6 +1,7 @@
 package com.project.field.config;
 
 import com.project.common.events.field.FieldEventTopics;
+import com.project.common.events.notification.NotificationEventTopics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,6 +51,11 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic fieldClosureDeletedTopic() {
         return topic(FieldEventTopics.FIELD_CLOSURE_DELETED);
+    }
+
+    @Bean
+    public NewTopic fieldEmployeeAssignedTopic() {
+        return topic(NotificationEventTopics.FIELD_EMPLOYEE_ASSIGNED);
     }
 
     private NewTopic topic(String name) {

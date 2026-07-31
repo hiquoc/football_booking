@@ -16,6 +16,9 @@ public interface RecurringBookingService {
     RecurringBookingResponse pause(UUID userId, UUID id);
     RecurringBookingResponse resume(UUID userId, UUID id);
     RecurringBookingResponse cancel(UUID userId, UUID id);
+    RecurringBookingResponse ownerPause(UUID ownerId, UUID id);
+    RecurringBookingResponse ownerResume(UUID ownerId, UUID id);
+    RecurringBookingResponse ownerCancel(UUID ownerId, UUID id);
     RecurringBookingResponse adminPause(UUID id);
     RecurringBookingResponse adminResume(UUID id);
     RecurringBookingResponse adminCancel(UUID id);

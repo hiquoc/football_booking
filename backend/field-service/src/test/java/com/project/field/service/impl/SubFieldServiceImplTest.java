@@ -3,6 +3,7 @@ package com.project.field.service.impl;
 import com.project.common.enums.SportType;
 import com.project.common.enums.SubFieldType;
 import com.project.common.exception.BadRequestException;
+import com.project.common.security.UserPrincipal;
 import com.project.field.dto.SubFieldDto;
 import com.project.field.dto.SubFieldRequest;
 import com.project.field.dto.BookingRuleDto;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SubFieldServiceImplTest {
@@ -53,13 +55,45 @@ class SubFieldServiceImplTest {
                 mock(SubFieldMapper.class),
                 mock(FieldEventPublisher.class));
 
-        var options = service.getFilterOptions(" abc ");
+        var options = service.getFilterOptions(" abc ", null);
 
         assertEquals(1, options.size());
         assertEquals(subFieldId, options.get(0).getId());
         assertEquals("ABC Football Field - 5v5", options.get(0).getName());
         assertEquals("ABC Football Field", options.get(0).getFieldName());
         assertEquals(SubFieldType.FOOTBALL_5V5, options.get(0).getType());
+    }
+
+    @Test
+    void getFilterOptionsForOwnerUsesOwnedFieldsOnly() {
+        UUID ownerId = UUID.randomUUID();
+        SubFieldRepository subFieldRepository = mock(SubFieldRepository.class);
+        SubFieldServiceImpl service = new SubFieldServiceImpl(
+                subFieldRepository,
+                mock(FieldRepository.class),
+                mock(FieldOperatingHoursRepository.class),
+                mock(SubFieldMapper.class),
+                mock(FieldEventPublisher.class));
+
+        service.getFilterOptions(" abc ", new UserPrincipal(ownerId, "owner@example.com", "OWNER"));
+
+        verify(subFieldRepository).findFilterOptionsByOwner("abc", ownerId);
+    }
+
+    @Test
+    void getFilterOptionsForEmployeeUsesAssignedFieldsOnly() {
+        UUID employeeId = UUID.randomUUID();
+        SubFieldRepository subFieldRepository = mock(SubFieldRepository.class);
+        SubFieldServiceImpl service = new SubFieldServiceImpl(
+                subFieldRepository,
+                mock(FieldRepository.class),
+                mock(FieldOperatingHoursRepository.class),
+                mock(SubFieldMapper.class),
+                mock(FieldEventPublisher.class));
+
+        service.getFilterOptions(null, new UserPrincipal(employeeId, "employee@example.com", "EMPLOYEE"));
+
+        verify(subFieldRepository).findFilterOptionsByEmployee(null, employeeId);
     }
 
     @Test

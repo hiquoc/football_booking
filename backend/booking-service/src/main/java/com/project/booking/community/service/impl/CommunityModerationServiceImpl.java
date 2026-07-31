@@ -101,6 +101,7 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
         UUID targetUserId = request.getTargetUserId() != null
                 ? request.getTargetUserId()
                 : post != null ? post.getOwnerId() : null;
+        UUID postId = post != null ? post.getId() : null;
         if (targetUserId == null) {
             throw new BadRequestException("A target user or target post is required");
         }
@@ -115,18 +116,25 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
                         payload(post, Map.of("reason", request.getReason())));
                 markReportsReviewed(post, moderatorId);
             }
-            case ISSUE_WARNING -> createViolation(targetUserId, request, CommunityViolationStatus.ACTIVE, "COMMUNITY_MODERATION_WARNING");
+            case ISSUE_WARNING -> {
+                requirePost(post);
+                createViolation(targetUserId, postId, request, CommunityViolationStatus.ACTIVE, "COMMUNITY_MODERATION_WARNING");
+                hidePost(post, request.getReason());
+                markReportsReviewed(post, moderatorId);
+            }
             case TEMPORARY_POSTING_BAN -> {
                 if (request.getExpireAt() == null) {
                     throw new BadRequestException("Temporary posting ban requires an expiration time");
                 }
-                createViolation(targetUserId, request, CommunityViolationStatus.ACTIVE, "COMMUNITY_TEMPORARY_POSTING_BAN");
+                createViolation(targetUserId, postId, request, CommunityViolationStatus.ACTIVE, "COMMUNITY_TEMPORARY_POSTING_BAN");
                 hidePostsAfterBan(targetUserId, moderatorId, request.getReason());
                 enforceThreshold(targetUserId, moderatorId, request.getReason());
+                markReportsReviewed(post, moderatorId);
             }
             case PERMANENT_POSTING_BAN -> {
-                createViolation(targetUserId, request, CommunityViolationStatus.PERMANENT, "COMMUNITY_PERMANENT_POSTING_BAN");
+                createViolation(targetUserId, postId, request, CommunityViolationStatus.PERMANENT, "COMMUNITY_PERMANENT_POSTING_BAN");
                 hidePostsAfterBan(targetUserId, moderatorId, request.getReason());
+                markReportsReviewed(post, moderatorId);
             }
             case RESTORE_POST -> {
                 requirePost(post);
@@ -215,8 +223,12 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
                 payload(post, Map.of("applicationId", application.getId(), "rejectedCount", rejected))));
     }
 
-    private void createViolation(UUID targetUserId, AdminModerationRequest request,
+    private void createViolation(UUID targetUserId, UUID postId, AdminModerationRequest request,
                                  CommunityViolationStatus status, String notificationCode) {
+        if (postId != null && violationRepository.existsByUserIdAndSourcePostIdAndAction(
+                targetUserId, postId, request.getAction())) {
+            throw new BadRequestException("Violation for this user and post already exists");
+        }
         CommunityUserViolation violation = CommunityUserViolation.builder()
                 .userId(targetUserId)
                 .reason(request.getReason())
@@ -245,7 +257,7 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
         request.setAction(CommunityModerationAction.PERMANENT_POSTING_BAN);
         request.setTargetUserId(targetUserId);
         request.setReason("Automatic permanent ban after " + activeCount + " active violations: " + reason);
-        createViolation(targetUserId, request, CommunityViolationStatus.PERMANENT, "COMMUNITY_PERMANENT_POSTING_BAN");
+        createViolation(targetUserId, null, request, CommunityViolationStatus.PERMANENT, "COMMUNITY_PERMANENT_POSTING_BAN");
         saveHistory(targetUserId, null, moderatorId, CommunityModerationAction.PERMANENT_POSTING_BAN,
                 request.getReason(), "Automatic threshold enforcement");
     }

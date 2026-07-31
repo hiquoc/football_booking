@@ -1,6 +1,7 @@
 package com.project.booking.moderation.service.impl;
 
 import com.project.booking.entity.Booking;
+import com.project.booking.client.FieldManagementClient;
 import com.project.booking.moderation.dto.*;
 import com.project.booking.moderation.entity.*;
 import com.project.booking.moderation.enums.PaymentDisputeStatus;
@@ -39,13 +40,15 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     private final ModerationAuditLogRepository auditLogRepository;
     private final PlatformBanRepository platformBanRepository;
     private final ModerationEventPublisher publisher;
+    private final FieldManagementClient fieldManagementClient;
 
     @Override
     @Transactional
-    public FieldViolationResponse reportNoShow(UUID ownerId, ReportNoShowRequest request) {
+    public FieldViolationResponse reportNoShow(UUID actorId, String actorRole, ReportNoShowRequest request) {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new NotFoundException("Booking not found"));
-        requireOwner(ownerId, booking);
+        UUID fieldId = booking.getSubField().getFieldId();
+        requireManager(actorId, actorRole, booking, fieldId);
         if (booking.getStatus() != BookingStatus.COMPLETED) {
             throw new BadRequestException("Only completed bookings can be reported as no-show");
         }
@@ -53,12 +56,11 @@ public class BookingModerationServiceImpl implements BookingModerationService {
             throw new BadRequestException("This booking has already been reported");
         }
 
-        UUID fieldId = booking.getSubField().getFieldId();
         noShowReportRepository.save(BookingNoShowReport.builder()
                 .bookingId(booking.getId())
                 .fieldId(fieldId)
                 .reportedUserId(booking.getClientId())
-                .ownerId(ownerId)
+                .ownerId(booking.getOwnerId())
                 .build());
 
         FieldViolation violation = violationRepository.findForUpdateByUserIdAndFieldId(booking.getClientId(), fieldId)
@@ -81,36 +83,66 @@ public class BookingModerationServiceImpl implements BookingModerationService {
                     payload("fieldId", fieldId, "bookingId", booking.getId(), "violationCount", nextCount));
         }
         FieldViolation saved = violationRepository.save(violation);
-        audit(ownerId, booking.getClientId(), fieldId, "NO_SHOW_REPORTED", "bookingId=" + booking.getId());
-        enforcePlatformBanIfNeeded(booking.getClientId(), ownerId);
+        audit(actorId, booking.getClientId(), fieldId, "NO_SHOW_REPORTED", "bookingId=" + booking.getId());
+        enforcePlatformBanIfNeeded(booking.getClientId(), actorId);
         return toViolationResponse(saved);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<FieldViolationResponse> getViolations(UUID ownerId, UUID fieldId, Pageable pageable) {
-        assertOwnerOwnsField(ownerId, fieldId);
+    public PageResponse<FieldViolationResponse> getUserFieldViolations(UUID userId, Pageable pageable) {
+        return PageResponse.from(violationRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageable)
+                .map(this::toViolationResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<FieldViolationResponse> getViolations(UUID actorId, String actorRole, UUID fieldId, Pageable pageable) {
+        assertManagerCanAccessField(actorId, actorRole, fieldId);
         return PageResponse.from(violationRepository.findByFieldIdOrderByUpdatedAtDesc(fieldId, pageable)
                 .map(this::toViolationResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<FieldViolationResponse> getBannedClients(UUID ownerId, UUID fieldId, Pageable pageable) {
-        assertOwnerOwnsField(ownerId, fieldId);
+    public PageResponse<FieldViolationResponse> getBannedClients(UUID actorId, String actorRole, UUID fieldId, Pageable pageable) {
+        assertManagerCanAccessField(actorId, actorRole, fieldId);
         return PageResponse.from(violationRepository.findByFieldIdAndBannedTrueOrderByBanDateDesc(fieldId, pageable)
                 .map(this::toViolationResponse));
     }
 
     @Override
     @Transactional
-    public FieldViolationResponse unban(UUID ownerId, UUID fieldId, UUID userId) {
-        assertOwnerOwnsField(ownerId, fieldId);
+    public FieldViolationResponse ban(UUID actorId, String actorRole, UUID fieldId, UUID userId) {
+        assertManagerCanAccessField(actorId, actorRole, fieldId);
+        FieldViolation violation = violationRepository.findForUpdateByUserIdAndFieldId(userId, fieldId)
+                .orElseGet(() -> FieldViolation.builder()
+                        .userId(userId)
+                        .fieldId(fieldId)
+                        .violationCount(0)
+                        .banned(false)
+                        .build());
+        if (!Boolean.TRUE.equals(violation.getBanned())) {
+            violation.setBanned(true);
+            violation.setBanDate(LocalDateTime.now());
+            notifyUser(userId, "FIELD_BAN", "Ban bi cam dat san tai dia diem nay",
+                    payload("fieldId", fieldId, "violationCount", violation.getViolationCount()));
+        }
+        FieldViolation saved = violationRepository.save(violation);
+        audit(actorId, userId, fieldId, "FIELD_BAN", "manual field manager ban");
+        enforcePlatformBanIfNeeded(userId, actorId);
+        return toViolationResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public FieldViolationResponse unban(UUID actorId, String actorRole, UUID fieldId, UUID userId) {
+        assertManagerCanAccessField(actorId, actorRole, fieldId);
         FieldViolation violation = violationRepository.findForUpdateByUserIdAndFieldId(userId, fieldId)
                 .orElseThrow(() -> new NotFoundException("Field violation not found"));
         violation.setBanned(false);
         violation.setBanDate(null);
-        audit(ownerId, userId, fieldId, "FIELD_UNBAN", "manual owner unban");
+        audit(actorId, userId, fieldId, "FIELD_UNBAN", "manual field manager unban");
         notifyUser(userId, "FIELD_UNBAN", "Lenh cam dat san da duoc go bo", payload("fieldId", fieldId));
         return toViolationResponse(violation);
     }
@@ -227,10 +259,24 @@ public class BookingModerationServiceImpl implements BookingModerationService {
         }
     }
 
-    private void assertOwnerOwnsField(UUID ownerId, UUID fieldId) {
-        if (!bookingRepository.existsByOwnerIdAndSubFieldFieldId(ownerId, fieldId)) {
-            throw new ForbiddenException("Only the owner of this field can perform this action");
+    private void requireManager(UUID actorId, String actorRole, Booking booking, UUID fieldId) {
+        if ("OWNER".equals(actorRole) && actorId.equals(booking.getOwnerId())) {
+            return;
         }
+        if ("EMPLOYEE".equals(actorRole) && fieldManagementClient.canManageField(actorId, actorRole, fieldId)) {
+            return;
+        }
+        throw new ForbiddenException("Only a field owner or assigned employee can perform this action");
+    }
+
+    private void assertManagerCanAccessField(UUID actorId, String actorRole, UUID fieldId) {
+        if ("OWNER".equals(actorRole) && bookingRepository.existsByOwnerIdAndSubFieldFieldId(actorId, fieldId)) {
+            return;
+        }
+        if ("EMPLOYEE".equals(actorRole) && fieldManagementClient.canManageField(actorId, actorRole, fieldId)) {
+            return;
+        }
+        throw new ForbiddenException("Only a field owner or assigned employee can perform this action");
     }
 
     private void enforcePlatformBanIfNeeded(UUID userId, UUID actorId) {

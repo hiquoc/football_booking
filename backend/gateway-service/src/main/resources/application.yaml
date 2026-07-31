@@ -44,7 +44,7 @@ spring:
             - id: booking-service-api
               uri: lb://booking-service
               predicates:
-                - Path=/api/v1/bookings/**,/api/v1/recurring-bookings,/api/v1/recurring-bookings/**,/api/v1/community-posts,/api/v1/community-posts/**,/api/v1/admin/community-moderation/**,/api/v1/admin/booking-config
+                - Path=/api/v1/bookings/**,/api/v1/recurring-bookings,/api/v1/recurring-bookings/**,/api/v1/community-posts,/api/v1/community-posts/**,/api/v1/moderation/**,/api/v1/admin/community-moderation/**,/api/v1/admin/booking-config
             - id: notification-service-api
               uri: lb://notification-service
               predicates:

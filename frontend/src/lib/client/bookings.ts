@@ -14,9 +14,17 @@ function todayInVietnam() {
   });
 }
 
-export function fetchMyBookings(page: number, size = 10) {
+export function fetchMyBookings(
+  page: number,
+  size = 10,
+  filters: { bookingDate?: string; status?: string } = {},
+) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) query.set(key, value);
+  });
   return requestJson<PageResponse<Booking>>(
-    `/api/bookings?page=${page}&size=${size}`,
+    `/api/bookings?${query}`,
   );
 }
 

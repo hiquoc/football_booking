@@ -3,7 +3,6 @@ package com.project.booking.service.impl;
 import com.project.booking.cache.AvailabilityCacheService;
 import com.project.booking.client.FieldManagementClient;
 import com.project.booking.client.UserBalanceClient;
-import com.project.booking.community.service.CommunityPostMaintenanceService;
 import com.project.booking.config.BookingDatabaseConstraints;
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
@@ -104,7 +103,6 @@ public class BookingServiceImpl implements BookingService {
     private final UserBalanceClient userBalanceClient;
     private final AvailabilityCacheService availabilityCacheService;
     private final RecurringBookingRepository recurringBookingRepository;
-    private final CommunityPostMaintenanceService communityPostMaintenanceService;
     private final UserProjectionRepository userProjectionRepository;
     private final BookingTrustEventPublisher bookingTrustEventPublisher;
     private final BookingModerationService bookingModerationService;
@@ -240,7 +238,6 @@ public class BookingServiceImpl implements BookingService {
         publishRefundIfEligible(cancelled);
         pendingBookingReservationService.release(cancelled);
         availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
-        communityPostMaintenanceService.cancelOpenPostForBooking(cancelled.getId());
         bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
         return bookingMapper.toResponse(cancelled);
     }
@@ -266,7 +263,6 @@ public class BookingServiceImpl implements BookingService {
         publishRefundIfEligible(cancelled);
         pendingBookingReservationService.release(cancelled);
         availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
-        communityPostMaintenanceService.cancelOpenPostForBooking(cancelled.getId());
         bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
         return bookingMapper.toResponse(cancelled);
     }
@@ -305,8 +301,15 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<BookingResponse> getMyBookings(UUID userId, Pageable pageable) {
-        return PageResponse.from(bookingRepository.findByClientId(userId, pageable).map(bookingMapper::toResponse));
+    public PageResponse<BookingResponse> getMyBookings(UUID userId, LocalDate bookingDate, BookingStatus status, Pageable pageable) {
+        LocalDateTime bookingDateStart = bookingDate == null ? null : bookingDate.atStartOfDay();
+        LocalDateTime bookingDateEnd = bookingDate == null ? null : bookingDate.plusDays(1).atStartOfDay();
+        return PageResponse.from(bookingRepository.findClientBookings(
+                userId,
+                bookingDateStart,
+                bookingDateEnd,
+                status,
+                pageable).map(bookingMapper::toResponse));
     }
 
     @Override
@@ -545,7 +548,8 @@ public class BookingServiceImpl implements BookingService {
         validateWithinOperatingHours(subField.getId(), request.getStartDateTime(), request.getEndDateTime(), hours);
         validateDuration(request, subField);
         validateStartTimeAlignment(request.getStartTime());
-        validateNoConflict(request.getSubFieldId(), request.getStartDateTime(), request.getEndDateTime(), sourceRecurringBookingId);
+        validateNoConflict(request.getSubFieldId(), request.getStartDateTime(), request.getEndDateTime(),
+                Boolean.TRUE.equals(subField.getHasRecurring()), sourceRecurringBookingId);
     }
 
     private void normalizeRequestDateTimes(CreateBookingRequest request) {
@@ -710,7 +714,12 @@ public class BookingServiceImpl implements BookingService {
         return subField.getMaximumBookingDurationMinutes() != null ? subField.getMaximumBookingDurationMinutes() : MAX_BOOKING_MINUTES;
     }
 
-    private void validateNoConflict(UUID subFieldId, LocalDateTime startDateTime, LocalDateTime endDateTime, UUID sourceRecurringBookingId) {
+    private void validateNoConflict(
+            UUID subFieldId,
+            LocalDateTime startDateTime,
+            LocalDateTime endDateTime,
+            boolean hasActiveRecurring,
+            UUID sourceRecurringBookingId) {
         LocalTime legacyEndTime = LocalTime.MIDNIGHT.equals(endDateTime.toLocalTime())
                 ? LocalTime.of(23, 59)
                 : endDateTime.toLocalTime();
@@ -728,13 +737,14 @@ public class BookingServiceImpl implements BookingService {
                         legacyEndTime,
                         RESERVING_STATUSES,
                         sourceRecurringBookingId);
-        boolean recurringConflict = !recurringBookingRepository.findActiveConflictsForDate(
-                subFieldId,
-                startDateTime.toLocalDate(),
-                startDateTime.toLocalTime(),
-                endDateTime.toLocalTime(),
-                RecurringBookingStatus.ACTIVE,
-                sourceRecurringBookingId).isEmpty();
+        boolean recurringConflict = hasActiveRecurring
+                && !recurringBookingRepository.findActiveConflictsForDate(
+                        subFieldId,
+                        startDateTime.toLocalDate(),
+                        startDateTime.toLocalTime(),
+                        endDateTime.toLocalTime(),
+                        RecurringBookingStatus.ACTIVE,
+                        sourceRecurringBookingId).isEmpty();
         if (isConflict || recurringConflict) {
             throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
         }

@@ -187,7 +187,10 @@ class BookingControllerApiTest {
 
     @Test
     void getMyBookingsWithClientHeaderReturnsList() throws Exception {
-        when(bookingService.getMyBookings(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+        when(bookingService.getMyBookings(eq(USER_ID),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
                 .thenReturn(bookingPageResponse());
 
         mockMvc.perform(get("/api/v1/bookings/my").headers(clientHeaders()))

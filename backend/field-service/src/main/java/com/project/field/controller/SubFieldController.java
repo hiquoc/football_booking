@@ -49,8 +49,9 @@ public class SubFieldController {
     @Operation(summary = "Get sub-field filter options", description = "Returns lightweight active sub-field options for booking filters.")
     @GetMapping("/filter-options")
     public ApiResponse<List<SubFieldFilterOptionDto>> getFilterOptions(
+            @CurrentUser UserPrincipal currentUser,
             @RequestParam(required = false) String search) {
-        return ApiResponse.success(subFieldService.getFilterOptions(search));
+        return ApiResponse.success(subFieldService.getFilterOptions(search, currentUser));
     }
 
     @Operation(

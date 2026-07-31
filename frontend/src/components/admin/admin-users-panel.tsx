@@ -6,8 +6,9 @@ import { AdminUserList } from "@/components/admin/admin-user-list";
 export function AdminUsersPanel() {
   const searchParams = useSearchParams();
   const page = parsePage(searchParams.get("page"));
+  const phoneNumber = searchParams.get("phoneNumber") ?? "";
 
-  return <AdminUserList page={page} />;
+  return <AdminUserList key={phoneNumber} page={page} phoneNumber={phoneNumber} />;
 }
 
 function parsePage(value: string | null) {

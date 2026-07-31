@@ -1,6 +1,7 @@
 package com.project.booking.service.impl;
 
 import com.project.booking.cache.AvailabilityCacheService;
+import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
 import com.project.booking.dto.request.CreateRecurringBookingRequest;
 import com.project.booking.dto.response.BookingResponse;
@@ -8,6 +9,7 @@ import com.project.booking.dto.response.RecurringBookingResponse;
 import com.project.booking.dto.response.SubFieldResponse;
 import com.project.booking.entity.Booking;
 import com.project.booking.entity.RecurringBooking;
+import com.project.booking.entity.SubFieldProjection;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.mapper.RecurringBookingMapper;
@@ -19,6 +21,7 @@ import com.project.booking.service.SubFieldProjectionService;
 import com.project.common.enums.BookingStatus;
 import com.project.common.enums.RecurringBookingStatus;
 import com.project.common.exception.BadRequestException;
+import com.project.common.exception.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -275,6 +278,65 @@ class RecurringBookingServiceImplTest {
         verify(recurringBookingRepository).save(recurringBooking);
     }
 
+    @Test
+    void ownerPauseAllowsFieldOwnerToPauseRecurringBooking() {
+        UUID ownerId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        RecurringBooking recurringBooking = ownerRecurringBooking(recurringId, ownerId, subFieldId);
+        RecurringBookingResponse mappedResponse = RecurringBookingResponse.builder().build();
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+        when(recurringBookingRepository.save(recurringBooking)).thenReturn(recurringBooking);
+        when(recurringBookingMapper.toResponse(recurringBooking)).thenReturn(mappedResponse);
+        when(recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE))
+                .thenReturn(false);
+
+        RecurringBookingResponse response = recurringBookingService.ownerPause(ownerId, recurringId);
+
+        assertSame(mappedResponse, response);
+        assertEquals(RecurringBookingStatus.PAUSED, recurringBooking.getStatus());
+        verify(subFieldRepository).updateHasRecurring(subFieldId, false);
+        verify(availabilityCacheService).evictAll();
+    }
+
+    @Test
+    void ownerPauseRejectsNonOwner() {
+        UUID ownerId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        RecurringBooking recurringBooking = ownerRecurringBooking(recurringId, UUID.randomUUID(), UUID.randomUUID());
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+
+        assertThrows(UnauthorizedException.class, () -> recurringBookingService.ownerPause(ownerId, recurringId));
+
+        verify(recurringBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void ownerCancelCancelsLatestConfirmedBookingAsOwner() {
+        UUID ownerId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        UUID latestBookingId = UUID.randomUUID();
+        RecurringBooking recurringBooking = ownerRecurringBooking(recurringId, ownerId, subFieldId);
+        Booking latestBooking = Booking.builder()
+                .id(latestBookingId)
+                .status(BookingStatus.CONFIRMED)
+                .build();
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+        when(bookingRepository.findFirstBySourceRecurringBookingIdOrderByStartDateTimeDesc(recurringId))
+                .thenReturn(Optional.of(latestBooking));
+        when(recurringBookingRepository.save(recurringBooking)).thenReturn(recurringBooking);
+        when(recurringBookingMapper.toResponse(recurringBooking)).thenReturn(RecurringBookingResponse.builder().build());
+
+        recurringBookingService.ownerCancel(ownerId, recurringId);
+
+        ArgumentCaptor<CancelBookingRequest> requestCaptor = ArgumentCaptor.forClass(CancelBookingRequest.class);
+        verify(bookingService).cancelBookingByManager(eq(ownerId), eq("OWNER"), requestCaptor.capture());
+        assertEquals(latestBookingId, requestCaptor.getValue().getBookingId());
+        assertEquals(RecurringBookingStatus.CANCELLED, recurringBooking.getStatus());
+        verify(availabilityCacheService).evictAll();
+    }
+
     private CreateRecurringBookingRequest request(UUID subFieldId, LocalDate startDate, LocalDate endDate, int intervalDays) {
         return CreateRecurringBookingRequest.builder()
                 .subFieldId(subFieldId)
@@ -295,6 +357,30 @@ class RecurringBookingServiceImplTest {
                 .fieldName("Field")
                 .active(true)
                 .status("ACTIVE")
+                .build();
+    }
+
+    private RecurringBooking ownerRecurringBooking(UUID recurringId, UUID ownerId, UUID subFieldId) {
+        SubFieldProjection subField = SubFieldProjection.builder()
+                .id(subFieldId)
+                .fieldId(UUID.randomUUID())
+                .ownerId(ownerId)
+                .name("Sub-field")
+                .active(true)
+                .build();
+        return RecurringBooking.builder()
+                .id(recurringId)
+                .userId(UUID.randomUUID())
+                .fieldId(subField.getFieldId())
+                .subFieldId(subFieldId)
+                .subField(subField)
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(8))
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(9, 0))
+                .intervalDays(7)
+                .status(RecurringBookingStatus.ACTIVE)
+                .nextProcessAt(LocalDate.now().plusDays(8).atStartOfDay())
                 .build();
     }
 }

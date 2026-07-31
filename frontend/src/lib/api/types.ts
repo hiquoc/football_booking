@@ -587,6 +587,7 @@ export interface CommunityPost {
   hiddenAt: string | null;
   hiddenReason: string | null;
   ownerUnderModeration: boolean | null;
+  matchResultSubmitted?: boolean | null;
   ownerStatistics: CommunityPlayerStatistics | null;
   createdAt: string;
   updatedAt: string;
@@ -602,10 +603,36 @@ export interface CommunityPlayerStatistics {
   completedBookingCount: number;
 }
 
+export interface MatchEvaluation {
+  id: string;
+  postId: string;
+  bookingId: string;
+  evaluatorId: string;
+  evaluatedUserId: string;
+  arrivedOnTime: boolean;
+  cancelledUnexpectedly: boolean;
+  fairPlay: boolean;
+  wouldPlayAgain: boolean;
+  comment: string | null;
+  createdAt: string;
+}
+
+export interface MatchEvaluationInput {
+  evaluatedUserId: string;
+  arrivedOnTime: boolean;
+  cancelledUnexpectedly: boolean;
+  fairPlay: boolean;
+  wouldPlayAgain: boolean;
+  comment?: string;
+}
+
 export interface CommunityReport {
   id: string;
   postId: string;
   reporterId: string;
+  reporterDisplayName?: string | null;
+  reportedUserId?: string | null;
+  reportedDisplayName?: string | null;
   reason: CommunityReportReason;
   description: string | null;
   status: CommunityReportStatus;
@@ -624,6 +651,11 @@ export interface CommunityViolation {
   status: "ACTIVE" | "EXPIRED" | "PERMANENT";
   sourcePostId: string | null;
   createdAt: string;
+}
+
+export interface UserViolationHistory {
+  community: PageResponse<CommunityViolation>;
+  field: PageResponse<FieldViolation>;
 }
 
 export interface CommunityModerationHistory {
@@ -647,12 +679,16 @@ export interface AdminModerationInput {
 }
 
 export interface CommunityPostFilters {
+  ownerId?: string;
+  applicantId?: string;
   postType?: CommunityPostType;
   skillLevel?: SkillLevel | string;
   date?: string;
   fieldType?: string;
+  city?: string;
   district?: string;
-  status?: CommunityPostStatus;
+  fieldName?: string;
+  status?: CommunityPostStatus | "all";
   keyword?: string;
   sortBy?: "newest" | "upcoming";
 }
@@ -673,6 +709,7 @@ export interface CreateCommunityPostInput {
 export interface FieldViolation {
   id: string;
   userId: string;
+  userDisplayName?: string | null;
   fieldId: string;
   violationCount: number;
   banned: boolean;

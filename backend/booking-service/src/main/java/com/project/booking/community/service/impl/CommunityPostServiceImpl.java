@@ -20,6 +20,7 @@ import com.project.booking.entity.Booking;
 import com.project.booking.entity.UserProjection;
 import com.project.booking.exception.BookingNotFoundException;
 import com.project.booking.repository.BookingRepository;
+import com.project.booking.repository.MatchResultRepository;
 import com.project.booking.repository.UserProjectionRepository;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
@@ -53,6 +54,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     private final MatchEvaluationEventPublisher evaluationEvents;
     private final CommunityModerationService moderationService;
     private final UserProjectionRepository userProjectionRepository;
+    private final MatchResultRepository matchResultRepository;
 
     @Override
     @Transactional
@@ -146,15 +148,15 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         if (post.getStatus() == CommunityPostStatus.HIDDEN) {
             throw new BadRequestException("Post unavailable");
         }
-        return withOwnerStatistics(mapper.toPostResponse(post, post.getOwnerId().equals(viewerId),
-                moderationService.isUserUnderModeration(post.getOwnerId())));
+        return withMatchResultSubmitted(withOwnerStatistics(mapper.toPostResponse(post, true,
+                moderationService.isUserUnderModeration(post.getOwnerId()))));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<CommunityPostResponse> search(CommunityPostSearchRequest request, Pageable pageable) {
         return PageResponse.from(postRepository.findAll(spec(request), pageable)
-                .map(post -> withOwnerStatistics(mapper.toPostResponse(post, false))));
+                .map(post -> withMatchResultSubmitted(withOwnerStatistics(mapper.toPostResponse(post, false)))));
     }
 
     @Override
@@ -209,10 +211,20 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
             post.setStatus(CommunityPostStatus.MATCHED);
             post.setMatchedApplicationId(application.getId());
             post.setClosedAt(LocalDateTime.now());
+            List<CommunityApplication> rejectedApplications = applicationRepository
+                    .findByPostIdAndStatus(postId, CommunityApplicationStatus.PENDING)
+                    .stream()
+                    .filter(candidate -> !candidate.getId().equals(applicationId))
+                    .toList();
             applicationRepository.rejectOtherPendingApplications(postId, applicationId,
                     CommunityApplicationStatus.PENDING, CommunityApplicationStatus.REJECTED);
             notifications.publish(application.getApplicantId(), "COMMUNITY_OPPONENT_MATCHED", "Doi cua ban da duoc chap nhan",
                     payload(post, Map.of("applicationId", applicationId)));
+            rejectedApplications.forEach(rejected -> notifications.publish(
+                    rejected.getApplicantId(),
+                    "COMMUNITY_APPLICATION_REJECTED",
+                    "Yeu cau tham gia da bi tu choi",
+                    payload(post, Map.of("applicationId", rejected.getId()))));
         } else {
             notifications.publish(application.getApplicantId(), "COMMUNITY_APPLICATION_ACCEPTED", "Yeu cau tham gia da duoc chap nhan",
                     payload(post, Map.of("applicationId", applicationId)));
@@ -323,14 +335,33 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
             List<Predicate> predicates = new ArrayList<>();
             if (request.getStatus() == CommunityPostStatus.HIDDEN) {
                 predicates.add(cb.disjunction());
+            } else if (request.getStatus() != null) {
+                predicates.add(cb.equal(root.get("status"), request.getStatus()));
             } else {
-                predicates.add(cb.equal(root.get("status"), request.getStatus() != null ? request.getStatus() : CommunityPostStatus.OPEN));
+                predicates.add(cb.notEqual(root.get("status"), CommunityPostStatus.HIDDEN));
+            }
+            if (request.getOwnerId() != null) predicates.add(cb.equal(root.get("ownerId"), request.getOwnerId()));
+            if (request.getApplicantId() != null) {
+                query.distinct(true);
+                predicates.add(cb.equal(root.join("applications").get("applicantId"), request.getApplicantId()));
             }
             if (request.getPostType() != null) predicates.add(cb.equal(root.get("postType"), request.getPostType()));
             if (request.getSkillLevel() != null && !request.getSkillLevel().isBlank()) predicates.add(cb.equal(root.get("skillLevel"), request.getSkillLevel()));
             if (request.getDate() != null) predicates.add(cb.equal(root.get("bookingDate"), request.getDate()));
             if (request.getFieldType() != null) predicates.add(cb.equal(root.get("fieldType"), request.getFieldType()));
-            if (request.getDistrict() != null && !request.getDistrict().isBlank()) predicates.add(cb.like(cb.lower(root.get("locationText")), "%" + request.getDistrict().toLowerCase(Locale.ROOT) + "%"));
+            if (request.getCity() != null && !request.getCity().isBlank()) {
+                String city = "%" + request.getCity().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("locationText")), city),
+                        cb.like(cb.lower(root.get("fieldName")), city)));
+            }
+            if (request.getDistrict() != null && !request.getDistrict().isBlank()) {
+                String district = "%" + request.getDistrict().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("locationText")), district),
+                        cb.like(cb.lower(root.get("fieldName")), district)));
+            }
+            if (request.getFieldName() != null && !request.getFieldName().isBlank()) predicates.add(cb.like(cb.lower(root.get("fieldName")), "%" + request.getFieldName().toLowerCase(Locale.ROOT) + "%"));
             if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
                 String keyword = "%" + request.getKeyword().toLowerCase(Locale.ROOT) + "%";
                 predicates.add(cb.or(
@@ -374,6 +405,11 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         userProjectionRepository.findById(response.getOwnerId())
                 .map(this::toStatistics)
                 .ifPresent(response::setOwnerStatistics);
+        return response;
+    }
+
+    private CommunityPostResponse withMatchResultSubmitted(CommunityPostResponse response) {
+        response.setMatchResultSubmitted(matchResultRepository.findByBookingId(response.getBookingId()).isPresent());
         return response;
     }
 

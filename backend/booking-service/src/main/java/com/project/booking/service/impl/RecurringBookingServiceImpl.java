@@ -160,6 +160,31 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
     @Override
     @Transactional
+    public RecurringBookingResponse ownerPause(UUID ownerId, UUID id) {
+        return changeOwnerStatus(ownerId, id, RecurringBookingStatus.PAUSED, false);
+    }
+
+    @Override
+    @Transactional
+    public RecurringBookingResponse ownerResume(UUID ownerId, UUID id) {
+        RecurringBooking recurringBooking = getOwnedByFieldOwner(ownerId, id);
+        validateCanResume(recurringBooking);
+        recurringBooking.setStatus(RecurringBookingStatus.ACTIVE);
+        recurringBooking.setNextProcessAt(nextProcessAt(nextOccurrenceOnOrAfter(recurringBooking, LocalDate.now())));
+        RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
+        refreshHasRecurring(saved.getSubFieldId());
+        availabilityCacheService.evictAll();
+        return toResponseWithLatestBooking(saved);
+    }
+
+    @Override
+    @Transactional
+    public RecurringBookingResponse ownerCancel(UUID ownerId, UUID id) {
+        return changeOwnerStatus(ownerId, id, RecurringBookingStatus.CANCELLED, true);
+    }
+
+    @Override
+    @Transactional
     public RecurringBookingResponse adminPause(UUID id) {
         return changeAdminStatus(id, RecurringBookingStatus.PAUSED);
     }
@@ -277,6 +302,18 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         return toResponseWithLatestBooking(saved);
     }
 
+    private RecurringBookingResponse changeOwnerStatus(UUID ownerId, UUID id, RecurringBookingStatus status, boolean cancelLatestConfirmedBooking) {
+        RecurringBooking recurringBooking = getOwnedByFieldOwner(ownerId, id);
+        if (cancelLatestConfirmedBooking) {
+            cancelLatestConfirmedBookingByOwner(ownerId, recurringBooking);
+        }
+        recurringBooking.setStatus(status);
+        RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
+        refreshHasRecurring(saved.getSubFieldId());
+        availabilityCacheService.evictAll();
+        return toResponseWithLatestBooking(saved);
+    }
+
     private RecurringBookingResponse changeAdminStatus(UUID id, RecurringBookingStatus status) {
         RecurringBooking recurringBooking = getRequired(id);
         recurringBooking.setStatus(status);
@@ -289,6 +326,14 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private RecurringBooking getOwned(UUID userId, UUID id) {
         RecurringBooking recurringBooking = getRequired(id);
         if (!recurringBooking.getUserId().equals(userId)) {
+            throw new UnauthorizedException("You are not authorised to manage this recurring booking");
+        }
+        return recurringBooking;
+    }
+
+    private RecurringBooking getOwnedByFieldOwner(UUID ownerId, UUID id) {
+        RecurringBooking recurringBooking = getRequired(id);
+        if (recurringBooking.getSubField() == null || !ownerId.equals(recurringBooking.getSubField().getOwnerId())) {
             throw new UnauthorizedException("You are not authorised to manage this recurring booking");
         }
         return recurringBooking;
@@ -385,6 +430,15 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                 .ifPresent(booking -> bookingService.cancelBooking(userId, CancelBookingRequest.builder()
                         .bookingId(booking.getId())
                         .reason("Recurring booking cancelled")
+                        .build()));
+    }
+
+    private void cancelLatestConfirmedBookingByOwner(UUID ownerId, RecurringBooking recurringBooking) {
+        bookingRepository.findFirstBySourceRecurringBookingIdOrderByStartDateTimeDesc(recurringBooking.getId())
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .ifPresent(booking -> bookingService.cancelBookingByManager(ownerId, "OWNER", CancelBookingRequest.builder()
+                        .bookingId(booking.getId())
+                        .reason("Recurring booking cancelled by field owner")
                         .build()));
     }
 

@@ -3,6 +3,7 @@ import "server-only";
 import type { ApiResponse, ErrorResponse } from "@/lib/api/types";
 
 export const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
+const DEFAULT_GATEWAY_TIMEOUT_MS = 25_000;
 
 export class ApiError extends Error {
   constructor(
@@ -34,7 +35,7 @@ export async function gatewayRequest<T>(
     response = await fetch(new URL(path, API_BASE_URL), {
       ...init,
       headers,
-      signal: init.signal ?? AbortSignal.timeout(8_000),
+      signal: init.signal ?? AbortSignal.timeout(DEFAULT_GATEWAY_TIMEOUT_MS),
     });
   } catch (error) {
     throw new ApiError(

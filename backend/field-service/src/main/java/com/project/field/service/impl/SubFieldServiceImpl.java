@@ -3,6 +3,7 @@ package com.project.field.service.impl;
 import com.project.common.enums.SubFieldType;
 import com.project.common.cache.CacheNames;
 import com.project.common.exception.BadRequestException;
+import com.project.common.security.UserPrincipal;
 import com.project.field.dto.SubFieldDto;
 import com.project.field.dto.SubFieldFilterOptionDto;
 import com.project.field.dto.SubFieldRequest;
@@ -22,6 +23,7 @@ import com.project.field.repository.FieldRepository;
 import com.project.field.repository.SubFieldRepository;
 import com.project.field.service.SubFieldService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SubFieldServiceImpl implements SubFieldService {
     private static final int MINUTES_PER_DAY = 24 * 60;
     private static final LocalTime END_OF_DAY_TIME = LocalTime.of(23, 59);
@@ -164,10 +167,12 @@ public class SubFieldServiceImpl implements SubFieldService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SubFieldFilterOptionDto> getFilterOptions(String search) {
+    public List<SubFieldFilterOptionDto> getFilterOptions(String search, UserPrincipal currentUser) {
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
-        System.out.println(normalizedSearch);
-        return subFieldRepository.findFilterOptions(normalizedSearch).stream()
+        log.debug("sub_field_filter_options_requested searchPresent={} role={}",
+                normalizedSearch != null,
+                currentUser != null ? currentUser.role() : "ANONYMOUS");
+        return findFilterOptionsForUser(normalizedSearch, currentUser).stream()
                 .map(subField -> {
                     Field field = subField.getField();
                     String fieldName = field != null ? field.getName() : null;
@@ -179,6 +184,27 @@ public class SubFieldServiceImpl implements SubFieldService {
                             .build();
                 })
                 .toList();
+    }
+
+    private List<SubField> findFilterOptionsForUser(String search, UserPrincipal currentUser) {
+        if (currentUser == null || currentUser.id() == null) {
+            return subFieldRepository.findFilterOptions(search);
+        }
+        if (hasRole(currentUser, "OWNER")) {
+            return subFieldRepository.findFilterOptionsByOwner(search, currentUser.id());
+        }
+        if (hasRole(currentUser, "EMPLOYEE")) {
+            return subFieldRepository.findFilterOptionsByEmployee(search, currentUser.id());
+        }
+        return subFieldRepository.findFilterOptions(search);
+    }
+
+    private boolean hasRole(UserPrincipal currentUser, String role) {
+        String currentRole = currentUser.role();
+        if (currentRole == null) {
+            return false;
+        }
+        return role.equalsIgnoreCase(currentRole) || ("ROLE_" + role).equalsIgnoreCase(currentRole);
     }
 
     @Override

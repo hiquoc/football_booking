@@ -23,6 +23,7 @@ import {
   submitCancellation,
   submitMatchResult,
 } from "@/lib/client/bookings";
+import { submitNoShowReport } from "@/lib/client/moderation";
 import { bookingQueryKeys } from "@/lib/query-keys";
 import { recurringBookingQueryKeys, userQueryKeys } from "@/lib/query-keys";
 
@@ -46,10 +47,14 @@ export function useBookingConfig() {
   });
 }
 
-export function useMyBookings(page: number, size = 10) {
+export function useMyBookings(
+  page: number,
+  size = 10,
+  filters: { bookingDate?: string; status?: string } = {},
+) {
   return useQuery({
-    queryKey: bookingQueryKeys.mine(page, size),
-    queryFn: () => fetchMyBookings(page, size),
+    queryKey: bookingQueryKeys.mine(page, size, filters),
+    queryFn: () => fetchMyBookings(page, size, filters),
   });
 }
 
@@ -73,9 +78,9 @@ export function useBookingList(
   return useQuery({
     queryKey: owner
       ? bookingQueryKeys.owner(page, size, filters)
-      : bookingQueryKeys.mine(page, size),
+      : bookingQueryKeys.mine(page, size, filters),
     queryFn: () =>
-      owner ? fetchOwnerBookings(page, size, filters) : fetchMyBookings(page, size),
+      owner ? fetchOwnerBookings(page, size, filters) : fetchMyBookings(page, size, filters),
   });
 }
 
@@ -177,6 +182,17 @@ export function useSubmitMatchResult() {
       queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
       void queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
+    },
+  });
+}
+
+export function useReportNoShow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: string) => submitNoShowReport(bookingId),
+    retry: false,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
     },
   });
 }

@@ -30,8 +30,12 @@ export function submitRecurringBookingUpdate(id: string, input: RecurringBooking
   });
 }
 
-export function submitRecurringBookingAction(id: string, action: "pause" | "resume" | "cancel", admin = false) {
-  const query = admin ? "?admin=true" : "";
+export function submitRecurringBookingAction(
+  id: string,
+  action: "pause" | "resume" | "cancel",
+  scope: "my" | "owner" | "admin" = "my",
+) {
+  const query = scope === "admin" ? "?admin=true" : scope === "owner" ? "?owner=true" : "";
   return requestJson<RecurringBooking>(`/api/recurring-bookings/${encodeURIComponent(id)}/${action}${query}`, {
     method: action === "cancel" ? "DELETE" : "PATCH",
   });

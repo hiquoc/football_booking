@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUsers } from "@/lib/server/users";
+import { searchUsers } from "@/lib/server/users";
 import { routeError } from "@/lib/server/route-response";
 
 export async function GET(request: Request) {
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
       30,
       Math.max(1, Number.parseInt(query.get("size") ?? "10", 10) || 10),
     );
-    return NextResponse.json(await getUsers(page, size));
+    return NextResponse.json(await searchUsers(page, size, query.get("phoneNumber") ?? ""));
   } catch (error) {
     return routeError(error);
   }

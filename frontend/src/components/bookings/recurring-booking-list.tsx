@@ -25,10 +25,9 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const bookings = useRecurringBookings(scope, page, 10, status === "ALL" ? undefined : status);
-  const action = useRecurringBookingAction(scope === "admin");
+  const action = useRecurringBookingAction(scope);
   const update = useUpdateRecurringBooking();
-  const abortBooking = useCancelBooking(false);
-  const readonly = scope === "owner";
+  const abortBooking = useCancelBooking(scope === "owner");
 
   if (bookings.isPending) return <ListSkeleton count={4} />;
   if (bookings.isError) return <DataError title="Không thể tải lịch đặt định kỳ" />;
@@ -55,7 +54,8 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
         {bookings.data.content.map((item) => {
           const latestBooking = item.latestBooking;
           const showAbortLatest = item.status === "PAUSED" && latestBooking?.status === "CONFIRMED";
-          const canManage = !readonly && item.status !== "CANCELLED" && item.status !== "COMPLETED";
+          const canEdit = scope !== "owner" && item.status !== "CANCELLED" && item.status !== "COMPLETED";
+          const canManage = item.status !== "CANCELLED" && item.status !== "COMPLETED";
           return (
             <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -114,9 +114,11 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
 
               {canManage ? (
                 <div className="mt-5 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setEditingId(editingId === item.id ? null : item.id)} className="action-button bg-slate-100 px-4 text-slate-700">
-                    <Pencil className="size-4" /> Sửa ngày kết thúc
-                  </button>
+                  {canEdit ? (
+                    <button type="button" onClick={() => setEditingId(editingId === item.id ? null : item.id)} className="action-button bg-slate-100 px-4 text-slate-700">
+                      <Pencil className="size-4" /> Sửa ngày kết thúc
+                    </button>
+                  ) : null}
                   {item.status === "ACTIVE" ? (
                     <ConfirmableAction
                       id={item.id}

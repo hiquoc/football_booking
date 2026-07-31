@@ -57,6 +57,11 @@ export function formatNotification(notification: Notification) {
         title: "Thanh toán thất bại",
         detail: joinParts([code && `Mã ${code}`, reason && `Lý do: ${reason}`]),
       };
+    case "WALLET_TOP_UP_SUCCEEDED":
+      return {
+        title: "Nap vi thanh cong",
+        detail: joinParts([Number.isFinite(amount) && formatCurrency(amount), code && `Ma ${code}`]),
+      };
     case "COMMUNITY_POST_APPLIED":
       return { title: "Có người vừa ứng tuyển", detail: community };
     case "COMMUNITY_APPLICATION_WITHDRAWN":

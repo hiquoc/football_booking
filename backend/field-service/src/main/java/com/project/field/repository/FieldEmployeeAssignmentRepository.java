@@ -13,4 +13,5 @@ public interface FieldEmployeeAssignmentRepository extends JpaRepository<FieldEm
     List<FieldEmployeeAssignment> findByFieldIdOrderByCreatedAtAsc(UUID fieldId);
     List<FieldEmployeeAssignment> findByEmployeeIdOrderByCreatedAtAsc(UUID employeeId);
     boolean existsByEmployeeIdAndFieldId(UUID employeeId, UUID fieldId);
+    boolean existsByEmployeeId(UUID employeeId);
 }

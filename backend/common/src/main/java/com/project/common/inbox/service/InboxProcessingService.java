@@ -6,6 +6,7 @@ import com.project.common.inbox.entity.InboxEventStatus;
 import com.project.common.inbox.handler.InboxEventHandler;
 import com.project.common.inbox.repository.InboxEventRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InboxProcessingService {
 
     private final InboxEventRepository inboxEventRepository;
@@ -53,10 +55,15 @@ public class InboxProcessingService {
         event.setErrorMessage(errorMessage);
         if (event.getRetryCount() >= properties.maxRetries()) {
             event.setStatus(InboxEventStatus.FAILED);
+            log.error("kafka_consumer_dlq_required topic={} eventId={} retryCount={} reason={}",
+                    event.getTopic(), event.getEventId(), event.getRetryCount(), errorMessage);
             return;
         }
         event.setStatus(InboxEventStatus.RECEIVED);
-        event.setNextRetryAt(Instant.now().plus(retryDelay(event.getRetryCount())));
+        Duration delay = retryDelay(event.getRetryCount());
+        event.setNextRetryAt(Instant.now().plus(delay));
+        log.warn("kafka_consumer_retry_scheduled topic={} eventId={} retryCount={} backoffMs={} reason={}",
+                event.getTopic(), event.getEventId(), event.getRetryCount(), delay.toMillis(), errorMessage);
     }
 
     @Transactional

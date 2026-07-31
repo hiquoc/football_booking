@@ -45,10 +45,16 @@ export function updateRecurringBooking(id: string, input: RecurringBookingInput)
   });
 }
 
-export function changeRecurringBookingStatus(id: string, action: "pause" | "resume" | "cancel", admin = false) {
-  const path = admin
+export function changeRecurringBookingStatus(
+  id: string,
+  action: "pause" | "resume" | "cancel",
+  scope: "my" | "owner" | "admin" = "my",
+) {
+  const path = scope === "admin"
     ? `/api/v1/recurring-bookings/admin/${encodeURIComponent(id)}${action === "cancel" ? "" : `/${action}`}`
-    : `/api/v1/recurring-bookings/${encodeURIComponent(id)}${action === "cancel" ? "" : `/${action}`}`;
+    : scope === "owner"
+      ? `/api/v1/recurring-bookings/owner/${encodeURIComponent(id)}${action === "cancel" ? "" : `/${action}`}`
+      : `/api/v1/recurring-bookings/${encodeURIComponent(id)}${action === "cancel" ? "" : `/${action}`}`;
   return authenticatedGatewayRequest<RecurringBooking>(path, {
     method: action === "cancel" ? "DELETE" : "PATCH",
   });

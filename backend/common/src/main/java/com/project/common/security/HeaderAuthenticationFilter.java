@@ -1,6 +1,8 @@
 package com.project.common.security;
 
 import com.project.common.constants.GlobalConstants;
+import com.project.common.logging.LogContext;
+import com.project.common.logging.MdcFields;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,9 +50,9 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
                 filterChain.doFilter(request, response);
                 return;
             }
-            log.warn("request_rejected reason=invalid_internal_gateway_secret method={} path={} correlationId={}",
+            log.warn("request_rejected reason=invalid_internal_gateway_secret method={} path={} requestId={}",
                     request.getMethod(), request.getRequestURI(),
-                    request.getHeader(GlobalConstants.CORRELATION_HEADER_NAME));
+                    request.getHeader(GlobalConstants.REQUEST_ID_HEADER_NAME));
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
             return;
         }
@@ -78,10 +80,11 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                LogContext.putIfPresent(MdcFields.USER_ID, userId);
             } catch (IllegalArgumentException e) {
-                log.warn("authentication_header_rejected reason=invalid_user_id method={} path={} correlationId={}",
+                log.warn("authentication_header_rejected reason=invalid_user_id method={} path={} requestId={}",
                         request.getMethod(), request.getRequestURI(),
-                        request.getHeader(GlobalConstants.CORRELATION_HEADER_NAME));
+                        request.getHeader(GlobalConstants.REQUEST_ID_HEADER_NAME));
             }
         }
 

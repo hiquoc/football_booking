@@ -2,6 +2,36 @@
 
 This repository is a full-stack football field booking platform. Use this file as the quick architecture map before changing code.
 
+Last updated: 2026-07-29
+
+## Current Progress
+
+The project is in active feature-integration work, with the main product surfaces already implemented across backend microservices and the Next.js BFF/frontend.
+
+Completed or largely implemented:
+
+- Microservice foundation: gateway, Eureka discovery, shared common module, per-service PostgreSQL databases, Redis, Kafka, and Docker Compose local stack.
+- User/auth: OTP login, OAuth login support, JWT/refresh-token flow, role-based access for `ADMIN`, `OWNER`, `EMPLOYEE`, and `CLIENT`, user profiles, avatar upload, wallet/balance support, and public profile lookup.
+- Field management: owner CRUD for fields and sub-fields, field types, schedules, closures, pricing rules, Cloudinary image workflow, favorites, reviews, employee assignment, and field-management permission checks.
+- Booking: availability calculation from booking-service projections, booking creation/cancellation, owner booking lists, client booking history, recurring bookings, match results, no-show reports, payment-related state transitions, pending expiration, and completed-booking scheduler flow.
+- Payments: Stripe checkout/webhooks, payment sessions, user-balance payment strategy, wallet top-up events, and payment result events consumed by booking/notification flows.
+- Notifications: email/in-app notification creation, STOMP/WebSocket delivery, authenticated WebSocket ticket flow through the BFF and gateway, and inbox/outbox-style processing.
+- Community: looking-for-opponent/player posts, post applications, owner decisions, post reporting, owner hide flow, moderation history, player statistics, and dedicated "my posts" / "my applications" frontend routes.
+- Frontend: public field search/detail, booking and payment pages, owner field/booking/employee tools, admin field/user/moderation tools, community feed/detail/create pages, notifications UI, and BFF route handlers.
+
+Current uncommitted work in the tree is concentrated around:
+
+- Community feed filtering and navigation, including `ownerId`, `applicantId`, status `all`, default upcoming sorting, location filters, field-name suggestions, and new routes under `frontend/src/app/(main)/community/my-posts` and `frontend/src/app/(main)/community/my-applications`.
+- Client booking history filters by booking date and status, wired from frontend query keys/hooks/BFF through `BookingController.getMyBookings`.
+- Owner/employee booking moderation, where assigned `EMPLOYEE` users can report no-shows, view violations, view banned clients, and unban through field-management permission checks.
+- Field employee assignment notifications via the new `field.employee.assigned` notification topic and `FieldEmployeeAssignedEvent`.
+- Wallet top-up success notification handling in notification-service.
+
+Known validation status:
+
+- Some unit tests were updated in booking and notification services.
+- Full verification should still be run before commit: backend tests, frontend lint/typecheck/tests/build, and Docker Compose config validation.
+
 ## Repository Layout
 
 ```text
@@ -66,6 +96,7 @@ Gateway routing is defined in `backend/gateway-service/src/main/resources/applic
 - `/api/v1/users/me/favorites/**` -> field-service
 - `/api/v1/fields/**`, `/api/v1/sub-fields/**`, `/api/v1/field-types/**`, `/api/v1/reviews/**` -> field-service
 - `/api/v1/bookings/**`, `/api/v1/admin/booking-config` -> booking-service
+- `/api/v1/owner/**` booking moderation routes -> booking-service
 - `/api/v1/notifications/**` -> notification-service
 - `/api/v1/payments/**` -> payment-service
 - `/ws/**` -> notification-service WebSocket
@@ -154,7 +185,7 @@ Current field topics:
 
 ### Booking
 
-Booking service owns booking creation, availability checks, recurring bookings, cancellation, completion, and expiration.
+Booking service owns booking creation, availability checks, recurring bookings, cancellation, completion, expiration, match results, and booking moderation.
 
 Important booking concepts:
 
@@ -163,9 +194,26 @@ Important booking concepts:
 - Pricing is based on time price rules and can span multiple price periods.
 - Pending bookings expire through a scheduler.
 - Confirmed bookings complete through a scheduler after their end time.
+- Client booking history supports filtering by `bookingDate` and `status`.
+- Owner booking lists support filters by date, sub-field, and status.
+- No-show reporting is allowed for completed bookings and is available to field owners and assigned employees.
+- Field violation and banned-client actions must prove field-management access before mutating moderation state.
 - Booking repository methods intentionally use bulk `@Modifying` updates for status transitions.
 
 The active file from the IDE, `backend/booking-service/src/main/java/com/project/booking/repository/BookingRepository.java`, is part of this booking persistence boundary.
+
+### Community
+
+Community posts are owned by booking-service and are tied to confirmed booking context.
+
+Important community concepts:
+
+- Posts support `LOOKING_OPPONENT` and `LOOKING_PLAYER` workflows.
+- Filters include post type, status, skill level, date, field type, city, district, field name, keyword, owner, applicant, and sort mode.
+- The main feed defaults toward upcoming open posts.
+- Logged-in clients and employees can see their own posts and applications through dedicated frontend routes.
+- Post applications can be accepted/rejected by post owners.
+- Reports, owner hide actions, moderation history, and player statistics are part of the same bounded context.
 
 ### Payment
 
@@ -194,10 +242,32 @@ Current notification/payment/user-balance topics:
 - `booking.created`
 - `booking.confirmed`
 - `booking.cancelled`
+- `booking.completed`
 - `payment.success`
 - `payment.failed`
+- `user.completed-booking-count.changed`
+- `user.balance.top-up-succeeded`
 - `user.balance.refund-requested`
 - `user.balance.deduction-requested`
+- `user.balance.updated`
+- `user.profile.updated`
+- `community.notification`
+- `field.employee.assigned`
+- `match.evaluation.submitted`
+- `player.match-statistics.adjusted`
+- `platform-ban.requested`
+- `moderation.notification`
+
+### Field Employees
+
+Field owners can assign employees to help manage fields.
+
+Important employee-management concepts:
+
+- Field service owns employee assignments and validates candidate users through user-service.
+- Assignment creates a field-domain record and publishes `FieldEmployeeAssignedEvent` to the notification topic `field.employee.assigned`.
+- Notification service creates an in-app notification for the assigned employee.
+- Booking moderation checks whether an `EMPLOYEE` can manage a field through the field-management client before allowing no-show, violation, banned-client, or unban actions.
 
 ## Cache Strategy
 
@@ -276,3 +346,33 @@ Before making changes:
 - For database changes, add Flyway migrations in the owning service only.
 - For cache-sensitive writes, check whether explicit cache invalidation is required.
 - For booking availability, payment, or cancellation changes, check both synchronous service logic and async Kafka handlers.
+
+## Recommended Next Steps
+
+1. Review the current uncommitted feature set for consistency before adding more scope. Pay special attention to role naming (`OWNER`/`EMPLOYEE`), field-management authorization, and whether every frontend BFF route maps to a gateway route.
+2. Run focused backend tests first:
+
+```bash
+cd backend
+./mvnw -pl booking-service test
+./mvnw -pl field-service test
+./mvnw -pl notification-service test
+```
+
+3. Run frontend checks:
+
+```bash
+cd frontend
+npm run lint
+npm run typecheck
+npm test
+```
+
+4. Start the stack and manually test these flows:
+
+- Login as owner, assign an employee, confirm the employee receives an in-app notification.
+- Login as employee, open owner booking tools, report a completed booking as no-show, then verify violation/banned-client views.
+- Login as client, filter `/bookings` by date/status.
+- Create community posts, apply to posts, verify `/community/my-posts` and `/community/my-applications`, and test status `all` filtering.
+
+5. After verification, fix any failing tests or UX issues, then update API docs/Swagger annotations for any changed backend endpoints before committing.

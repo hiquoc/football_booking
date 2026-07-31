@@ -1,6 +1,7 @@
 package com.project.field.config;
 
 import com.project.common.constants.GlobalConstants;
+import com.project.common.logging.MdcFields;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,9 +20,9 @@ public class FeignConfig implements RequestInterceptor {
     @Override
     public void apply(RequestTemplate template) {
         template.header(GlobalConstants.HEADER_INTERNAL_SECRET, internalGatewaySecret);
-        String correlationId = MDC.get("correlationId");
-        if (correlationId != null) {
-            template.header(GlobalConstants.CORRELATION_HEADER_NAME, correlationId);
+        String requestId = MDC.get(MdcFields.REQUEST_ID);
+        if (requestId != null) {
+            template.header(GlobalConstants.REQUEST_ID_HEADER_NAME, requestId);
         }
 
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();

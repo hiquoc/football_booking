@@ -3,7 +3,11 @@ import { z } from "zod";
 import { assignFieldEmployee, getFieldEmployees } from "@/lib/server/fields";
 import { assertSameOrigin, routeError } from "@/lib/server/route-response";
 
-const schema = z.object({ employeeId: z.string().uuid() });
+const javaUuidSchema = z.string().regex(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  "Invalid UUID",
+);
+const schema = z.object({ employeeId: javaUuidSchema });
 
 export async function GET(
   _request: Request,

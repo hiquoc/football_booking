@@ -7,7 +7,7 @@ import type { Booking, MatchResultOutcome, WinningTeam } from "@/lib/api/types";
 import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime, getBookingStatus } from "@/lib/booking-format";
 import { formatCurrency } from "@/lib/field-format";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
-import { useSubmitMatchResult } from "@/lib/hooks/use-bookings";
+import { useReportNoShow, useSubmitMatchResult } from "@/lib/hooks/use-bookings";
 
 const splitPresets = [
   { label: "50 / 50", a: 50, b: 50 },
@@ -30,7 +30,7 @@ export function BookingCard({
   const status = getBookingStatus(useBookingDisplayStatus(booking) ?? booking.status);
   const fieldPrice = Number(booking.subFieldPrice ?? booking.totalAmount ?? 0);
   const bookingFee = Number(booking.bookingPrice ?? booking.platformBookingFee ?? 0);
-  const bookerDetails = customerDetails(booking);
+  const bookerDetailsWithPhone = customerDetailsWithPhone(booking);
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -48,7 +48,7 @@ export function BookingCard({
           {owner ? (
             <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
               <UserRound className="size-3.5 text-slate-400" />
-              Khách hàng: {bookerDetails}
+              Khách hàng: {bookerDetailsWithPhone}
             </p>
           ) : null}
         </div>
@@ -130,10 +130,11 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
   const [teamAPercentage, setTeamAPercentage] = useState(result?.teamAPercentage ?? 70);
   const [teamBPercentage, setTeamBPercentage] = useState(result?.teamBPercentage ?? 30);
   const [matchResult, setMatchResult] = useState<MatchResultOutcome>(
-    normalizeResult(result?.result ?? result?.winningTeam),
+    "BOOKER_WIN" as MatchResultOutcome,
   );
   const mutation = useSubmitMatchResult();
   const bookerName = customerDetails(booking);
+  const noShowMutation = useReportNoShow();
 
   const teamAAmount = useMemo(
     () => (Number(booking.totalAmount) * teamAPercentage) / 100,
@@ -221,20 +222,42 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
           Kết quả đã lưu: {winningTeamLabel(result.result ?? result.winningTeam, bookerName)} - {result.teamAPercentage}/{result.teamBPercentage}
         </p>
       ) : null}
-      <button
-        disabled={mutation.isPending || !splitValid}
-        onClick={() =>
-          mutation.mutate({
-            bookingId: booking.id,
-            input: { result: matchResult, teamAPercentage, teamBPercentage },
-          })
-        }
-        className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-      >
-        <Save className="size-4" />
-        {result ? "Cập nhật kết quả" : "Lưu kết quả"}
-      </button>
+      <div className="flex justify-between">
+        <button
+          disabled={mutation.isPending || !splitValid}
+          onClick={() =>
+            mutation.mutate({
+              bookingId: booking.id,
+              input: { result: matchResult, teamAPercentage, teamBPercentage },
+            })
+          }
+          className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+        >
+          <Save className="size-4" />
+          {result ? "Cập nhật kết quả" : "Lưu kết quả"}
+        </button>
+
+        {booking.status === "COMPLETED" && !booking.matchResult ? (
+          <button
+            disabled={noShowMutation.isPending}
+            onClick={() => {
+              if (window.confirm("Xác nhận báo cáo khách hàng vắng mặt cho lịch đặt này?")) {
+                noShowMutation.mutate(booking.id);
+              }
+            }}
+            className="action-button min-h-0 rounded-lg bg-amber-500 px-3 py-2 text-xs text-white hover:bg-amber-600"
+          >
+            Báo vắng mặt
+          </button>
+        ) : null}
+      </div>
       {mutation.error ? <p className="text-sm font-semibold text-rose-600">{mutation.error.message}</p> : null}
+
+      {noShowMutation.error ? (
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {noShowMutation.error.message}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -261,5 +284,9 @@ function bookerTeamLabel(bookerName: string, outcome: "won" | "lost") {
 }
 
 function customerDetails(booking: Booking) {
+  return booking.clientName ? booking.clientName : "Không xác định";
+}
+
+function customerDetailsWithPhone(booking: Booking) {
   return booking.clientName ? booking.clientName + (booking.clientPhoneNumber ? " (" + booking.clientPhoneNumber + ")" : "") : booking.clientPhoneNumber ? booking.clientPhoneNumber : "Không xác định";
 }

@@ -49,6 +49,7 @@ public class CommunityPostResponse {
     private LocalDateTime hiddenAt;
     private String hiddenReason;
     private Boolean ownerUnderModeration;
+    private Boolean matchResultSubmitted;
     private CommunityPlayerStatisticsResponse ownerStatistics;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

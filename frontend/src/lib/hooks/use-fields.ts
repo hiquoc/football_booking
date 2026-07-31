@@ -33,7 +33,7 @@ export function useUpdateFieldStatus(id: string) {
     onMutate: async (status) => {
       await queryClient.cancelQueries({ queryKey: fieldQueryKeys.all });
       const snapshot = queryClient.getQueriesData({ queryKey: fieldQueryKeys.all });
-      queryClient.setQueriesData<PageResponse<Field>>({ queryKey: fieldQueryKeys.all }, (old) => old ? { ...old, content: old.content.map((field) => field.id === id ? { ...field, status } : field) } : old);
+      queryClient.setQueriesData<PageResponse<Field>>({ queryKey: fieldQueryKeys.all }, (old) => old ? { ...old, content: old.content?.map((field) => field.id === id ? { ...field, status } : field) } : old);
       queryClient.setQueryData<Field>(fieldQueryKeys.detail(id), (old) => old ? { ...old, status } : old);
       return snapshot;
     },
@@ -121,10 +121,11 @@ export function useFieldDetails(id: string) {
   });
 }
 
-export function useSubFieldFilterOptions(search = "") {
+export function useSubFieldFilterOptions(search = "", enabled = true) {
   return useQuery({
     queryKey: fieldQueryKeys.subFieldFilterOptions(search),
     queryFn: () => fetchSubFieldFilterOptions(search),
+    enabled,
     staleTime: 5 * 60 * 1000,
   });
 }

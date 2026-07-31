@@ -8,7 +8,10 @@ import type {
   CommunityReport,
   CommunityReportReason,
   CommunityReportStatus,
+  CommunityViolation,
   CreateCommunityPostInput,
+  MatchEvaluation,
+  MatchEvaluationInput,
   PageResponse,
   UpdateCommunityPostInput,
 } from "@/lib/api/types";
@@ -18,7 +21,7 @@ import { gatewayRequest } from "./gateway";
 function communityQuery(page: number, size: number, filters: CommunityPostFilters) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   Object.entries(filters).forEach(([key, value]) => {
-    if (value) query.set(key, String(value));
+    if (value && !(key === "status" && value === "all")) query.set(key, String(value));
   });
   return query;
 }
@@ -91,6 +94,13 @@ export function ownerHideCommunityPost(id: string, reason: string) {
   );
 }
 
+export function submitMatchEvaluation(id: string, input: MatchEvaluationInput) {
+  return authenticatedGatewayRequest<MatchEvaluation>(
+    `/api/v1/community-posts/${encodeURIComponent(id)}/evaluations`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
 export function getCommunityReports(page = 0, size = 20, status?: CommunityReportStatus) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) query.set("status", status);
@@ -104,4 +114,11 @@ export function submitCommunityModeration(input: AdminModerationInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function getUserCommunityViolations(userId: string, page = 0, size = 5) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return authenticatedGatewayRequest<PageResponse<CommunityViolation>>(
+    `/api/v1/admin/community-moderation/users/${encodeURIComponent(userId)}/violations?${query}`,
+  );
 }

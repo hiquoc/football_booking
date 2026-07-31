@@ -1,6 +1,9 @@
 package com.project.common.exception;
 
 import com.project.common.dto.ErrorResponse;
+import com.project.common.logging.MdcFields;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -9,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.context.request.ServletWebRequest;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -72,7 +76,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex, WebRequest request) {
-        log.error("unhandled_request_error path={}", request.getDescription(false), ex);
+        HttpServletRequest servletRequest = request instanceof ServletWebRequest servletWebRequest
+                ? servletWebRequest.getRequest()
+                : null;
+        String path = servletRequest != null ? servletRequest.getRequestURI() : request.getDescription(false);
+        String method = servletRequest != null ? servletRequest.getMethod() : "unknown";
+        log.error("unhandled_request_error requestId={} userId={} method={} path={} exceptionClass={} message={}",
+                MDC.get(MdcFields.REQUEST_ID),
+                MDC.get(MdcFields.USER_ID),
+                method,
+                path,
+                ex.getClass().getName(),
+                ex.getMessage(),
+                ex);
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .error(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase())

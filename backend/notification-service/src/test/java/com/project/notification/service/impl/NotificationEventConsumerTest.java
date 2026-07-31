@@ -3,6 +3,7 @@ package com.project.notification.service.impl;
 import com.project.common.events.notification.BookingConfirmedEvent;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.UserBalanceUpdatedEvent;
+import com.project.common.events.notification.WalletTopUpSucceededEvent;
 import com.project.common.inbox.entity.InboxEvent;
 import com.project.common.inbox.service.InboxService;
 import com.project.notification.dto.NotificationRequest;
@@ -100,5 +101,45 @@ class NotificationEventConsumerTest {
         assertThat(captor.getValue().balance()).isEqualTo(150_000L);
         assertThat(captor.getValue().reason()).isEqualTo("WALLET_TOP_UP");
         assertThat(captor.getValue().occurredAt()).isEqualTo(occurredAt);
+    }
+
+    @Test
+    void walletTopUpSucceededInboxEventCreatesInAppNotification() {
+        InboxService inboxService = mock(InboxService.class);
+        NotificationService notificationService = mock(NotificationService.class);
+        SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        NotificationInboxEventHandler handler = new NotificationInboxEventHandler(
+                inboxService,
+                notificationService,
+                messagingTemplate);
+        UUID userId = UUID.randomUUID();
+        UUID paymentId = UUID.randomUUID();
+
+        InboxEvent inboxEvent = InboxEvent.builder()
+                .topic(NotificationEventTopics.USER_BALANCE_TOP_UP_SUCCEEDED)
+                .build();
+        WalletTopUpSucceededEvent event = new WalletTopUpSucceededEvent(
+                paymentId,
+                null,
+                null,
+                userId,
+                "user@example.com",
+                BigDecimal.valueOf(200_000L),
+                null,
+                "VND",
+                Instant.now());
+        when(inboxService.payload(inboxEvent, WalletTopUpSucceededEvent.class)).thenReturn(event);
+
+        handler.handle(inboxEvent);
+
+        ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+        verify(notificationService).create(captor.capture());
+        NotificationRequest request = captor.getValue();
+        assertThat(request.getUserId()).isEqualTo(userId);
+        assertThat(request.getCode()).isEqualTo(NotificationCode.WALLET_TOP_UP_SUCCEEDED);
+        assertThat(request.getChannels()).containsExactly(NotificationChannel.IN_APP);
+        assertThat(request.getPayload()).containsEntry("paymentId", paymentId);
+        assertThat(request.getPayload()).containsEntry("amount", BigDecimal.valueOf(200_000L));
+        assertThat(request.getPayload()).containsEntry("currency", "VND");
     }
 }

@@ -49,7 +49,7 @@ public class AuthServiceImpl implements AuthService {
 
         // 2. Generate 6-digit OTP
         String otpCode = String.format("%06d", otp);
-        log.info("[SMS MOCK] Sending OTP {} to phone number {}", otpCode, phone);
+        log.info("auth_otp_requested eventType=otp_requested userId=anonymous phoneSuffix={}", phoneSuffix(phone));
 
         // 3. Save to Redis
         String codeKey = GlobalConstants.REDIS_KEY_OTP_CODE_PREFIX + phone;
@@ -83,6 +83,7 @@ public class AuthServiceImpl implements AuthService {
         String actualCode = (String) redisService.get(codeKey);
         if (!actualCode.equals(request.getCode())) {
             redisService.increment(attemptKey);
+            log.warn("auth_invalid_credentials eventType=invalid_otp phoneSuffix={}", phoneSuffix(phone));
             throw new BadRequestException("Invalid OTP code");
         }
 
@@ -106,8 +107,9 @@ public class AuthServiceImpl implements AuthService {
                     .status("ACTIVE")
                     .build();
             user = userRepository.save(user);
-            log.info("Registered new user with phone: {}", phone);
+            log.info("auth_registration eventType=registration userId={} phoneSuffix={}", user.getId(), phoneSuffix(phone));
         }
+        log.info("auth_login_success eventType=login_success userId={}", user.getId());
 
         // 5. Generate JWT tokens
         String accessToken = jwtTokenProvider.generateToken(user.getId(), user.getEmail(), user.getUserType().name(),
@@ -140,6 +142,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!redisService.isRefreshTokenValid(userId, token)) {
+            log.warn("auth_expired_or_revoked_refresh_token eventType=expired_refresh_token userId={}", userId);
             throw new BadRequestException("Refresh token is revoked or expired");
         }
 
@@ -170,6 +173,7 @@ public class AuthServiceImpl implements AuthService {
         if (jwtTokenProvider.validateToken(token)) {
             UUID userId = jwtTokenProvider.getUserIdFromJWT(token);
             redisService.removeRefreshToken(userId, token);
+            log.info("auth_logout eventType=logout userId={}", userId);
         }
     }
 
@@ -188,6 +192,13 @@ public class AuthServiceImpl implements AuthService {
         return request != null && request.getRefreshToken() != null
                 ? request.getRefreshToken()
                 : refreshTokenCookie;
+    }
+
+    private String phoneSuffix(String phone) {
+        if (phone == null || phone.length() < 4) {
+            return "unknown";
+        }
+        return phone.substring(phone.length() - 4);
     }
 
 }

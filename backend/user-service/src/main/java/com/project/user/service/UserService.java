@@ -12,11 +12,15 @@ import java.util.UUID;
 
 public interface UserService {
     PageResponse<UserDto> getUsers(Pageable pageable);
+    PageResponse<UserDto> getUsers(String phoneNumber, Pageable pageable);
     UserDto getEmployeeByPhone(String phoneNumber);
+    UserDto getAssignableUserByPhone(String phoneNumber);
     UserDto getUserById(UUID id);
     UserDto getUserById(UUID id, UserPrincipal requester);
     PublicProfileDto getPublicProfile(UUID id);
     UserDto getUserByPhone(String phone);
     UserDto updateUserProfile(UserPrincipal user, UpdateProfileRequest request);
+    UserDto changeUserRole(UUID actorId, UUID targetUserId, UserType newRole);
     UserDto changeUserRole(UUID targetUserId, UserType newRole);
+    UserDto changeUserStatus(UUID actorId, UUID targetUserId, String status);
 }

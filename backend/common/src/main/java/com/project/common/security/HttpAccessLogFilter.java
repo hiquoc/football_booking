@@ -1,20 +1,21 @@
 package com.project.common.security;
 
 import com.project.common.constants.GlobalConstants;
+import com.project.common.logging.LogContext;
+import com.project.common.logging.MdcFields;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.UUID;
+import java.util.Map;
 
 /** Logs request metadata and outcomes without logging credentials, headers, query strings, or bodies. */
 public class HttpAccessLogFilter extends OncePerRequestFilter {
@@ -31,14 +32,11 @@ public class HttpAccessLogFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         long startedAt = System.nanoTime();
-        String previousCorrelationId = MDC.get("correlationId");
-        String correlationId = request.getHeader(GlobalConstants.CORRELATION_HEADER_NAME);
-        if (!StringUtils.hasText(correlationId)) {
-            correlationId = UUID.randomUUID().toString();
-        }
+        Map<String, String> previousContext = org.slf4j.MDC.getCopyOfContextMap();
+        String requestId = LogContext.requestIdOrNew(request.getHeader(GlobalConstants.REQUEST_ID_HEADER_NAME));
 
-        MDC.put("correlationId", correlationId);
-        response.setHeader(GlobalConstants.CORRELATION_HEADER_NAME, correlationId);
+        LogContext.putRequestContext(requestId, serviceName);
+        response.setHeader(GlobalConstants.REQUEST_ID_HEADER_NAME, requestId);
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = "anonymous";
@@ -52,6 +50,7 @@ public class HttpAccessLogFilter extends OncePerRequestFilter {
                 role = authentication.getAuthorities().toString();
             }
         }
+        LogContext.putIfPresent(MdcFields.USER_ID, userId);
 
         log.info("request_started service={} method={} path={} remoteIp={} userId={} role={}",
                 serviceName, request.getMethod(), request.getRequestURI(), clientIp(request), userId, role);
@@ -72,11 +71,7 @@ public class HttpAccessLogFilter extends OncePerRequestFilter {
                         serviceName, request.getMethod(), request.getRequestURI(), status, durationMs, userId, role);
             }
 
-            if (previousCorrelationId == null) {
-                MDC.remove("correlationId");
-            } else {
-                MDC.put("correlationId", previousCorrelationId);
-            }
+            LogContext.restore(previousContext);
         }
     }
 

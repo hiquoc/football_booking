@@ -8,10 +8,12 @@ import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface BookingModerationService {
-    FieldViolationResponse reportNoShow(UUID ownerId, ReportNoShowRequest request);
-    PageResponse<FieldViolationResponse> getViolations(UUID ownerId, UUID fieldId, Pageable pageable);
-    PageResponse<FieldViolationResponse> getBannedClients(UUID ownerId, UUID fieldId, Pageable pageable);
-    FieldViolationResponse unban(UUID ownerId, UUID fieldId, UUID userId);
+    FieldViolationResponse reportNoShow(UUID actorId, String actorRole, ReportNoShowRequest request);
+    PageResponse<FieldViolationResponse> getUserFieldViolations(UUID userId, Pageable pageable);
+    PageResponse<FieldViolationResponse> getViolations(UUID actorId, String actorRole, UUID fieldId, Pageable pageable);
+    PageResponse<FieldViolationResponse> getBannedClients(UUID actorId, String actorRole, UUID fieldId, Pageable pageable);
+    FieldViolationResponse ban(UUID actorId, String actorRole, UUID fieldId, UUID userId);
+    FieldViolationResponse unban(UUID actorId, String actorRole, UUID fieldId, UUID userId);
     int recoverMonthlyViolations();
     void ensureCanBook(UUID userId, UUID fieldId);
     void ensurePlatformAllowed(UUID userId);

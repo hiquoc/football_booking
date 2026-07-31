@@ -43,6 +43,9 @@ export function EmployeeManager({ fieldId }: { fieldId: string }) {
       </section>
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="mb-4 text-base font-black text-slate-900">Phan cong nhan vien</h2>
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+          Lưu ý: quyền nhân viên có thể mất tối đa 5 phút để có hiệu lực. Nếu nhân viên vừa được phân công chưa truy cập được trang quản lý, hãy yêu cầu họ đăng xuất rồi đăng nhập lại.
+        </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <label className="flex flex-1 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
             <Phone className="size-4 text-slate-400" />

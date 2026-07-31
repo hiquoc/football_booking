@@ -7,11 +7,23 @@ import type {
 } from "@/lib/api/types";
 import { jsonBody, requestJson } from "./http";
 
+export const submitNoShowReport = (bookingId: string) =>
+  requestJson<FieldViolation>("/api/owner/no-shows", {
+    method: "POST",
+    ...jsonBody({ bookingId }),
+  });
+
 export const fetchFieldViolations = (fieldId: string, page = 0, size = 20) =>
   requestJson<PageResponse<FieldViolation>>(`/api/owner/client-violations?fieldId=${encodeURIComponent(fieldId)}&page=${page}&size=${size}`);
 
 export const fetchBannedClients = (fieldId: string, page = 0, size = 20) =>
   requestJson<PageResponse<FieldViolation>>(`/api/owner/banned-clients?fieldId=${encodeURIComponent(fieldId)}&page=${page}&size=${size}`);
+
+export const submitBanClient = (fieldId: string, userId: string) =>
+  requestJson<FieldViolation>(`/api/owner/banned-clients/${encodeURIComponent(userId)}/ban`, {
+    method: "PATCH",
+    ...jsonBody({ fieldId }),
+  });
 
 export const submitUnbanClient = (fieldId: string, userId: string) =>
   requestJson<FieldViolation>(`/api/owner/banned-clients/${encodeURIComponent(userId)}/unban`, {

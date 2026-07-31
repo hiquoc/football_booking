@@ -115,6 +115,36 @@ public class RecurringBookingController {
                 recurringBookingService.cancel(user.id(), id)));
     }
 
+    @Operation(summary = "Owner pause recurring booking")
+    @PreAuthorize("hasRole('OWNER')")
+    @PatchMapping("/owner/{id}/pause")
+    public ResponseEntity<ApiResponse<RecurringBookingResponse>> ownerPause(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Recurring booking paused successfully",
+                recurringBookingService.ownerPause(user.id(), id)));
+    }
+
+    @Operation(summary = "Owner resume recurring booking")
+    @PreAuthorize("hasRole('OWNER')")
+    @PatchMapping("/owner/{id}/resume")
+    public ResponseEntity<ApiResponse<RecurringBookingResponse>> ownerResume(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Recurring booking resumed successfully",
+                recurringBookingService.ownerResume(user.id(), id)));
+    }
+
+    @Operation(summary = "Owner cancel recurring booking")
+    @PreAuthorize("hasRole('OWNER')")
+    @DeleteMapping("/owner/{id}")
+    public ResponseEntity<ApiResponse<RecurringBookingResponse>> ownerCancel(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success("Recurring booking cancelled successfully",
+                recurringBookingService.ownerCancel(user.id(), id)));
+    }
+
     @Operation(summary = "Admin pause recurring booking")
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/admin/{id}/pause")

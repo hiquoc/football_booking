@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.common.kafka.KafkaHeaderUtil;
+import com.project.common.logging.MdcFields;
 import com.project.common.outbox.dto.OutboxSaveRequest;
 import com.project.common.outbox.entity.OutboxEvent;
 import com.project.common.outbox.entity.OutboxEventStatus;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.MDC;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +35,14 @@ public class OutboxService {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put(KafkaHeaderUtil.EVENT_ID, eventId.toString());
         headers.put("aggregateType", request.aggregateType());
-        headers.put("eventType", request.eventType());
+        headers.put(KafkaHeaderUtil.EVENT_TYPE, request.eventType());
+        if (request.aggregateId() != null) {
+            headers.put(KafkaHeaderUtil.AGGREGATE_ID, request.aggregateId());
+        }
+        String requestId = MDC.get(MdcFields.REQUEST_ID);
+        if (requestId != null) {
+            headers.put(KafkaHeaderUtil.REQUEST_ID, requestId);
+        }
 
         OutboxEvent event = OutboxEvent.builder()
                 .id(eventId)

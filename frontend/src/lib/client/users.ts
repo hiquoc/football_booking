@@ -5,6 +5,7 @@ import type {
   PublicProfile,
   UpdateProfileInput,
   User,
+  UserViolationHistory,
 } from "@/lib/api/types";
 import { jsonBody, requestJson } from "./http";
 
@@ -20,8 +21,10 @@ export function fetchPublicProfile(id: string) {
   return requestJson<PublicProfile>(`/api/users/${encodeURIComponent(id)}/profile`);
 }
 
-export function fetchUsers(page: number, size = 10) {
+export function fetchUsers(page: number, size = 10, phoneNumber = "") {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
+  const trimmedPhone = phoneNumber.trim();
+  if (trimmedPhone) query.set("phoneNumber", trimmedPhone);
   return requestJson<PageResponse<User>>(`/api/admin/users?${query}`);
 }
 
@@ -73,4 +76,17 @@ export function submitUserRole(id: string, userType: User["userType"]) {
     method: "PUT",
     ...jsonBody({ userType }),
   });
+}
+
+export function submitUserStatus(id: string, status: "ACTIVE" | "PLATFORM_BANNED") {
+  return requestJson<User>(`/api/admin/users/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    ...jsonBody({ status }),
+  });
+}
+
+export function fetchUserViolations(id: string) {
+  return requestJson<UserViolationHistory>(
+    `/api/admin/users/${encodeURIComponent(id)}/violations?size=5`,
+  );
 }

@@ -10,8 +10,9 @@ async function handle(request: Request, paramsPromise: Promise<{ id: string; act
   if (!["pause", "resume", "cancel"].includes(action)) {
     return NextResponse.json({ message: "Unsupported action" }, { status: 400 });
   }
-  const admin = new URL(request.url).searchParams.get("admin") === "true";
-  return NextResponse.json(await changeRecurringBookingStatus(id, action as Action, admin));
+  const query = new URL(request.url).searchParams;
+  const scope = query.get("admin") === "true" ? "admin" : query.get("owner") === "true" ? "owner" : "my";
+  return NextResponse.json(await changeRecurringBookingStatus(id, action as Action, scope));
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; action: string }> }) {

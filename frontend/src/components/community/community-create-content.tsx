@@ -6,6 +6,7 @@ import { LoaderCircle } from "lucide-react";
 import type { PublicProfile } from "@/lib/api/types";
 import { useMyBookings } from "@/lib/hooks/use-bookings";
 import { useCreateCommunityPost } from "@/lib/hooks/use-community";
+import { skillLevelOptions } from "./community-labels";
 
 export function CommunityCreateContent({ profile }: { profile: PublicProfile | null }) {
   const router = useRouter();
@@ -67,7 +68,14 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
           <textarea name="description" rows={4} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2" />
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input name="skillLevel" label="Trình độ" defaultValue={profile?.personal.skillLevel ?? "AVERAGE"} required />
+          <label className="block text-sm font-bold text-slate-700">
+            Trình độ
+            <select name="skillLevel" defaultValue={profile?.personal.skillLevel ?? "AVERAGE"} required className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2">
+              {skillLevelOptions.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
           <Input name="contactPhone" label="Zalo" defaultValue={profile?.personal.phoneNumber ?? ""} required />
         </div>
         {postType === "LOOKING_PLAYER" ? <Input name="playersNeeded" label="Số cầu thủ cần thêm" type="number" min={1} required /> : null}

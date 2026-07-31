@@ -64,11 +64,11 @@ export function useUpdateRecurringBooking() {
   });
 }
 
-export function useRecurringBookingAction(admin = false) {
+export function useRecurringBookingAction(scope: "my" | "owner" | "admin" = "my") {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: "pause" | "resume" | "cancel" }) =>
-      submitRecurringBookingAction(id, action, admin),
+      submitRecurringBookingAction(id, action, scope),
     retry: false,
     onSuccess: (recurringBooking) => {
       updateRecurringBookingInCache(queryClient, recurringBooking);

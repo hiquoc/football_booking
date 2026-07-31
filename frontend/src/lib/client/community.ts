@@ -7,6 +7,8 @@ import type {
   CommunityReportReason,
   CommunityReportStatus,
   CreateCommunityPostInput,
+  MatchEvaluation,
+  MatchEvaluationInput,
   PageResponse,
   UpdateCommunityPostInput,
 } from "@/lib/api/types";
@@ -15,7 +17,7 @@ import { jsonBody, requestJson } from "./http";
 function query(page: number, size: number, filters: CommunityPostFilters) {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   Object.entries(filters).forEach(([key, value]) => {
-    if (value) params.set(key, String(value));
+    if (value && !(key === "status" && value === "all")) params.set(key, String(value));
   });
   return params;
 }
@@ -69,6 +71,13 @@ export function submitOwnerHideCommunityPost(id: string, reason: string) {
   return requestJson<CommunityPost>(`/api/community-posts/${encodeURIComponent(id)}/owner-hide`, {
     method: "PATCH",
     ...jsonBody({ reason }),
+  });
+}
+
+export function submitCommunityMatchEvaluation(id: string, input: MatchEvaluationInput) {
+  return requestJson<MatchEvaluation>(`/api/community-posts/${encodeURIComponent(id)}/evaluations`, {
+    method: "POST",
+    ...jsonBody(input),
   });
 }
 
