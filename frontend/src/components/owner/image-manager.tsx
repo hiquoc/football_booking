@@ -54,7 +54,7 @@ export function ImageManager({ fieldId }: { fieldId: string }) {
 
   return (
     <div>
-      <label className="mb-6 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-5 py-6 text-sm font-semibold text-slate-700 transition hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700">
+      <label className="mb-6 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-5 py-6 text-sm font-semibold text-slate-700 transition hover:border-green-400 hover:bg-green-50 hover:text-green-700">
         {upload.isPending ? (
           <LoaderCircle className="size-5 animate-spin" />
         ) : (

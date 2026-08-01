@@ -7,6 +7,7 @@ import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.converters.models.PageableAsQueryParam;
@@ -44,6 +45,7 @@ public class BookingModerationController {
 
     @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PageableAsQueryParam
+    @Operation(summary = "List field violations", description = "Returns paged field violations enriched with username, phoneNumber, and userId for authorized field managers.")
     @GetMapping("/owner/fields/{fieldId}/violations")
     public ResponseEntity<ApiResponse<PageResponse<FieldViolationResponse>>> violations(
             @CurrentUser UserPrincipal user,
@@ -54,6 +56,7 @@ public class BookingModerationController {
 
     @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @PageableAsQueryParam
+    @Operation(summary = "List banned clients for a field", description = "Returns paged banned clients enriched with username, phoneNumber, and userId for authorized field managers.")
     @GetMapping("/owner/fields/{fieldId}/banned-clients")
     public ResponseEntity<ApiResponse<PageResponse<FieldViolationResponse>>> bannedClients(
             @CurrentUser UserPrincipal user,

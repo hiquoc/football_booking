@@ -9,6 +9,7 @@ import com.project.field.entity.TimePriceRule;
 import com.project.field.dto.TimePriceRuleDto;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 @Component
@@ -32,7 +33,9 @@ public class SubFieldMapper {
                 .airConditioning(entity.getAirConditioning())
                 .bookingRule(toBookingRuleDto(entity.getBookingRule()))
                 .timePriceRules(entity.getTimePriceRules() != null
-                        ? entity.getTimePriceRules().stream().map(this::toTimePriceRuleDto).collect(Collectors.toList())
+                        ? entity.getTimePriceRules().stream()
+                          .sorted(Comparator.comparing(TimePriceRule::getStartTime))
+                          .map(this::toTimePriceRuleDto).collect(Collectors.toList())
                         : null)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())

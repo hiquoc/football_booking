@@ -15,19 +15,26 @@ function todayInVietnam() {
 
 export default async function BookFieldPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ mode?: string }>;
 }) {
   const user = await requireUser();
-  if (user.userType !== "CLIENT" && user.userType !== "EMPLOYEE") return <AccessDenied />;
+  const query = await searchParams;
+  const reservationMode = query.mode === "reservation";
+  if (user.userType !== "CLIENT" && user.userType !== "EMPLOYEE" && user.userType !== "OWNER") return <AccessDenied />;
+  if (reservationMode && user.userType !== "OWNER") return <AccessDenied />;
   const { id } = await params;
   const initialDate = todayInVietnam();
   const queryClient = await prefetchFieldBooking(id, initialDate);
   return (
-    <div className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8">
+    <div className="min-h-[70vh] bg-slate-50">
+      <div className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <BookingForm fieldId={id} initialDate={initialDate} />
+        <BookingForm fieldId={id} initialDate={initialDate} reservationMode={reservationMode} />
       </HydrationBoundary>
+      </div>
     </div>
   );
 }

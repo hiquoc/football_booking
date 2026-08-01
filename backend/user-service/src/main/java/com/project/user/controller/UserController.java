@@ -25,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springdoc.core.converters.models.PageableAsQueryParam;
 
 import java.util.UUID;
@@ -60,7 +62,7 @@ public class UserController {
     @GetMapping
     public ApiResponse<PageResponse<UserDto>> getUsers(
             @RequestParam(required = false) String phoneNumber,
-            Pageable pageable) {
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ApiResponse.success(userService.getUsers(phoneNumber, pageable));
     }
 
@@ -201,7 +203,7 @@ public class UserController {
     }
 
     @Operation(summary = "Change user role (Admin only)",
-            description = "Allows an ADMIN to change the role of any user. Accessible only to users with ADMIN role.",
+            description = "Allows an ADMIN to change the role of any user to CLIENT, OWNER, or EMPLOYEE. Users cannot be upgraded to ADMIN through this endpoint.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
                     content = @Content(schema = @Schema(implementation = ChangeRoleRequest.class),
                             examples = @ExampleObject(value = """
@@ -238,7 +240,7 @@ public class UserController {
         private String status;
     }
 
-    @Operation(summary = "Change user role internally")
+    @Operation(summary = "Change user role internally", description = "Internal role changes may assign CLIENT, OWNER, or EMPLOYEE. ADMIN cannot be assigned.")
     @PutMapping("/internal/{id}/role")
     public ApiResponse<UserDto> changeUserRoleInternal(
             @PathVariable UUID id,

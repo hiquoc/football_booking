@@ -13,7 +13,7 @@ export function FieldStatusControl({ fieldId, status }: { fieldId: string; statu
         value={mutation.data?.status ?? status}
         disabled={mutation.isPending}
         onChange={(event) => mutation.mutate(event.target.value as FieldStatus)}
-        className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 outline-none focus:border-sky-500"
+        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-700 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
         aria-label="Đổi trạng thái sân"
       >
         <option value="PENDING">Chờ xác nhận
@@ -27,7 +27,7 @@ export function FieldStatusControl({ fieldId, status }: { fieldId: string; statu
           {currentStatus === "REJECTED" ? "Đã từ chối" : "Từ chối"}
         </option>
       </select>
-      {mutation.isPending ? <LoaderCircle className="size-4 animate-spin text-sky-600" /> : null}
+      {mutation.isPending ? <LoaderCircle className="size-4 animate-spin text-green-600" /> : null}
       {mutation.error ? <span className="text-xs font-semibold text-rose-600">{mutation.error.message}</span> : null}
     </div>
   );

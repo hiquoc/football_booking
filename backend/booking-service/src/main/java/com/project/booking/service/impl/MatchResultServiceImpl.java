@@ -52,8 +52,8 @@ public class MatchResultServiceImpl implements MatchResultService {
         result.setWinningTeam(nextResult);
         result.setTeamAPercentage(request.getTeamAPercentage());
         result.setTeamBPercentage(request.getTeamBPercentage());
-        result.setTeamAAmount(calculateAmount(booking.getTotalAmount(), request.getTeamAPercentage()));
-        result.setTeamBAmount(calculateAmount(booking.getTotalAmount(), request.getTeamBPercentage()));
+        result.setTeamAAmount(calculateAmount(booking.getSubFieldPrice(), request.getTeamAPercentage()));
+        result.setTeamBAmount(calculateAmount(booking.getSubFieldPrice(), request.getTeamBPercentage()));
         result.setSubmittedBy(managerId);
 
         MatchResult saved = matchResultRepository.save(result);
@@ -89,8 +89,8 @@ public class MatchResultServiceImpl implements MatchResultService {
         }
     }
 
-    private BigDecimal calculateAmount(BigDecimal totalAmount, int percentage) {
-        return totalAmount
+    private BigDecimal calculateAmount(BigDecimal amount, int percentage) {
+        return amount
                 .multiply(BigDecimal.valueOf(percentage))
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }

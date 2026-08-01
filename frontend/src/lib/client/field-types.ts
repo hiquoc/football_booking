@@ -5,6 +5,12 @@ export function fetchFieldTypes() {
   return requestJson<FieldType[]>("/api/field-types");
 }
 
+export function fetchSubFieldTypes() {
+  return requestJson<string[]>("/api/sub-field-types", {
+    cache: "force-cache",
+  });
+}
+
 export function submitFieldType(input: FieldTypeInput) {
   return requestJson<FieldType>("/api/field-types", {
     method: "POST",

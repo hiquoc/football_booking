@@ -6,7 +6,13 @@ import { gatewayRequest } from "./gateway";
 
 export function getFieldTypes() {
   return gatewayRequest<FieldType[]>("/api/v1/field-types", {
-    next: { revalidate: 300 },
+    next: { revalidate: 31_536_000 },
+  });
+}
+
+export function getSubFieldTypes() {
+  return gatewayRequest<string[]>("/api/v1/sub-fields/types", {
+    next: { revalidate: 31_536_000 },
   });
 }
 

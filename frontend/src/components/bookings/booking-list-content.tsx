@@ -5,10 +5,21 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import type { BookingStatus } from "@/lib/api/types";
 import { getBookingStatus } from "@/lib/booking-format";
+import { formatFieldType } from "@/lib/field-format";
 import { useBookingList, useCancelBooking } from "@/lib/hooks/use-bookings";
-import { useSubFieldFilterOptions } from "@/lib/hooks/use-fields";
+import { useSubFieldTypes } from "@/lib/hooks/use-field-types";
+import { useCurrentManagedFields } from "@/lib/hooks/use-owner-fields";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 import { BookingCard } from "./booking-card";
+
+type BookingFiltersValue = {
+  bookingDate?: string;
+  fieldId?: string;
+  fieldType?: string;
+  subFieldId?: string;
+  subFieldType?: string;
+  status?: string;
+};
 
 export function BookingListContent({
   page,
@@ -17,7 +28,7 @@ export function BookingListContent({
 }: {
   page: number;
   owner?: boolean;
-  filters?: { bookingDate?: string; subFieldId?: string; status?: string };
+  filters?: BookingFiltersValue;
 }) {
   const query = useBookingList(page, owner, 10, filters);
   const cancelMutation = useCancelBooking(true);
@@ -52,7 +63,7 @@ export function BookingListContent({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <BookingFilters owner={owner} filters={filters} />
       {query.data.content.map((booking) => (
         <BookingCard
@@ -73,7 +84,7 @@ export function BookingListContent({
                         });
                       }
                     }}
-                    className="action-button min-h-0 rounded-lg bg-rose-500 px-3 py-2 text-xs text-white hover:bg-rose-600"
+                    className="action-button min-h-0 rounded-lg bg-rose-500 px-3 py-2 text-xs text-white"
                   >
                     Hủy lịch
                   </button>
@@ -87,7 +98,7 @@ export function BookingListContent({
         <div className="flex justify-center gap-3 pt-5">
           {page > 0 ? (
             <Link
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-green-300 hover:bg-green-50 hover:text-green-700"
               href={pageLink(page, filters)}
             >
               Trước
@@ -95,7 +106,7 @@ export function BookingListContent({
           ) : null}
           {page + 1 < query.data.totalPages ? (
             <Link
-              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-bold text-white"
+              className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white"
               href={pageLink(page + 2, filters)}
             >
               Sau
@@ -112,20 +123,30 @@ function BookingFilters({
   filters,
 }: {
   owner: boolean;
-  filters: { bookingDate?: string; subFieldId?: string; status?: string };
+  filters: BookingFiltersValue;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const subFieldOptions = useSubFieldFilterOptions("", owner);
+  const fields = useCurrentManagedFields(0, 100);
+  const subFieldTypes = useSubFieldTypes();
+  const fieldTypeOptions = Array.from(
+    new Set(
+      fields.data?.content.flatMap((field) =>
+        field.fieldTypes.map((type) => type.name),
+      ) ?? [],
+    ),
+  );
 
   function applyFilters(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
     const params = new URLSearchParams();
-    ["bookingDate", "subFieldId", "status"].forEach((key) => {
+    ["bookingDate", "fieldId", "fieldType", "subFieldType", "status"].forEach((key) => {
       const value = String(form.get(key) ?? "").trim();
       if (value) params.set(key, value);
     });
-    startTransition(() => router.push(`${owner ? "/owner/bookings" : "/bookings"}${params.size ? `?${params}` : ""}`));
+    startTransition(() =>
+      router.push(`${owner ? "/owner/bookings" : "/bookings"}${params.size ? `?${params}` : ""}`),
+    );
   }
 
   return (
@@ -135,48 +156,78 @@ function BookingFilters({
         applyFilters(event.currentTarget);
       }}
       onChange={(event) => applyFilters(event.currentTarget)}
-      className={`grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm ${
-        owner ? "md:grid-cols-[1fr_1fr_1fr_auto]" : "md:grid-cols-[1fr_1fr_auto]"
+      className={`grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${
+        owner ? "md:grid-cols-[1fr_1fr_1fr_1fr_auto]" : "md:grid-cols-[1fr_1fr_auto]"
       }`}
     >
       <input
         name="bookingDate"
         type="date"
-        defaultValue={filters.bookingDate ?? (owner ? new Date().toISOString().split("T")[0] : "")}
-        className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
+        defaultValue={filters.bookingDate ?? ""}
+        className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
       />
       {owner ? (
         <select
-          name="subFieldId"
-          defaultValue={filters.subFieldId ?? ""}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
-          disabled={subFieldOptions.isPending || subFieldOptions.isError}
+          name="fieldId"
+          defaultValue={filters.fieldId ?? ""}
+          className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 disabled:text-slate-400"
+          disabled={fields.isPending || fields.isError}
         >
           <option value="">
-            {subFieldOptions.isPending
-              ? "Đang tải sân con..."
-              : subFieldOptions.isError
-                ? "Không thể tải sân con"
-                : "Tất cả sân con"}
+            {fields.isPending
+              ? "Đang tải sân..."
+              : fields.isError
+                ? "Không thể tải sân"
+                : "Tất cả sân"}
           </option>
-          {subFieldOptions.data?.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
+          {fields.data?.content.map((field) => (
+            <option key={field.id} value={field.id}>
+              {field.name}
             </option>
           ))}
         </select>
       ) : null}
-      {owner && subFieldOptions.isSuccess && subFieldOptions.data.length === 0 ? (
+      {owner ? (
+        <select
+          name="fieldType"
+          defaultValue={filters.fieldType ?? ""}
+          className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 disabled:text-slate-400"
+          disabled={fields.isPending || fields.isError}
+        >
+          <option value="">Tất cả môn</option>
+          {fieldTypeOptions.map((type) => (
+            <option key={type} value={type}>
+              {formatFieldType(type)}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      {owner ? (
+        <select
+          name="subFieldType"
+          defaultValue={filters.subFieldType ?? ""}
+          className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 disabled:text-slate-400"
+          disabled={subFieldTypes.isPending || subFieldTypes.isError}
+        >
+          <option value="">Tất cả loại sân</option>
+          {subFieldTypes.data?.map((type) => (
+            <option key={type} value={type}>
+              {formatFieldType(type)}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      {owner && fields.isSuccess && fields.data.content.length === 0 ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 md:col-span-5">
-          Chưa có sân con để lọc.
+          Chưa có sân để lọc.
         </p>
       ) : null}
       <select
         name="status"
-        defaultValue={filters.status ?? (owner ? "COMPLETED" : "")}
-        className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium"
+        defaultValue={filters.status ?? ""}
+        className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
       >
-        <option value="">Tất cả trạng thái</option>
+        <option value={owner ? "ALL" : ""}>Tất cả trạng thái</option>
         {(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "EXPIRED"] satisfies BookingStatus[]).map((status) => (
           <option key={status} value={status}>
             {getBookingStatus(status).label}
@@ -187,7 +238,7 @@ function BookingFilters({
   );
 }
 
-function pageLink(page: number, filters: { bookingDate?: string; subFieldId?: string; status?: string }) {
+function pageLink(page: number, filters: BookingFiltersValue) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value) params.set(key, value);

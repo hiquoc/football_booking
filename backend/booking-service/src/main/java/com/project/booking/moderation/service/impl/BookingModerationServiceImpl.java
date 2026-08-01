@@ -7,6 +7,7 @@ import com.project.booking.moderation.entity.*;
 import com.project.booking.moderation.enums.PaymentDisputeStatus;
 import com.project.booking.moderation.kafka.ModerationEventPublisher;
 import com.project.booking.moderation.repository.*;
+import com.project.booking.repository.UserProjectionRepository;
 import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.repository.BookingRepository;
 import com.project.common.dto.PageResponse;
@@ -23,9 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +45,7 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     private final PlatformBanRepository platformBanRepository;
     private final ModerationEventPublisher publisher;
     private final FieldManagementClient fieldManagementClient;
+    private final UserProjectionRepository userProjectionRepository;
 
     @Override
     @Transactional
@@ -99,16 +104,18 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     @Transactional(readOnly = true)
     public PageResponse<FieldViolationResponse> getViolations(UUID actorId, String actorRole, UUID fieldId, Pageable pageable) {
         assertManagerCanAccessField(actorId, actorRole, fieldId);
-        return PageResponse.from(violationRepository.findByFieldIdOrderByUpdatedAtDesc(fieldId, pageable)
+        PageResponse<FieldViolationResponse> response = PageResponse.from(violationRepository.findByFieldIdOrderByUpdatedAtDesc(fieldId, pageable)
                 .map(this::toViolationResponse));
+        return enrichViolationUsers(response);
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<FieldViolationResponse> getBannedClients(UUID actorId, String actorRole, UUID fieldId, Pageable pageable) {
         assertManagerCanAccessField(actorId, actorRole, fieldId);
-        return PageResponse.from(violationRepository.findByFieldIdAndBannedTrueOrderByBanDateDesc(fieldId, pageable)
+        PageResponse<FieldViolationResponse> response = PageResponse.from(violationRepository.findByFieldIdAndBannedTrueOrderByBanDateDesc(fieldId, pageable)
                 .map(this::toViolationResponse));
+        return enrichViolationUsers(response);
     }
 
     @Override
@@ -334,6 +341,36 @@ public class BookingModerationServiceImpl implements BookingModerationService {
                 .createdAt(violation.getCreatedAt())
                 .updatedAt(violation.getUpdatedAt())
                 .build();
+    }
+
+    private PageResponse<FieldViolationResponse> enrichViolationUsers(PageResponse<FieldViolationResponse> response) {
+        List<FieldViolationResponse> violations = response.getContent();
+        if (violations == null || violations.isEmpty()) {
+            return response;
+        }
+
+        Set<UUID> userIds = violations.stream()
+                .map(FieldViolationResponse::getUserId)
+                .collect(Collectors.toSet());
+        Map<UUID, UserProjectionRepository.UserContactView> usersById = userProjectionRepository.findContactByUserIdIn(userIds).stream()
+                .collect(Collectors.toMap(UserProjectionRepository.UserContactView::getUserId, contact -> contact));
+
+        violations.forEach(violation -> {
+            UserProjectionRepository.UserContactView user = usersById.get(violation.getUserId());
+            if (user != null) {
+                violation.setUsername(displayUsername(user.getUsername(), user.getUserId()));
+                violation.setPhoneNumber(user.getPhoneNumber());
+            }
+        });
+        return response;
+    }
+
+    private String displayUsername(String username, UUID userId) {
+        if (username != null && !username.isBlank()) {
+            return username.trim();
+        }
+        String value = userId.toString();
+        return "User " + value.substring(value.length() - 4);
     }
 
     private PaymentDisputeReportResponse toDisputeResponse(PaymentDisputeReport report) {

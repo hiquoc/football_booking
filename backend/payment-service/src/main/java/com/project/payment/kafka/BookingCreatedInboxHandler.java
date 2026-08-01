@@ -14,11 +14,15 @@ public class BookingCreatedInboxHandler implements InboxEventHandler {
     @Override public boolean supports(String topic) { return NotificationEventTopics.BOOKING_CREATED.equals(topic); }
     @Override @Transactional public void handle(InboxEvent inboxEvent) {
         BookingCreatedEvent event = inboxService.payload(inboxEvent, BookingCreatedEvent.class);
+        if ("RESERVATION".equals(event.bookingType())) {
+            repository.deleteById(event.bookingId());
+            return;
+        }
         BookingPaymentProjection projection = repository.findById(event.bookingId())
                 .orElseGet(() -> BookingPaymentProjection.builder().bookingId(event.bookingId()).build());
         projection.setBookingCode(event.bookingCode()); projection.setUserId(event.userId());
-        projection.setUserEmail(event.userEmail()); projection.setTotalAmount(event.totalAmount());
-        projection.setSubFieldPrice(event.subFieldPrice() == null ? event.totalAmount() : event.subFieldPrice());
+        projection.setUserEmail(event.userEmail());
+        projection.setSubFieldPrice(event.subFieldPrice());
         projection.setBookingPrice(event.bookingPrice() == null ? 0L : event.bookingPrice());
         projection.setPlatformBookingFee(event.platformBookingFee() == null ? projection.getBookingPrice() : event.platformBookingFee());
         repository.save(projection);

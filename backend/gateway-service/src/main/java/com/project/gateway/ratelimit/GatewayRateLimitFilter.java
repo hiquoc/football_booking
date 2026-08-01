@@ -144,7 +144,8 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
         ErrorResponse response = ErrorResponse.builder()
-                .code("RATE_LIMIT_EXCEEDED")
+                .code("RATE_LIMITED")
+                .statusCode("RATE_LIMITED")
                 .status(HttpStatus.TOO_MANY_REQUESTS.value())
                 .error(HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase())
                 .message("Too many requests. Please try again later.")

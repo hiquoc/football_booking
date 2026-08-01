@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/server/session";
 import { getMyPublicProfile } from "@/lib/server/users";
 
 export const metadata: Metadata = {
-  title: "Dang bai cong dong",
+  title: "Đăng bài cộng đồng",
 };
 
 export default async function NewCommunityPostPage() {

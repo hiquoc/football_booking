@@ -1,9 +1,17 @@
+import {
+  localizedErrorMessage,
+  statusCodeFromHttpStatus,
+  statusCodeFromPayload,
+} from "../error-messages";
+
 let refreshPromise: Promise<boolean> | null = null;
 
 export class ClientRequestError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly statusCode: string,
+    public readonly developerMessage?: string,
   ) {
     super(message);
     this.name = "ClientRequestError";
@@ -48,23 +56,29 @@ async function fetchJson<T>(path: string, init?: RequestInit) {
 
   const payload = (await response.json().catch(() => null)) as
     | T
-    | { message?: string }
+    | { message?: string; statusCode?: string; code?: string }
     | null;
 
   return { response, payload };
 }
 
-function payloadMessage(payload: unknown) {
+function payloadDeveloperMessage(payload: unknown) {
   return payload && typeof payload === "object" && "message" in payload
     ? (payload.message as string | undefined)
     : undefined;
 }
 
 function throwRequestError(payload: unknown, status: number) {
+  const payloadStatusCode = statusCodeFromPayload(payload);
+  const statusCode =
+    payloadStatusCode === "UNKNOWN_ERROR"
+      ? statusCodeFromHttpStatus(status)
+      : payloadStatusCode;
   throw new ClientRequestError(
-    payloadMessage(payload) ??
-      "Khong the hoan tat yeu cau. Vui long thu lai.",
+    localizedErrorMessage(statusCode),
     status,
+    statusCode,
+    payloadDeveloperMessage(payload),
   );
 }
 

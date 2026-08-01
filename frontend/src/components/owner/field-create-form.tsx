@@ -102,7 +102,7 @@ export function FieldCreateForm() {
     <form onSubmit={submit} className="space-y-7">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-sky-100 text-sky-700">
+          <span className="grid size-11 place-items-center rounded-xl bg-green-100 text-green-700">
             <MapPin className="size-5" />
           </span>
           <div>
@@ -236,7 +236,7 @@ export function FieldCreateForm() {
       ) : null}
       <button
         disabled={mutation.isPending}
-        className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-6 py-3.5 text-sm font-black text-white disabled:opacity-60"
+        className="inline-flex items-center gap-2 rounded-full bg-green-600 px-6 py-3.5 text-sm font-black text-white disabled:opacity-60"
       >
         {mutation.isPending ? (
           <LoaderCircle className="size-4 animate-spin" />

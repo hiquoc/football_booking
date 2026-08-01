@@ -15,7 +15,7 @@ function bookingDetails(notification: Notification) {
   const date = text(notification.payload, "bookingDate");
   const start = text(notification.payload, "startTime")?.slice(0, 5);
   const end = text(notification.payload, "endTime")?.slice(0, 5);
-  const amount = Number(notification.payload.totalAmount);
+  const amount = Number(notification.payload.subFieldPrice);
   return joinParts([
     field,
     date && start && end ? `${date}, ${start} - ${end}` : null,

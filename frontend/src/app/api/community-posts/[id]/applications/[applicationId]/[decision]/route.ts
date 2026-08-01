@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { decideCommunityApplication } from "@/lib/server/community";
-import { assertSameOrigin, routeError } from "@/lib/server/route-response";
+import { assertSameOrigin, errorJson, routeError } from "@/lib/server/route-response";
 
 export async function PATCH(
   request: Request,
@@ -10,7 +10,7 @@ export async function PATCH(
     assertSameOrigin(request);
     const { id, applicationId, decision } = await params;
     if (decision !== "accept" && decision !== "reject") {
-      return NextResponse.json({ message: "Invalid decision" }, { status: 404 });
+      return errorJson(404, "RESOURCE_NOT_FOUND", "Resource not found.");
     }
     return NextResponse.json(await decideCommunityApplication(id, applicationId, decision));
   } catch (error) {

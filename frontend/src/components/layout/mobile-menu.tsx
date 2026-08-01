@@ -26,7 +26,7 @@ export function MobileMenu({ user }: { user: User | null }) {
       <button
         onClick={() => setOpen((value) => !value)}
         aria-label="Mở menu"
-        className="grid size-10 place-items-center rounded-full border border-slate-200"
+        className="grid size-10 place-items-center rounded-full border border-slate-200 text-slate-700 hover:bg-green-50 hover:text-green-700"
       >
         {open ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>
@@ -40,15 +40,15 @@ export function MobileMenu({ user }: { user: User | null }) {
                     key={href}
                     href={href}
                     onClick={() => setOpen(false)}
-                    className="inline-flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-sky-50"
+                    className="inline-flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 hover:bg-green-50 hover:text-green-700"
                   >
-                    <Icon className="size-4 text-slate-400" /> {label}
+                    <Icon className="size-4 text-green-600" /> {label}
                   </Link>
                 ))}
             {!user ? (
               <Link
                 href="/auth/login"
-                className="mt-2 rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-black text-white"
+                className="mt-2 rounded-xl bg-green-600 px-4 py-3 text-center text-sm font-black text-white hover:bg-green-700"
               >
                 Đăng nhập
               </Link>

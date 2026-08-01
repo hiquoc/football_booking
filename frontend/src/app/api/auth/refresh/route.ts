@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertSameOrigin, routeError } from "@/lib/server/route-response";
+import { assertSameOrigin, errorJson, routeError } from "@/lib/server/route-response";
 import {
   clearSession,
   REFRESH_COOKIE,
@@ -19,10 +19,7 @@ export async function POST(request: Request) {
       new RegExp(`(?:^|;\\s*)${REFRESH_COOKIE}=([^;]+)`),
     )?.[1];
     if (!refreshToken) {
-      return NextResponse.json(
-        { message: "Session has expired" },
-        { status: 401 },
-      );
+      return errorJson(401, "TOKEN_EXPIRED", "Session has expired.");
     }
 
     const response = await fetch(
@@ -37,10 +34,7 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const error = await response.json().catch(() => null);
       await clearSession();
-      return NextResponse.json(
-        { message: error?.message ?? "Session has expired" },
-        { status: 401 },
-      );
+      return errorJson(401, error?.statusCode ?? error?.code ?? "TOKEN_EXPIRED", "Session has expired.");
     }
 
     const payload = await response.json();
@@ -48,10 +42,7 @@ export async function POST(request: Request) {
 
     if (typeof accessToken !== "string" || !accessToken) {
       await clearSession();
-      return NextResponse.json(
-        { message: "Invalid refresh response" },
-        { status: 502 },
-      );
+      return errorJson(502, "SERVICE_UNAVAILABLE", "Invalid refresh response.");
     }
 
     const nextResponse = NextResponse.json({ success: true });
@@ -62,10 +53,7 @@ export async function POST(request: Request) {
     );
     if (!rotatedRefreshToken) {
       await clearSession();
-      return NextResponse.json(
-        { message: "Invalid refresh response: refresh cookie is missing" },
-        { status: 502 },
-      );
+      return errorJson(502, "SERVICE_UNAVAILABLE", "Invalid refresh response.");
     }
     setRefreshCookie(nextResponse.cookies, rotatedRefreshToken);
 

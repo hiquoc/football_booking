@@ -1,5 +1,6 @@
 package com.project.user.exception;
 
+import com.project.common.dto.ErrorResponse;
 import com.project.user.controller.ChatController;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -8,33 +9,36 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.OffsetDateTime;
-import java.util.Map;
+import java.time.LocalDateTime;
 
 @RestControllerAdvice(assignableTypes = ChatController.class)
 public class ChatExceptionHandler {
 
     @ExceptionHandler(ChatServiceException.class)
-    public ResponseEntity<Map<String, Object>> chatServiceException(ChatServiceException exception) {
-        return ResponseEntity.status(exception.status()).body(error(exception.status(), exception.getMessage()));
+    public ResponseEntity<ErrorResponse> chatServiceException(ChatServiceException exception) {
+        HttpStatus status = exception.status();
+        String statusCode = status == HttpStatus.UNAUTHORIZED ? "UNAUTHORIZED" : "SERVICE_UNAVAILABLE";
+        return ResponseEntity.status(status).body(error(status, statusCode, developerMessage(statusCode)));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
-    public ResponseEntity<Map<String, Object>> validation(Exception exception) {
-        String message = exception instanceof MethodArgumentNotValidException bindException
-                ? bindException.getFieldErrors().stream().findFirst()
-                        .map(fieldError -> fieldError.getDefaultMessage())
-                        .orElse("Invalid request")
-                : "Invalid request";
-        return ResponseEntity.badRequest().body(error(HttpStatus.BAD_REQUEST, message));
+    public ResponseEntity<ErrorResponse> validation(Exception exception) {
+        return ResponseEntity.badRequest().body(error(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed."));
     }
 
-    private Map<String, Object> error(HttpStatus status, String message) {
-        return Map.of(
-                "code", status.name(),
-                "status", status.value(),
-                "message", message,
-                "timestamp", OffsetDateTime.now().toString()
-        );
+    private ErrorResponse error(HttpStatus status, String statusCode, String message) {
+        return ErrorResponse.builder()
+                .code(statusCode)
+                .statusCode(statusCode)
+                .status(status.value())
+                .error(status.getReasonPhrase())
+                .message(message)
+                .path("/api/v1/chat")
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    private String developerMessage(String statusCode) {
+        return "UNAUTHORIZED".equals(statusCode) ? "Authentication is required." : "Service unavailable.";
     }
 }

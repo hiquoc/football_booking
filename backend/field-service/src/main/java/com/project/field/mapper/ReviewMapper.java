@@ -11,11 +11,16 @@ import java.util.UUID;
 public class ReviewMapper {
 
     public ReviewDto toDto(Review entity) {
+        return toDto(entity, null);
+    }
+
+    public ReviewDto toDto(Review entity, String fullName) {
         if (entity == null) return null;
         return ReviewDto.builder()
                 .id(entity.getId())
                 .fieldId(entity.getField() != null ? entity.getField().getId() : null)
                 .userId(entity.getUserId())
+                .fullName(fullName)
                 .rating(entity.getRating())
                 .comment(entity.getComment())
                 .createdAt(entity.getCreatedAt())

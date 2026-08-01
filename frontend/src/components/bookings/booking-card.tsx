@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, Eye, MapPin, Save, UserRound } from "lucide-react";
+import { CalendarDays, Clock3, Eye, MapPin, Phone, Save, UserRound } from "lucide-react";
 import type { Booking, MatchResultOutcome, WinningTeam } from "@/lib/api/types";
 import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime, getBookingStatus } from "@/lib/booking-format";
 import { formatCurrency } from "@/lib/field-format";
@@ -28,11 +28,10 @@ export function BookingCard({
   action?: React.ReactNode;
 }) {
   const status = getBookingStatus(useBookingDisplayStatus(booking) ?? booking.status);
-  const fieldPrice = Number(booking.subFieldPrice ?? booking.totalAmount ?? 0);
+  const fieldPrice = Number(booking.subFieldPrice ?? 0);
   const bookingFee = Number(booking.bookingPrice ?? booking.platformBookingFee ?? 0);
-  const bookerDetailsWithPhone = customerDetailsWithPhone(booking);
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 sm:p-5">
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-green-300 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)] sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -41,14 +40,17 @@ export function BookingCard({
             </span>
             <span className="text-xs font-semibold text-slate-400">{booking.bookingCode}</span>
           </div>
-          <h2 className="mt-3 truncate text-lg font-black text-slate-900">{booking.fieldName}</h2>
-          <p className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-            <MapPin className="size-4 shrink-0 text-sky-600" /> {booking.subFieldName}
+          <h2 className="mt-3 truncate text-xl font-black text-slate-950">{booking.fieldName}</h2>
+          <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-500">
+            <MapPin className="size-4 shrink-0 text-green-600" /> {booking.subFieldName}
           </p>
           {owner ? (
             <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
               <UserRound className="size-3.5 text-slate-400" />
-              Khách hàng: {bookerDetailsWithPhone}
+              Khách hàng: {customerName(booking)} {customerPhone(booking) ? (
+                <>
+                  <Phone className="size-4 text-slate-400" /> ` ${customerPhone(booking)}`
+                </>) : ""}
             </p>
           ) : null}
         </div>
@@ -82,7 +84,7 @@ export function BookingCard({
         {!owner ? (
           <Link
             href={`/bookings/${booking.id}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:border-sky-300 hover:text-sky-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-black text-white hover:bg-green-700"
           >
             <Eye className="size-4" />
             Xem chi tiết
@@ -116,7 +118,7 @@ function BookingMeta({
 }) {
   return (
     <div className="flex min-w-0 items-start gap-2">
-      <span className="mt-0.5 shrink-0 text-sky-600 [&_svg]:size-4">{icon}</span>
+      <span className="mt-0.5 shrink-0 text-green-600 [&_svg]:size-4">{icon}</span>
       <div className="min-w-0">
         <p className="text-xs font-bold text-slate-400">{label}</p>
         <p className="mt-0.5 font-semibold text-slate-700">{value}</p>
@@ -133,16 +135,16 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
     "BOOKER_WIN" as MatchResultOutcome,
   );
   const mutation = useSubmitMatchResult();
-  const bookerName = customerDetails(booking);
+  const bookerName = customerName(booking);
   const noShowMutation = useReportNoShow();
 
   const teamAAmount = useMemo(
-    () => (Number(booking.totalAmount) * teamAPercentage) / 100,
-    [booking.totalAmount, teamAPercentage],
+    () => (Number(booking.subFieldPrice ?? 0) * teamAPercentage) / 100,
+    [booking.subFieldPrice, teamAPercentage],
   );
   const teamBAmount = useMemo(
-    () => (Number(booking.totalAmount) * teamBPercentage) / 100,
-    [booking.totalAmount, teamBPercentage],
+    () => (Number(booking.subFieldPrice ?? 0) * teamBPercentage) / 100,
+    [booking.subFieldPrice, teamBPercentage],
   );
   const splitValid = teamAPercentage + teamBPercentage === 100;
 
@@ -206,9 +208,9 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
             onChange={(event) => setMatchResult(event.target.value as MatchResultOutcome)}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
           >
-            <option value="BOOKER_WIN">{bookerTeamLabel(bookerName, "won")}</option>
-            <option value="BOOKER_LOSS">{bookerTeamLabel(bookerName, "lost")}</option>
-            <option value="DRAW">Draw</option>
+            <option value="BOOKER_WIN">{bookerTeamLabel(bookerName, "win")}</option>
+            <option value="BOOKER_LOSS">{bookerTeamLabel(bookerName, "lose")}</option>
+            <option value="DRAW">Hòa</option>
           </select>
         </label>
       </div>
@@ -231,7 +233,7 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
               input: { result: matchResult, teamAPercentage, teamBPercentage },
             })
           }
-          className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+          className="inline-flex w-fit items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-60"
         >
           <Save className="size-4" />
           {result ? "Cập nhật kết quả" : "Lưu kết quả"}
@@ -268,9 +270,9 @@ function matchingPreset(teamAPercentage: number, teamBPercentage: number) {
 
 function winningTeamLabel(result: WinningTeam | undefined, bookerName: string) {
   const normalized = normalizeResult(result);
-  if (normalized === "BOOKER_WIN") return bookerTeamLabel(bookerName, "won");
-  if (normalized === "BOOKER_LOSS") return bookerTeamLabel(bookerName, "lost");
-  return "Draw";
+  if (normalized === "BOOKER_WIN") return bookerTeamLabel(bookerName, "win");
+  if (normalized === "BOOKER_LOSS") return bookerTeamLabel(bookerName, "lose");
+  return "Hòa";
 }
 
 function normalizeResult(result: WinningTeam | undefined): MatchResultOutcome {
@@ -279,14 +281,14 @@ function normalizeResult(result: WinningTeam | undefined): MatchResultOutcome {
   return result ?? "DRAW";
 }
 
-function bookerTeamLabel(bookerName: string, outcome: "won" | "lost") {
-  return `Team ${bookerName}'s ${outcome === "won" ? "Thắng" : "Thua"}`;
+function bookerTeamLabel(bookerName: string, outcome: "win" | "lose") {
+  return `Đội của ${bookerName} ${outcome === "win" ? "thắng" : "thua"}`;
 }
 
-function customerDetails(booking: Booking) {
-  return booking.clientName ? booking.clientName : "Không xác định";
+function customerName(booking: Booking) {
+  return booking.clientName ? booking.clientName : "";
 }
 
-function customerDetailsWithPhone(booking: Booking) {
-  return booking.clientName ? booking.clientName + (booking.clientPhoneNumber ? " (" + booking.clientPhoneNumber + ")" : "") : booking.clientPhoneNumber ? booking.clientPhoneNumber : "Không xác định";
+function customerPhone(booking: Booking) {
+  return booking.clientPhoneNumber ? booking.clientPhoneNumber : "";
 }

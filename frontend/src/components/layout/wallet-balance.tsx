@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle, Plus, WalletCards, X } from "lucide-react";
 import { formatCurrency } from "@/lib/field-format";
+import {
+  addOptimisticBalance,
+  clearPendingTopUp,
+  consumePendingTopUp,
+  rememberPendingTopUp,
+} from "@/lib/client/top-up-balance";
 import { useCreateCheckout } from "@/lib/hooks/use-payments";
 import { useCurrentUser } from "@/lib/hooks/use-profile";
 
@@ -10,19 +17,34 @@ const TOP_UP_AMOUNTS = [20000, 30000, 40000, 50000] as const;
 
 export function WalletBalance() {
   const currentUser = useCurrentUser();
+  const queryClient = useQueryClient();
   const checkout = useCreateCheckout();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number>(TOP_UP_AMOUNTS[0]);
   const balance = currentUser.data?.balance ?? 0;
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const topUpStatus = searchParams.get("topup");
+    if (topUpStatus === "returned" && currentUser.data) {
+      const pendingTopUp = consumePendingTopUp();
+      if (pendingTopUp) addOptimisticBalance(queryClient, pendingTopUp.amount);
+      return;
+    }
+    if (topUpStatus === "cancelled") clearPendingTopUp();
+  }, [currentUser.data, queryClient]);
+
   async function topUp() {
-    const result = await checkout.mutateAsync({ amount, currency: "VND", provider: "STRIPE" });
+    const input = { amount, currency: "VND", provider: "STRIPE" as const };
+    const result = await checkout.mutateAsync(input);
+    rememberPendingTopUp(result, input);
     window.location.assign(result.checkoutUrl);
   }
 
   return (
     <div className="relative hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 sm:flex">
-      <WalletCards className="size-4 text-sky-600" />
+      <WalletCards className="size-4 text-green-600" />
       <span className="leading-tight">
         <span className="block text-[10px] text-slate-400">Ví</span>
         <span>{currentUser.isPending ? "--" : formatCurrency(balance)}</span>
@@ -30,7 +52,7 @@ export function WalletBalance() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="grid size-8 place-items-center rounded-full bg-sky-500 text-white hover:bg-sky-600"
+        className="grid size-8 place-items-center rounded-full bg-green-600 text-white hover:bg-green-700"
         title="Nạp tiền"
       >
         <Plus className="size-4" />
@@ -81,7 +103,7 @@ export function WalletBalance() {
             type="button"
             onClick={topUp}
             disabled={checkout.isPending}
-            className="action-button mt-4 w-full bg-sky-500 px-4 text-white hover:bg-sky-600 disabled:opacity-60"
+            className="action-button mt-4 w-full bg-green-600 px-4 text-white hover:bg-green-700 disabled:opacity-60"
           >
             {checkout.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />}
             Nạp {formatCurrency(amount)}

@@ -19,6 +19,10 @@ export function fetchAssignedFields(page: number, size = 10) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   return requestJson<PageResponse<Field>>(`/api/employee/fields?${query}`);
 }
+export function fetchManagedFields(page: number, size = 10) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return requestJson<PageResponse<Field>>(`/api/owner/managed-fields?${query}`);
+}
 export function fetchFieldEmployees(fieldId: string) {
   return requestJson<FieldEmployee[]>(`/api/owner/fields/${fieldId}/employees`);
 }

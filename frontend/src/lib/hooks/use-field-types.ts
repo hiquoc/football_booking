@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FieldTypeInput } from "@/lib/api/types";
 import {
   fetchFieldTypes,
+  fetchSubFieldTypes,
   submitFieldType,
   submitFieldTypeDelete,
   submitFieldTypeUpdate,
@@ -14,6 +15,17 @@ export function useFieldTypes() {
   return useQuery({
     queryKey: fieldTypeQueryKeys.all,
     queryFn: fetchFieldTypes,
+    staleTime: 31_536_000_000,
+    gcTime: 31_536_000_000,
+  });
+}
+
+export function useSubFieldTypes() {
+  return useQuery({
+    queryKey: fieldTypeQueryKeys.subFieldTypes,
+    queryFn: fetchSubFieldTypes,
+    staleTime: 31_536_000_000,
+    gcTime: 31_536_000_000,
   });
 }
 

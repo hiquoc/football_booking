@@ -51,14 +51,15 @@ const ownerSteps = [
 export default function ContactPage() {
   return (
     <div className="min-h-[70vh] bg-slate-50">
-      <section className="relative overflow-hidden bg-sky-50 py-16 text-slate-900 sm:py-20">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_90%)]" />
+      <section className="relative overflow-hidden bg-white py-16 text-slate-900 sm:py-20">
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,#f0fdf4_0%,#ffffff_58%,#f8fafc_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(34,197,94,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(34,197,94,0.08)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(to_bottom,black,transparent_88%)]" />
         <div className="relative mx-auto grid w-full max-w-[90rem] gap-10 px-5 sm:px-8 lg:grid-cols-[1fr_0.8fr] lg:items-end">
           <div>
-            <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-sky-600">
+            <span className="inline-flex items-center gap-2 text-sm font-black uppercase text-green-600">
               <Mail className="size-4" aria-hidden="true" /> Liên hệ PitchUp
             </span>
-            <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-[-0.05em] text-slate-950 sm:text-6xl">
+            <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight text-slate-950 sm:text-6xl">
               Kết nối người chơi với những sân thể thao phù hợp.
             </h1>
             <p className="mt-5 max-w-2xl leading-7 text-slate-600">
@@ -68,11 +69,11 @@ export default function ContactPage() {
               hàng.
             </p>
           </div>
-          <div className="rounded-[1.75rem] border border-sky-100 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-600">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+            <p className="text-sm font-black uppercase text-green-600">
               Dành cho chủ sân
             </p>
-            <h2 className="mt-3 text-2xl font-black tracking-[-0.035em] text-slate-950">
+            <h2 className="mt-3 text-2xl font-black text-slate-950">
               Muốn đưa sân lên PitchUp?
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -81,7 +82,7 @@ export default function ContactPage() {
             </p>
             <Link
               href="mailto:partners@pitchup.vn"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white hover:bg-sky-600"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-black text-white hover:bg-green-700"
             >
               <Mail className="size-4" aria-hidden="true" /> Gửi email hợp tác
             </Link>
@@ -93,13 +94,13 @@ export default function ContactPage() {
         {contactChannels.map(({ icon: Icon, title, value, href, note }) => (
           <article
             key={title}
-            className="rounded-[1.75rem] border border-slate-200 bg-white p-7 shadow-[0_12px_40px_rgba(15,23,42,0.04)]"
+            className="rounded-2xl border border-slate-200 bg-white p-7 shadow-[0_12px_40px_rgba(15,23,42,0.04)] transition hover:border-green-300 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)]"
           >
-            <span className="grid size-11 place-items-center rounded-xl bg-sky-100 text-sky-700">
+            <span className="grid size-11 place-items-center rounded-xl bg-green-100 text-green-700">
               <Icon className="size-5" aria-hidden="true" />
             </span>
             <h2 className="mt-6 text-lg font-black text-slate-950">{title}</h2>
-            <Link href={href} className="mt-2 inline-flex text-sm font-black text-sky-600 hover:text-sky-700">
+            <Link href={href} className="mt-2 inline-flex text-sm font-black text-green-700 hover:text-green-800">
               {value}
             </Link>
             <p className="mt-3 text-sm leading-6 text-slate-500">{note}</p>
@@ -110,10 +111,10 @@ export default function ContactPage() {
       <section className="bg-white py-12 sm:py-16">
         <div className="mx-auto grid w-full max-w-[90rem] gap-10 px-5 sm:px-8 lg:grid-cols-[0.85fr_1fr] lg:items-start">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-600">
+            <p className="text-sm font-black uppercase text-green-600">
               PitchUp làm gì?
             </p>
-            <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-5xl">
+            <h2 className="mt-3 text-3xl font-black leading-tight text-slate-950 sm:text-5xl">
               Một nền tảng cho cả người chơi và chủ sân.
             </h2>
             <p className="mt-5 leading-7 text-slate-600">
@@ -149,19 +150,19 @@ export default function ContactPage() {
       </section>
 
       <section className="mx-auto w-full max-w-[90rem] px-5 py-12 sm:px-8 sm:py-16">
-        <div className="grid gap-8 rounded-[1.75rem] border border-slate-200 bg-slate-950 p-7 text-white sm:p-9 lg:grid-cols-[0.75fr_1fr]">
+        <div className="grid gap-8 rounded-2xl border border-slate-200 bg-slate-950 p-7 text-white sm:p-9 lg:grid-cols-[0.75fr_1fr]">
           <div>
-            <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-sky-300">
+            <span className="inline-flex items-center gap-2 text-sm font-black uppercase text-green-300">
               <Building2 className="size-4" aria-hidden="true" /> Quy trình hợp tác
             </span>
-            <h2 className="mt-4 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
+            <h2 className="mt-4 text-3xl font-black leading-tight sm:text-4xl">
               Chủ sân cần chuẩn bị gì?
             </h2>
           </div>
           <div className="grid gap-4">
             {ownerSteps.map((step) => (
               <div key={step} className="flex gap-3 rounded-2xl bg-white/8 p-4">
-                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-sky-300" aria-hidden="true" />
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-300" aria-hidden="true" />
                 <p className="text-sm leading-6 text-slate-200">{step}</p>
               </div>
             ))}
@@ -182,8 +183,8 @@ function InfoTile({
   copy: string;
 }) {
   return (
-    <article className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
-      <span className="grid size-10 place-items-center rounded-xl bg-white text-sky-700 shadow-sm [&_svg]:size-5">
+    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6 transition hover:border-green-300">
+      <span className="grid size-10 place-items-center rounded-xl bg-white text-green-700 shadow-sm [&_svg]:size-5">
         {icon}
       </span>
       <h3 className="mt-5 text-base font-black text-slate-950">{title}</h3>

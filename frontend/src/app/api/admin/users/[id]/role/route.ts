@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { User } from "@/lib/api/types";
 import { updateUserRole } from "@/lib/server/users";
-import { assertSameOrigin, routeError } from "@/lib/server/route-response";
+import { assertSameOrigin, errorJson, routeError } from "@/lib/server/route-response";
 
-const roles = new Set<User["userType"]>(["CLIENT", "OWNER", "EMPLOYEE", "ADMIN"]);
+const roles = new Set<User["userType"]>(["CLIENT", "OWNER", "EMPLOYEE"]);
 
 export async function PUT(
   request: Request,
@@ -13,7 +13,7 @@ export async function PUT(
     assertSameOrigin(request);
     const body = (await request.json()) as { userType?: User["userType"] };
     if (!body.userType || !roles.has(body.userType)) {
-      return NextResponse.json({ message: "Vai trò không hợp lệ" }, { status: 400 });
+      return errorJson(400, "VALIDATION_ERROR", "Validation failed.");
     }
     return NextResponse.json(
       await updateUserRole((await params).id, body.userType),

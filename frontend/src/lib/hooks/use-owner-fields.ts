@@ -5,6 +5,7 @@ import {
   fetchAssignedFields,
   fetchClosures,
   fetchFieldEmployees,
+  fetchManagedFields,
   fetchOwnerFields,
   submitClosure,
   submitClosureDelete,
@@ -25,18 +26,28 @@ export function useOwnerFields(page: number, size = 10) {
   return useQuery({
     queryKey: ownerFieldQueryKeys.list(page, size),
     queryFn: () => fetchOwnerFields(page, size),
+    staleTime: 60 * 1000,
   });
 }
 export function useManagedFields(role: "OWNER" | "EMPLOYEE", page: number, size = 10) {
   return useQuery({
     queryKey: role === "EMPLOYEE" ? ownerFieldQueryKeys.assigned(page, size) : ownerFieldQueryKeys.list(page, size),
     queryFn: () => role === "EMPLOYEE" ? fetchAssignedFields(page, size) : fetchOwnerFields(page, size),
+    staleTime: 60 * 1000,
+  });
+}
+export function useCurrentManagedFields(page: number, size = 10) {
+  return useQuery({
+    queryKey: ownerFieldQueryKeys.managed(page, size),
+    queryFn: () => fetchManagedFields(page, size),
+    staleTime: 60 * 1000,
   });
 }
 export function useAssignedFields(page: number, size = 10) {
   return useQuery({
     queryKey: ownerFieldQueryKeys.assigned(page, size),
     queryFn: () => fetchAssignedFields(page, size),
+    staleTime: 60 * 1000,
   });
 }
 export function useFieldEmployees(fieldId: string) {

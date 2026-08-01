@@ -8,24 +8,24 @@ export const bookingStatus: Record<
 > = {
   PENDING: {
     label: "Chờ thanh toán",
-    className: "bg-amber-100 text-amber-700",
+    className: "bg-amber-500 text-white",
   },
   CONFIRMED: {
     label: "Đã xác nhận",
-    className: "bg-sky-100 text-sky-700",
+    className: "bg-green-600 text-white",
   },
   IN_PROGRESS: {
     label: "Đang diễn ra",
-    className: "bg-emerald-100 text-emerald-700",
+    className: "bg-green-600 text-white",
   },
-  CANCELLED: { label: "Đã hủy", className: "bg-rose-100 text-rose-700" },
-  COMPLETED: { label: "Hoàn thành", className: "bg-sky-100 text-sky-700" },
-  EXPIRED: { label: "Đã hết hạn", className: "bg-slate-100 text-slate-600" },
+  CANCELLED: { label: "Đã hủy", className: "bg-rose-500 text-white" },
+  COMPLETED: { label: "Hoàn thành", className: "bg-green-600 text-white" },
+  EXPIRED: { label: "Đã hết hạn", className: "bg-slate-500 text-white" },
 };
 
 const unknownBookingStatus = {
   label: "Không xác định",
-  className: "bg-slate-100 text-slate-600",
+  className: "bg-slate-500 text-white",
 };
 
 export function getBookingStatus(status: string) {

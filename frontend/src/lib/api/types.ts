@@ -7,6 +7,7 @@ export interface ApiResponse<T> {
 
 export interface ErrorResponse {
   code?: string | null;
+  statusCode?: string | null;
   status: number;
   error: string;
   message: string;
@@ -126,7 +127,7 @@ export interface FieldDetails {
   field: Field;
   operatingHours: OperatingHours[];
   subFields: SubField[];
-  reviews: Review[];
+  reviews: PageResponse<Review>;
 }
 
 export type FieldStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -191,6 +192,7 @@ export interface Review {
   id: string;
   fieldId: string;
   userId: string;
+  fullName?: string | null;
   rating: number;
   comment: string | null;
   createdAt: string;
@@ -239,6 +241,7 @@ export interface PublicProfile {
     fullName: string | null;
     avatarUrl: string | null;
     phoneNumber: string | null;
+    email: string | null;
     bio: string | null;
     teamPhotoUrl: string | null;
     skillLevel: SkillLevel;
@@ -269,7 +272,8 @@ export type BookingStatus =
   | "COMPLETED"
   | "EXPIRED";
 
-export type BookingPaymentStatus = "UNPAID" | "PAID" | "REFUNDED" | "FAILED";
+export type BookingPaymentStatus = "UNPAID" | "PAID" | "NOT_REQUIRED" | "REFUNDED" | "FAILED";
+export type BookingType = "NORMAL" | "RESERVATION";
 
 export type MatchResultOutcome = "BOOKER_WIN" | "BOOKER_LOSS" | "DRAW";
 export type WinningTeam = MatchResultOutcome | "TEAM_A" | "TEAM_B";
@@ -303,6 +307,7 @@ export interface Booking {
   clientAvatarUrl: string | null;
   subFieldId: string;
   subFieldName: string;
+  fieldId?: string;
   fieldName: string;
   ownerId: string;
   bookingDate: string;
@@ -312,10 +317,10 @@ export interface Booking {
   endTime: string;
   durationMinutes: number;
   pricePerHour: number;
-  totalAmount: number;
   subFieldPrice: number;
   bookingPrice: number;
   platformBookingFee: number;
+  bookingType?: BookingType;
   paymentMethod?: PaymentMethod;
   status: BookingStatus;
   paymentStatus: BookingPaymentStatus;
@@ -709,6 +714,8 @@ export interface CreateCommunityPostInput {
 export interface FieldViolation {
   id: string;
   userId: string;
+  username?: string | null;
+  phoneNumber?: string | null;
   userDisplayName?: string | null;
   fieldId: string;
   violationCount: number;

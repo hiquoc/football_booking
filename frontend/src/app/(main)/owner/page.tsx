@@ -20,7 +20,7 @@ export default function OwnerPage() {
         action={
           <Link
             href="/owner/fields/new"
-            className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white"
+            className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-black text-white"
           >
             <Plus className="size-4" /> Thêm sân mới
           </Link>
@@ -29,27 +29,27 @@ export default function OwnerPage() {
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         <Link
           href="/owner/bookings"
-          className="rounded-[1.5rem] border border-sky-100 bg-white p-6 text-slate-900"
+          className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900"
         >
-          <CalendarRange className="size-6 text-sky-400" />
+          <CalendarRange className="size-6 text-green-600" />
           <h2 className="mt-5 text-xl font-black">Quản lý lịch đặt</h2>
           <p className="mt-2 text-sm text-slate-500">
             Xem lịch đặt mới nhất từ khách hàng.
           </p>
-          <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-sky-400">
+          <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-green-700">
             Mở danh sách <ArrowRight className="size-4" />
           </span>
         </Link>
         <Link
           href="/owner/fields"
-          className="rounded-[1.5rem] border border-slate-200 bg-white p-6"
+          className="rounded-2xl border border-slate-200 bg-white p-6"
         >
-          <MapPinned className="size-6 text-sky-400" />
+          <MapPinned className="size-6 text-green-600" />
           <h2 className="mt-5 text-xl font-black">Hệ thống sân</h2>
           <p className="mt-2 text-sm text-slate-500">
             Quản lý thông tin, sân con và hình ảnh.
           </p>
-          <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-sky-400">
+          <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-green-700">
             Xem sân <ArrowRight className="size-4" />
           </span>
         </Link>

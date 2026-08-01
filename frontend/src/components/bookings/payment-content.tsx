@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, CreditCard, LoaderCircle, LockKeyhole, XCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/field-format";
+import {
+  addOptimisticBalance,
+  clearPendingTopUp,
+  consumePendingTopUp,
+  rememberPendingTopUp,
+} from "@/lib/client/top-up-balance";
 import { useBooking } from "@/lib/hooks/use-bookings";
 import { useCountdown } from "@/lib/hooks/use-countdown";
 import { useCreateCheckout, usePayment } from "@/lib/hooks/use-payments";
@@ -12,11 +19,12 @@ import { DataError, FormSkeleton } from "@/components/ui/data-state";
 
 const TOP_UP_AMOUNTS = [20000, 30000, 40000, 50000] as const;
 
-export function PaymentContent({ bookingId, returned }: { bookingId: string; returned: boolean }) {
+export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId: string; returned: boolean; topUpStatus?: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const booking = useBooking(bookingId);
   const bookingConfirmed = booking.data?.status === "CONFIRMED";
-  const currentUser = useCurrentUser({ refetchInterval: bookingConfirmed ? false : 2000 });
+  const currentUser = useCurrentUser();
   const payment = usePayment(bookingId, returned && !bookingConfirmed);
   const checkout = useCreateCheckout();
   const [selectedTopUpAmount, setSelectedTopUpAmount] = useState<number>(TOP_UP_AMOUNTS[0]);
@@ -25,6 +33,17 @@ export function PaymentContent({ bookingId, returned }: { bookingId: string; ret
     : null;
   const remainingSeconds = useCountdown(bookingDeadline);
   const expired = remainingSeconds === 0;
+
+  useEffect(() => {
+    if (!topUpStatus) return;
+    if (topUpStatus === "returned") {
+      if (!currentUser.data) return;
+      const pendingTopUp = consumePendingTopUp(bookingId);
+      if (pendingTopUp) addOptimisticBalance(queryClient, pendingTopUp.amount);
+      return;
+    }
+    if (topUpStatus === "cancelled") clearPendingTopUp();
+  }, [bookingId, currentUser.data, queryClient, topUpStatus]);
 
   if (booking.isPending || currentUser.isPending || (returned && payment.isPending)) return <FormSkeleton />;
   if (booking.isError) return <DataError title="Không thể tải thông tin nạp ví" />;
@@ -105,7 +124,9 @@ export function PaymentContent({ bookingId, returned }: { bookingId: string; ret
 
   async function pay() {
     try {
-      const result = await checkout.mutateAsync({ bookingId: data.id, amount: selectedTopUpAmount, currency: "VND", provider: "STRIPE" });
+      const input = { bookingId: data.id, amount: selectedTopUpAmount, currency: "VND", provider: "STRIPE" as const };
+      const result = await checkout.mutateAsync(input);
+      rememberPendingTopUp(result, input);
       window.location.assign(result.checkoutUrl);
     } catch {
       // Mutation state renders the error.
@@ -120,7 +141,7 @@ export function PaymentContent({ bookingId, returned }: { bookingId: string; ret
       <div className="mt-7 rounded-2xl bg-slate-50 p-5">
         <div className="flex justify-between text-sm">
           <span className="text-slate-500">{data.fieldName} · {data.subFieldName}</span>
-          <strong>{formatCurrency(Number(data.subFieldPrice ?? data.totalAmount))}</strong>
+          <strong>{formatCurrency(Number(data.subFieldPrice ?? 0))}</strong>
         </div>
         <div className="mt-3 flex justify-between text-sm">
           <span className="text-slate-500">Phí đặt sân</span>

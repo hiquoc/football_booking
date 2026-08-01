@@ -32,7 +32,7 @@ public class RecurringBookingController {
     private final RecurringBookingService recurringBookingService;
 
     @Operation(summary = "Create recurring booking")
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PostMapping
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> create(
             @CurrentUser UserPrincipal user,
@@ -43,7 +43,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Get my recurring bookings")
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PageableAsQueryParam
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<PageResponse<RecurringBookingResponse>>> getMine(
@@ -75,7 +75,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Edit recurring booking")
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> update(
             @CurrentUser UserPrincipal user,
@@ -86,7 +86,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Pause recurring booking")
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PatchMapping("/{id}/pause")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> pause(
             @CurrentUser UserPrincipal user,
@@ -96,7 +96,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Resume recurring booking")
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PatchMapping("/{id}/resume")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> resume(
             @CurrentUser UserPrincipal user,
@@ -106,7 +106,7 @@ public class RecurringBookingController {
     }
 
     @Operation(summary = "Cancel recurring booking")
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> cancel(
             @CurrentUser UserPrincipal user,

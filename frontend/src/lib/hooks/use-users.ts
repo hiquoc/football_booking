@@ -54,33 +54,61 @@ export function usePublicProfile(id: string, enabled = true) {
   });
 }
 
-export function useUpdateUserRole(page: number, size = 10, phoneNumber = "") {
+function isUserPage(data: unknown): data is PageResponse<User> {
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      "content" in data &&
+      Array.isArray((data as PageResponse<User>).content),
+  );
+}
+
+function replaceCachedUser(old: PageResponse<User> | undefined, updatedUser: User) {
+  if (!isUserPage(old)) return old;
+  return {
+    ...old,
+    content: old.content.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
+  };
+}
+
+const userListQueryKey = [...userQueryKeys.all, "list"] as const;
+
+export function useUpdateUserRole() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, userType }: { id: string; userType: User["userType"] }) =>
       submitUserRole(id, userType),
     onMutate: async ({ id, userType }) => {
-      await queryClient.cancelQueries({ queryKey: userQueryKeys.all });
-      const snapshot = queryClient.getQueriesData({ queryKey: userQueryKeys.all });
-      queryClient.setQueriesData<PageResponse<User>>({ queryKey: userQueryKeys.all }, (old) => old ? { ...old, content: old.content.map((user) => user.id === id ? { ...user, userType } : user) } : old);
+      await queryClient.cancelQueries({ queryKey: userListQueryKey });
+      const snapshot = queryClient.getQueriesData<PageResponse<User>>({ queryKey: userListQueryKey });
+      queryClient.setQueriesData<PageResponse<User>>({ queryKey: userListQueryKey }, (old) =>
+        isUserPage(old)
+          ? {
+              ...old,
+              content: old.content.map((user) => (user.id === id ? { ...user, userType } : user)),
+            }
+          : old,
+      );
       return snapshot;
     },
     onError: (_error, _variables, snapshot) => snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data)),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: userQueryKeys.list(page, size, phoneNumber) }),
+    onSuccess: (updatedUser) =>
+      queryClient.setQueriesData<PageResponse<User>>({ queryKey: userListQueryKey }, (old) =>
+        replaceCachedUser(old, updatedUser),
+      ),
   });
 }
 
-export function useUpdateUserStatus(page: number, size = 10, phoneNumber = "") {
+export function useUpdateUserStatus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "ACTIVE" | "PLATFORM_BANNED" }) =>
       submitUserStatus(id, status),
     onMutate: async ({ id, status }) => {
-      await queryClient.cancelQueries({ queryKey: userQueryKeys.all });
-      const snapshot = queryClient.getQueriesData({ queryKey: userQueryKeys.all });
-      queryClient.setQueriesData<PageResponse<User>>({ queryKey: userQueryKeys.all }, (old) =>
-        old
+      await queryClient.cancelQueries({ queryKey: userListQueryKey });
+      const snapshot = queryClient.getQueriesData<PageResponse<User>>({ queryKey: userListQueryKey });
+      queryClient.setQueriesData<PageResponse<User>>({ queryKey: userListQueryKey }, (old) =>
+        isUserPage(old)
           ? {
               ...old,
               content: old.content.map((user) =>
@@ -100,7 +128,9 @@ export function useUpdateUserStatus(page: number, size = 10, phoneNumber = "") {
       return snapshot;
     },
     onError: (_error, _variables, snapshot) => snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data)),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: userQueryKeys.list(page, size, phoneNumber) }),
+    onSuccess: (updatedUser) =>
+      queryClient.setQueriesData<PageResponse<User>>({ queryKey: userListQueryKey }, (old) =>
+        replaceCachedUser(old, updatedUser),
+      ),
   });
 }

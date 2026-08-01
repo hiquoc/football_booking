@@ -5,6 +5,7 @@ import { LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { SubField } from "@/lib/api/types";
 import { formatCurrency, formatEnum } from "@/lib/field-format";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
+import { useSubFieldTypes } from "@/lib/hooks/use-field-types";
 import {
   useCreateSubField,
   useDeleteSubField,
@@ -16,15 +17,6 @@ import {
   toClosingTimeInputValue,
   toClosingTimePayload,
 } from "@/lib/time-format";
-const types = [
-  "FOOTBALL_5V5",
-  "FOOTBALL_7V7",
-  "FOOTBALL_11V11",
-  "BADMINTON_SINGLES",
-  "BADMINTON_DOUBLES",
-  "TENNIS_SINGLES",
-  "PICKLEBALL",
-];
 type PriceRule = { startTime: string; endTime: string; hourlyPrice: number };
 const defaultPriceRule: PriceRule = { startTime: "06:00", endTime: "23:00", hourlyPrice: 200000 };
 const priceRuleEndOptions = closingTimeOptions();
@@ -33,9 +25,15 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
   const create = useCreateSubField(fieldId);
   const update = useUpdateSubField(fieldId);
   const remove = useDeleteSubField(fieldId);
+  const subFieldTypes = useSubFieldTypes();
   const [show, setShow] = useState(false);
   const [editing, setEditing] = useState<SubField | null>(null);
   const [priceRules, setPriceRules] = useState<PriceRule[]>([defaultPriceRule]);
+  const typeOptions = subFieldTypes.data?.length
+    ? subFieldTypes.data
+    : editing?.subFieldType
+      ? [editing.subFieldType]
+      : [];
   function openForm(subField: SubField | null) {
     setEditing(subField);
     setPriceRules(subField?.timePriceRules?.length ? subField.timePriceRules.map((rule) => ({
@@ -83,7 +81,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
           if (show && !editing) setShow(false);
           else openForm(null);
         }}
-        className="mb-5 inline-flex items-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white"
+        className="mb-5 inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-black text-white"
       >
         <Plus className="size-4" /> Thêm sân con
       </button>
@@ -91,7 +89,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
         <form
           key={editing?.id ?? "new"}
           onSubmit={submit}
-          className="mb-6 grid gap-4 rounded-[1.5rem] border border-sky-200 bg-sky-50/40 p-5 sm:grid-cols-2"
+          className="mb-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:grid-cols-2"
         >
           <Input label="Tên sân">
             <input
@@ -106,8 +104,11 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
               name="type"
               defaultValue={editing?.subFieldType}
               className="input-field"
+              disabled={subFieldTypes.isPending || subFieldTypes.isError || !typeOptions.length}
             >
-              {types.map((type) => (
+              {subFieldTypes.isPending ? <option value="">Đang tải loại sân...</option> : null}
+              {subFieldTypes.isError ? <option value="">Không thể tải loại sân</option> : null}
+              {typeOptions.map((type) => (
                 <option key={type} value={type}>
                   {formatEnum(type)}
                 </option>
@@ -145,10 +146,10 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
               className="input-field"
             />
           </Input>
-          <div className="sm:col-span-2 rounded-2xl border border-sky-100 bg-white p-4">
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-black">Giá theo khung giờ</h3>
-              <button type="button" onClick={() => setPriceRules((rules) => [...rules, { ...defaultPriceRule }])} className="inline-flex items-center gap-2 rounded-full border border-sky-200 px-3 py-2 text-xs font-black text-sky-700"><Plus className="size-4" /> Thêm khung</button>
+              <button type="button" onClick={() => setPriceRules((rules) => [...rules, { ...defaultPriceRule }])} className="inline-flex items-center gap-2 rounded-full border border-green-200 px-3 py-2 text-xs font-black text-green-700"><Plus className="size-4" /> Thêm khung</button>
             </div>
             <div className="mt-4 space-y-3">
               {priceRules.map((rule, index) => (
@@ -202,11 +203,11 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
           {data.subFields.data.map((item) => (
             <article
               key={item.id}
-              className="rounded-[1.5rem] border border-slate-200 bg-white p-5"
+            className="rounded-2xl border border-slate-200 bg-white p-5"
             >
               <div className="flex justify-between gap-3">
                 <div>
-                  <p className="text-xs font-black uppercase text-sky-600">
+                  <p className="text-xs font-black uppercase text-green-700">
                     {formatEnum(item.subFieldType)}
                   </p>
                   <h2 className="mt-1 text-xl font-black">{item.name}</h2>
@@ -216,7 +217,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
                     onClick={() => {
                       openForm(item);
                     }}
-                    className="grid size-9 place-items-center rounded-full border border-slate-200 text-sky-600"
+                    className="grid size-9 place-items-center rounded-full border border-slate-200 text-green-700"
                     aria-label="Chỉnh sửa sân con"
                   >
                     <Pencil className="size-4" />

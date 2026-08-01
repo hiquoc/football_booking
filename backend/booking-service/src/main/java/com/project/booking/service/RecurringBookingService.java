@@ -7,7 +7,6 @@ import com.project.common.dto.PageResponse;
 import com.project.common.enums.RecurringBookingStatus;
 import org.springframework.data.domain.Pageable;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 public interface RecurringBookingService {
@@ -25,5 +24,4 @@ public interface RecurringBookingService {
     PageResponse<RecurringBookingResponse> getMine(UUID userId, RecurringBookingStatus status, Pageable pageable);
     PageResponse<RecurringBookingResponse> getForOwner(UUID ownerId, RecurringBookingStatus status, Pageable pageable);
     PageResponse<RecurringBookingResponse> getForAdmin(RecurringBookingStatus status, Pageable pageable);
-    void processDue(LocalDateTime now);
 }

@@ -1,4 +1,9 @@
-import type { CommunityPostStatus, CommunityPostType, SkillLevel } from "@/lib/api/types";
+import type {
+  CommunityApplicationStatus,
+  CommunityPostStatus,
+  CommunityPostType,
+  SkillLevel,
+} from "@/lib/api/types";
 
 export const postTypeLabels: Record<CommunityPostType, string> = {
   LOOKING_OPPONENT: "Tìm đối thủ",
@@ -12,6 +17,13 @@ export const postStatusLabels: Record<CommunityPostStatus, string> = {
   CLOSED: "Đã đóng",
   CANCELLED: "Đã hủy",
   HIDDEN: "Đã ẩn",
+};
+
+export const applicationStatusLabels: Record<CommunityApplicationStatus, string> = {
+  PENDING: "Chờ duyệt",
+  ACCEPTED: "Đã chấp nhận",
+  REJECTED: "Đã từ chối",
+  WITHDRAWN: "Đã rút",
 };
 
 export const skillLabels: Record<SkillLevel, string> = {

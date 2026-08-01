@@ -11,7 +11,7 @@ export default function FieldTypesPage() {
       <PageHeading
         eyebrow="Danh mục"
         title="Quản lý loại sân"
-        description="Thiết lập môn thể thao và thời lượng đặt mặc định."
+        description="Thiết lập môn thể thao và thời lượng đặt sân mặc định."
       />
       <div className="mt-8">
         <FieldTypeManager />

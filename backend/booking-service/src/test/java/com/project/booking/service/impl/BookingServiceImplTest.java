@@ -32,6 +32,7 @@ import com.project.booking.service.SubFieldProjectionService;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingPaymentStatus;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.BookingType;
 import com.project.common.enums.PaymentMethod;
 import com.project.common.dto.balance.BalanceDeductionResponse;
 import com.project.common.exception.BadRequestException;
@@ -65,6 +66,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -133,6 +135,8 @@ class BookingServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(bookingService, "balanceDeductionAttempts", 1);
+        ReflectionTestUtils.setField(bookingService, "balanceDeductionRetryDelayMs", 0L);
         org.mockito.Mockito.lenient().when(transactionTemplate.execute(org.mockito.ArgumentMatchers.any(TransactionCallback.class)))
                 .thenAnswer(invocation -> {
                     TransactionCallback<?> callback = invocation.getArgument(0);
@@ -236,7 +240,7 @@ class BookingServiceImplTest {
         ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
         verify(bookingRepository).saveAndFlush(bookingCaptor.capture());
         Booking savedBooking = bookingCaptor.getValue();
-        assertEquals(new BigDecimal("100000"), savedBooking.getTotalAmount());
+        assertEquals(new BigDecimal("100000"), savedBooking.getSubFieldPrice());
         assertEquals(6000L, savedBooking.getPlatformBookingFee());
         assertEquals(PaymentMethod.ACCOUNT_BALANCE, savedBooking.getPaymentMethod());
         assertEquals(BookingStatus.PENDING, savedBooking.getStatus());
@@ -276,6 +280,50 @@ class BookingServiceImplTest {
         verify(userBalanceClient).deduct(any());
         verify(bookingRepository).confirmPendingBookingFromPayment(any(), eq(BookingStatus.PENDING), eq(BookingStatus.CONFIRMED), eq(BookingPaymentStatus.PAID));
         verify(bookingNotificationEventPublisher, never()).publishBookingConfirmed(any(), any());
+    }
+
+    @Test
+    void createBookingRetriesWalletDeductionWhenBalanceProjectionLags() {
+        ReflectionTestUtils.setField(bookingService, "balanceDeductionAttempts", 4);
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userBalanceClient.deduct(any()))
+                .thenReturn(new BalanceDeductionResponse(false, 0L, "Insufficient account balance"))
+                .thenReturn(new BalanceDeductionResponse(false, 0L, "Insufficient account balance"))
+                .thenReturn(new BalanceDeductionResponse(true, 9000L, "Balance deducted"));
+        when(bookingRepository.confirmPendingBookingFromPayment(any(), eq(BookingStatus.PENDING), eq(BookingStatus.CONFIRMED), eq(BookingPaymentStatus.PAID)))
+                .thenReturn(1);
+        when(bookingRepository.findById(org.mockito.ArgumentMatchers.nullable(UUID.class)))
+                .thenAnswer(invocation -> Optional.of(Booking.builder()
+                        .id(invocation.getArgument(0))
+                        .subFieldId(subFieldId)
+                        .bookingDate(request.getBookingDate())
+                        .build()));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenAnswer(invocation -> {
+            Booking booking = invocation.getArgument(0);
+            return BookingResponse.builder().status(booking.getStatus()).build();
+        });
+
+        BookingResponse response = bookingService.createBooking(userId, request);
+
+        assertEquals(BookingStatus.CONFIRMED, response.getStatus());
+        verify(userBalanceClient, times(3)).deduct(any());
+        verify(bookingRepository).confirmPendingBookingFromPayment(any(), eq(BookingStatus.PENDING), eq(BookingStatus.CONFIRMED), eq(BookingPaymentStatus.PAID));
     }
 
     @Test
@@ -695,7 +743,7 @@ class BookingServiceImplTest {
                 .clientId(clientId)
                 .build();
 
-        when(bookingRepository.findOwnerBookings(eq(ownerId), eq(null), eq(null), eq(null), eq(null), any()))
+        when(bookingRepository.findOwnerBookings(eq(ownerId), eq(null), eq(null), eq(null), eq(false), any(), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 10), 1));
         when(bookingMapper.toResponse(booking)).thenReturn(mapped);
         when(userProjectionRepository.findAllById(any())).thenReturn(List.of(UserProjection.builder()
@@ -706,7 +754,7 @@ class BookingServiceImplTest {
                 .build()));
         when(matchResultRepository.findByBookingIdIn(List.of(bookingId))).thenReturn(List.of());
 
-        var response = bookingService.getManagerBookings(ownerId, "OWNER", null, null, null, PageRequest.of(0, 10));
+        var response = bookingService.getManagerBookings(ownerId, "OWNER", null, null, null, null, null, PageRequest.of(0, 10));
 
         assertEquals("Nguyen Van A", response.getContent().getFirst().getClientName());
         assertEquals("0862470050", response.getContent().getFirst().getClientPhoneNumber());
@@ -787,6 +835,92 @@ class BookingServiceImplTest {
         bookingService.cancelBooking(userId, request);
 
         verify(bookingBalanceEventPublisher, never()).publishRefundRequested(any(), anyLong(), any());
+    }
+
+    @Test
+    void ownerCannotCreateNormalBookingOnOwnedField() {
+        UUID ownerId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        subField.setOwnerId(ownerId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+
+        assertThrows(BadRequestException.class, () -> bookingService.createBooking(ownerId, request));
+        verify(bookingRepository, never()).saveAndFlush(any());
+        verify(userBalanceClient, never()).deduct(any());
+    }
+
+    @Test
+    void ownerCreatesZeroCostReservationOnOwnedFieldWithoutPayment() {
+        UUID ownerId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        subField.setOwnerId(ownerId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder()
+                .bookingType(BookingType.RESERVATION)
+                .subFieldPrice(BigDecimal.ZERO)
+                .paymentStatus(BookingPaymentStatus.NOT_REQUIRED)
+                .build());
+
+        BookingResponse response = bookingService.createReservation(ownerId, request);
+
+        ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).saveAndFlush(bookingCaptor.capture());
+        Booking reservation = bookingCaptor.getValue();
+        assertEquals(BookingType.RESERVATION, reservation.getBookingType());
+        assertEquals(BigDecimal.ZERO, reservation.getSubFieldPrice());
+        assertEquals(0L, reservation.getBookingPrice());
+        assertEquals(0L, reservation.getPlatformBookingFee());
+        assertEquals(BookingStatus.CONFIRMED, reservation.getStatus());
+        assertEquals(BookingPaymentStatus.NOT_REQUIRED, reservation.getPaymentStatus());
+        assertEquals(BookingType.RESERVATION, response.getBookingType());
+        verify(pricingStrategy, never()).calculate(any(), any());
+        verify(userBalanceClient, never()).deduct(any());
+        verify(bookingNotificationEventPublisher).publishReservationChanged(any(Booking.class), eq(subField), eq("CREATED"));
+    }
+
+    @Test
+    void reservationUsesExistingConflictDetection() {
+        UUID ownerId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        subField.setOwnerId(ownerId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(true);
+
+        assertThrows(BookingConflictException.class, () -> bookingService.createReservation(ownerId, request));
+        verify(bookingRepository, never()).saveAndFlush(any());
+        verify(userBalanceClient, never()).deduct(any());
     }
 
     private SubFieldResponse activeSubField(UUID subFieldId) {

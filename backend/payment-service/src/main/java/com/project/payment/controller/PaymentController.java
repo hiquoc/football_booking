@@ -15,13 +15,13 @@ import java.util.UUID;
 public class PaymentController {
     private final PaymentService paymentService;
     @Operation(summary="Create a provider checkout session")
-    @PreAuthorize("hasRole('CLIENT')") @PostMapping("/checkout")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')") @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<CheckoutResponse>> checkout(@CurrentUser UserPrincipal user,
             @Valid @RequestBody CreateCheckoutRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Checkout session created", paymentService.createCheckout(user.id(), request)));
     }
     @Operation(summary="Get payment status for a booking")
-    @PreAuthorize("hasRole('CLIENT')") @GetMapping("/{bookingId}")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')") @GetMapping("/{bookingId}")
     public ApiResponse<PaymentResponse> status(@CurrentUser UserPrincipal user, @PathVariable UUID bookingId) {
         return ApiResponse.success(paymentService.getByBookingId(user.id(), bookingId));
     }

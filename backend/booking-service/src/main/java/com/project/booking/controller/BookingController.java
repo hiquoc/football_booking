@@ -2,6 +2,7 @@ package com.project.booking.controller;
 
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
+import com.project.booking.dto.request.UpdateReservationRequest;
 import com.project.booking.dto.request.UpsertMatchResultRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingConfigResponse;
@@ -36,6 +37,8 @@ import java.util.List;
 import java.util.UUID;
 import com.project.booking.repository.BookingRepository;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.SportType;
+import com.project.common.enums.SubFieldType;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -68,7 +71,7 @@ public class BookingController {
 
     @Operation(
         summary = "Create booking",
-        description = "Creates a new booking for the authenticated client. When a booking overlaps multiple price rules, each segment is charged proportionally and the total is rounded up to the nearest 1,000 VND.",
+        description = "Creates a new normal booking for an authenticated client, employee, or owner booking another owner's field. Owners cannot create normal bookings for fields they own.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(
@@ -114,7 +117,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PostMapping
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @CurrentUser UserPrincipal user,
@@ -122,6 +125,42 @@ public class BookingController {
         BookingResponse response = bookingService.createBooking(user.id(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Booking created successfully", response));
+    }
+
+    @Operation(
+        summary = "Create reservation",
+        description = "Creates an owner reservation on an owned field. Reservations block availability like confirmed bookings, always cost 0 VND, and do not create payment records."
+    )
+    @PreAuthorize("hasRole('OWNER')")
+    @PostMapping("/owner/reservations")
+    public ResponseEntity<ApiResponse<BookingResponse>> createReservation(
+            @CurrentUser UserPrincipal user,
+            @Valid @RequestBody CreateBookingRequest request) {
+        BookingResponse response = bookingService.createReservation(user.id(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Reservation created successfully", response));
+    }
+
+    @Operation(summary = "Update reservation", description = "Updates an owner reservation and keeps its total price at 0 VND.")
+    @PreAuthorize("hasRole('OWNER')")
+    @PutMapping("/owner/reservations/{reservationId}")
+    public ResponseEntity<ApiResponse<BookingResponse>> updateReservation(
+            @PathVariable UUID reservationId,
+            @CurrentUser UserPrincipal user,
+            @Valid @RequestBody UpdateReservationRequest request) {
+        request.setReservationId(reservationId);
+        BookingResponse response = bookingService.updateReservation(user.id(), request);
+        return ResponseEntity.ok(ApiResponse.success("Reservation updated successfully", response));
+    }
+
+    @Operation(summary = "Cancel reservation", description = "Cancels an owner reservation without payment or refund side effects.")
+    @PreAuthorize("hasRole('OWNER')")
+    @PatchMapping("/owner/reservations/cancel")
+    public ResponseEntity<ApiResponse<BookingResponse>> cancelReservation(
+            @CurrentUser UserPrincipal user,
+            @Valid @RequestBody CancelBookingRequest request) {
+        BookingResponse response = bookingService.cancelReservation(user.id(), request);
+        return ResponseEntity.ok(ApiResponse.success("Reservation cancelled successfully", response));
     }
 
     @Operation(
@@ -169,7 +208,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PatchMapping("/cancel")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(
             @CurrentUser UserPrincipal user,
@@ -232,7 +271,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @PageableAsQueryParam
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getMyBookings(
@@ -246,7 +285,7 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success(bookings));
     }
 
-    @Operation(summary = "Get owner bookings", description = "Returns paginated bookings across the authenticated owner's sub-fields. Supports page, size, and sort query parameters.")
+    @Operation(summary = "Get owner bookings", description = "Returns paginated bookings across the authenticated owner's fields. Supports bookingDate, fieldId, fieldType, subFieldType, status, page, size, and sort query parameters.")
     @ApiResponses({
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
@@ -279,13 +318,31 @@ public class BookingController {
     public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getOwnerBookings(
             @Parameter(hidden = true) @CurrentUser UserPrincipal user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bookingDate,
+            @RequestParam(required = false) UUID fieldId,
+            @RequestParam(required = false) SportType fieldType,
+            @RequestParam(required = false) SubFieldType subFieldType,
+            @RequestParam(required = false) BookingStatus status,
+            @Parameter(hidden = true)
+            Pageable pageable) {
+
+        PageResponse<BookingResponse> bookings = bookingService.getManagerBookings(user.id(), user.role(), bookingDate, fieldId, fieldType, subFieldType, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(bookings));
+    }
+
+    @Operation(summary = "Get owner reservations", description = "Returns paginated reservations across managed sub-fields. Supports bookingDate, subFieldId, status, page, size, and sort query parameters.")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
+    @PageableAsQueryParam
+    @GetMapping("/owner/reservations")
+    public ResponseEntity<ApiResponse<PageResponse<BookingResponse>>> getOwnerReservations(
+            @Parameter(hidden = true) @CurrentUser UserPrincipal user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bookingDate,
             @RequestParam(required = false) UUID subFieldId,
             @RequestParam(required = false) BookingStatus status,
             @Parameter(hidden = true)
             Pageable pageable) {
 
-        PageResponse<BookingResponse> bookings = bookingService.getManagerBookings(user.id(), user.role(), bookingDate, subFieldId, status, pageable);
-        return ResponseEntity.ok(ApiResponse.success(bookings));
+        PageResponse<BookingResponse> reservations = bookingService.getManagerReservations(user.id(), user.role(), bookingDate, subFieldId, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(reservations));
     }
 
     @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
@@ -328,7 +385,7 @@ public class BookingController {
             )
         )
     })
-    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
     @GetMapping("/{bookingId}")
     public ResponseEntity<ApiResponse<BookingResponse>> getBookingById(
             @PathVariable UUID bookingId,
@@ -387,7 +444,9 @@ public class BookingController {
               "endTime": "10:00:00",
               "durationMinutes": 120,
               "pricePerHour": 150000,
-              "totalAmount": 300000,
+              "subFieldPrice": 300000,
+              "bookingPrice": 1000,
+              "platformBookingFee": 1000,
               "status": "CONFIRMED",
               "note": "Please prepare extra balls",
               "cancellationReason": null,

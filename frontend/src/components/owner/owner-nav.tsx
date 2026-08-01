@@ -16,14 +16,14 @@ export async function OwnerNav() {
 
   return (
     <nav className="border-b border-slate-200 bg-white" aria-label="Quản lý sân">
-      <div className="mx-auto flex w-full max-w-[90rem] gap-2 overflow-x-auto px-5 py-3 sm:px-8">
+      <div className="mx-auto flex justify-center w-full max-w-[90rem] gap-2 overflow-x-auto px-5 py-3 sm:px-8">
         {links.filter((link) => link.show).map((link) => {
           const Icon = link.icon;
           return (
             <Link
               key={link.href}
               href={link.href}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-sky-50 hover:text-sky-700"
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-green-50 hover:text-green-700"
             >
               <Icon className="size-4" />
               {link.label}

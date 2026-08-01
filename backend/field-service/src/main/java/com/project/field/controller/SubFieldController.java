@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.common.dto.ApiResponse;
+import com.project.common.enums.SubFieldType;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import com.project.field.dto.FieldClosureDto;
@@ -52,6 +53,12 @@ public class SubFieldController {
             @CurrentUser UserPrincipal currentUser,
             @RequestParam(required = false) String search) {
         return ApiResponse.success(subFieldService.getFilterOptions(search, currentUser));
+    }
+
+    @Operation(summary = "Get sub-field types", description = "Returns the backend-supported subFieldType values.")
+    @GetMapping("/types")
+    public ApiResponse<List<SubFieldType>> getSubFieldTypes() {
+        return ApiResponse.success(subFieldService.getSubFieldTypes());
     }
 
     @Operation(

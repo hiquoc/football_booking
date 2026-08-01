@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/server/session";
 import type { CommunityPostFilters } from "@/lib/api/types";
 
 export const metadata: Metadata = {
-  title: "Cong dong bong da",
-  description: "Tim doi thu hoac tuyen them cau thu cho lich dat san da xac nhan.",
+  title: "Cộng đồng bóng đá",
+  description: "Tìm đối thủ hoặc tuyển thêm cầu thủ cho lịch đặt sân đã xác nhận.",
 };
 
 export default async function CommunityPage({
@@ -44,7 +44,7 @@ function parseFilters(params: Record<string, string | string[] | undefined>): Co
     applicantId,
     postType: value("postType") as CommunityPostFilters["postType"],
     skillLevel: value("skillLevel"),
-    date: value("date") ?? tomorrowDate(),
+    date: value("date"),
     fieldType: value("fieldType"),
     city: value("city"),
     district: value("district"),
@@ -53,14 +53,4 @@ function parseFilters(params: Record<string, string | string[] | undefined>): Co
     keyword: value("keyword"),
     sortBy: value("sortBy") === "newest" ? "newest" : "upcoming",
   };
-}
-
-function tomorrowDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + 1);
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
 }

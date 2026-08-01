@@ -280,7 +280,7 @@ function EditorForm({
         </datalist>
       </section>
       {update.isSuccess ? (
-        <p className="rounded-xl bg-sky-50 p-3 text-sm text-sky-700">
+        <p className="rounded-xl bg-green-50 p-3 text-sm text-green-700">
           Đã lưu thay đổi.
         </p>
       ) : null}
@@ -291,7 +291,7 @@ function EditorForm({
       ) : null}
       <button
         disabled={update.isPending}
-        className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-6 py-3 text-sm font-black text-white hover:bg-sky-600 shadow-none disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-full bg-green-600 px-6 py-3 text-sm font-black text-white shadow-none disabled:opacity-50"
       >
         {update.isPending ? (
           <LoaderCircle className="size-4 animate-spin" />

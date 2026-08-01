@@ -288,7 +288,7 @@ export function VietnamLocationFields({
       ) : null}
 
       {value.address && value.province && value.ward ? (
-        <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
+        <div className="sm:col-span-2 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
           <strong className="block">Địa chỉ hành chính sẽ được lưu</strong>
           <span>
             {value.address}, {value.ward}, {value.province} · Mã {value.wardCode}/{value.provinceCode}

@@ -2,6 +2,7 @@ package com.project.booking.service;
 
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
+import com.project.booking.dto.request.UpdateReservationRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingResponse;
 import com.project.common.dto.PageResponse;
@@ -10,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.UUID;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.SportType;
+import com.project.common.enums.SubFieldType;
 
 public interface BookingService {
 
@@ -21,6 +24,12 @@ public interface BookingService {
      * @return the created booking response
      */
     BookingResponse createBooking(UUID userId, CreateBookingRequest request);
+
+    BookingResponse createReservation(UUID ownerId, CreateBookingRequest request);
+
+    BookingResponse updateReservation(UUID ownerId, UpdateReservationRequest request);
+
+    BookingResponse cancelReservation(UUID ownerId, CancelBookingRequest request);
 
     BookingResponse createRecurringOccurrence(UUID userId, UUID recurringBookingId, CreateBookingRequest request);
 
@@ -72,7 +81,9 @@ public interface BookingService {
      * @param managerId the authenticated owner's ID
      * @return page of bookings for that owner
      */
-    PageResponse<BookingResponse> getManagerBookings(UUID managerId, String managerRole, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable);
+    PageResponse<BookingResponse> getManagerBookings(UUID managerId, String managerRole, LocalDate bookingDate, UUID fieldId, SportType fieldType, SubFieldType subFieldType, BookingStatus status, Pageable pageable);
+
+    PageResponse<BookingResponse> getManagerReservations(UUID managerId, String managerRole, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable);
 
     /**
      * Returns a booking by ID.

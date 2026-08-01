@@ -45,7 +45,8 @@ class GatewayRateLimitFilterTest {
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         JsonNode json = objectMapper.readTree(exchange.getResponse().getBodyAsString().block());
-        assertThat(json.get("code").asText()).isEqualTo("RATE_LIMIT_EXCEEDED");
+        assertThat(json.get("code").asText()).isEqualTo("RATE_LIMITED");
+        assertThat(json.get("statusCode").asText()).isEqualTo("RATE_LIMITED");
         assertThat(json.get("status").asInt()).isEqualTo(429);
         assertThat(json.get("message").asText()).contains("Too many requests");
         verify(fixture.chain, never()).filter(exchange);

@@ -1,3 +1,36 @@
+import type { Field } from "@/lib/api/types";
+
+export const fieldTypeLabels: Record<string, string> = {
+  FOOTBALL: "Bóng đá",
+  BASKETBALL: "Bóng rổ",
+  BADMINTON: "Cầu lông",
+  VOLLEYBALL: "Bóng chuyền",
+  TENNIS: "Quần vợt",
+  PICKLEBALL: "Pickleball",
+  TABLE_TENNIS: "Bóng bàn",
+  SWIMMING: "Bơi lội",
+  YOGA: "Yoga",
+  GYM: "Gym",
+  DANCE: "Nhảy",
+  MARTIAL_ARTS: "Võ thuật",
+  OTHER: "Khác",
+};
+
+export const subFieldTypeLabels: Record<string, string> = {
+  FOOTBALL_5V5: "Bóng đá 5 người",
+  FOOTBALL_7V7: "Bóng đá 7 người",
+  FOOTBALL_11V11: "Bóng đá 11 người",
+  BASKETBALL_HALF_COURT: "Bóng rổ nửa sân",
+  BASKETBALL_FULL_COURT: "Bóng rổ toàn sân",
+  BADMINTON_SINGLES: "Cầu lông đơn",
+  BADMINTON_DOUBLES: "Cầu lông đôi",
+  TENNIS_SINGLES: "Quần vợt đơn",
+  TENNIS_DOUBLES: "Quần vợt đôi",
+  BADMINTON: "Cầu lông",
+  VOLLEYBALL: "Bóng chuyền",
+  TENNIS: "Quần vợt",
+};
+
 const dayNames: Record<string, string> = {
   MONDAY: "Thứ Hai",
   TUESDAY: "Thứ Ba",
@@ -9,19 +42,8 @@ const dayNames: Record<string, string> = {
 };
 
 const labels: Record<string, string> = {
-  FOOTBALL: "Bóng đá",
-  FOOTBALL_5V5: "Sân bóng 5 người",
-  FOOTBALL_7V7: "Sân bóng 7 người",
-  FOOTBALL_11V11: "Sân bóng 11 người",
-  BADMINTON_SINGLES: "Sân cầu lông đơn",
-  BADMINTON_DOUBLES: "Sân cầu lông đôi",
-  TENNIS_SINGLES: "Sân quần vợt đơn",
-  TENNIS_DOUBLES: "Sân quần vợt đôi",
-  BADMINTON: "Cầu lông",
-  TENNIS: "Quần vợt",
-  PICKLEBALL: "Pickleball",
-  BASKETBALL: "Bóng rổ",
-  VOLLEYBALL: "Bóng chuyền",
+  ...fieldTypeLabels,
+  ...subFieldTypeLabels,
   INDOOR: "Trong nhà",
   OUTDOOR: "Ngoài trời",
   COVERED: "Có mái che",
@@ -32,6 +54,41 @@ const labels: Record<string, string> = {
   WOOD: "Sàn gỗ",
   SYNTHETIC: "Mặt sân tổng hợp",
 };
+
+export const fieldTypeOptions = [
+  ["FOOTBALL", fieldTypeLabels.FOOTBALL],
+  ["BASKETBALL", fieldTypeLabels.BASKETBALL],
+  ["BADMINTON", fieldTypeLabels.BADMINTON],
+  ["VOLLEYBALL", fieldTypeLabels.VOLLEYBALL],
+  ["TENNIS", fieldTypeLabels.TENNIS],
+] as const;
+
+export const communityFieldTypeOptions = [
+  ["FOOTBALL_5V5", subFieldTypeLabels.FOOTBALL_5V5],
+  ["FOOTBALL_7V7", subFieldTypeLabels.FOOTBALL_7V7],
+  ["FOOTBALL_11V11", subFieldTypeLabels.FOOTBALL_11V11],
+  ["BASKETBALL_HALF_COURT", subFieldTypeLabels.BASKETBALL_HALF_COURT],
+  ["BASKETBALL_FULL_COURT", subFieldTypeLabels.BASKETBALL_FULL_COURT],
+  ["BADMINTON", subFieldTypeLabels.BADMINTON],
+  ["VOLLEYBALL", subFieldTypeLabels.VOLLEYBALL],
+  ["TENNIS", subFieldTypeLabels.TENNIS],
+] as const;
+
+export const subFieldTypeOptions = [
+  ["FOOTBALL_5V5", subFieldTypeLabels.FOOTBALL_5V5],
+  ["FOOTBALL_7V7", subFieldTypeLabels.FOOTBALL_7V7],
+  ["FOOTBALL_11V11", subFieldTypeLabels.FOOTBALL_11V11],
+  ["BASKETBALL_HALF_COURT", subFieldTypeLabels.BASKETBALL_HALF_COURT],
+  ["BASKETBALL_FULL_COURT", subFieldTypeLabels.BASKETBALL_FULL_COURT],
+  ["BADMINTON", subFieldTypeLabels.BADMINTON],
+  ["VOLLEYBALL", subFieldTypeLabels.VOLLEYBALL],
+  ["TENNIS", subFieldTypeLabels.TENNIS],
+] as const;
+
+export function formatFieldType(value: string | null | undefined) {
+  if (!value) return "Chưa cập nhật";
+  return fieldTypeLabels[value] ?? subFieldTypeLabels[value] ?? formatEnum(value);
+}
 
 export function formatDay(day: string) {
   return dayNames[day] ?? formatEnum(day);
@@ -57,7 +114,7 @@ export function formatCurrency(value: number) {
   const sign = amount < 0 ? "-" : "";
   const digits = Math.abs(amount).toString();
   const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${sign}${formatted} ₫`;
+  return `${sign}${formatted} đ`;
 }
 
 export function formatDate(value: string) {
@@ -85,4 +142,3 @@ export function formatFieldAddress(
     ),
   ).join(", ");
 }
-import type { Field } from "@/lib/api/types";

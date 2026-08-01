@@ -16,7 +16,7 @@ const statusLabels: Record<FieldStatus, string> = {
 
 const statusStyles: Record<FieldStatus, string> = {
   PENDING: "bg-amber-100 text-amber-700",
-  APPROVED: "bg-sky-100 text-sky-700",
+  APPROVED: "bg-green-600 text-white",
   REJECTED: "bg-rose-100 text-rose-700",
 };
 
@@ -42,7 +42,7 @@ export function OwnerFieldList({ page, role }: { page: number; role: "OWNER" | "
         {query.data.content.map((field) => (
           <article
             key={field.id}
-            className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-200 hover:shadow-md"
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-green-200 hover:shadow-md"
           >
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
               <div className="min-w-0">
@@ -62,32 +62,32 @@ export function OwnerFieldList({ page, role }: { page: number; role: "OWNER" | "
                   {field.name}
                 </h2>
                 <p className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-                  <MapPin className="mt-0.5 size-4 shrink-0 text-sky-600" />
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-green-600" />
                   {formatFieldAddress(field)}
                 </p>
                 <Link
                   href={`/owner/fields/${field.id}/employees`}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-sky-400 hover:text-sky-700"
+                  className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-green-400 hover:text-green-700"
                 >
-                  <Users className="size-4" /> NhÃ¢n viÃªn
+                  <Users className="size-4" /> Nhân viên
                 </Link>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Link
                   href={`/fields/${field.id}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-sky-400 hover:text-sky-700"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-green-400 hover:text-green-700"
                 >
                   <Eye className="size-4" /> Xem chi tiết
                 </Link>
                 <Link
                   href={`/owner/fields/${field.id}/edit`}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-sky-400 hover:text-sky-700"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 transition hover:border-green-400 hover:text-green-700"
                 >
                   <Pencil className="size-4" /> Chỉnh sửa
                 </Link>
                 <Link
                   href={`/owner/fields/${field.id}/sub-fields`}
-                  className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-black text-white transition hover:bg-sky-600"
+                  className="inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2.5 text-sm font-black text-white"
                 >
                   <Settings2 className="size-4" /> Quản lý
                 </Link>

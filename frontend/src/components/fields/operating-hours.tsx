@@ -46,9 +46,9 @@ export function OperatingHours({
   }, []);
 
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-xl bg-sky-100 text-sky-700">
+        <span className="grid size-10 place-items-center rounded-xl bg-green-100 text-green-700">
           <Clock3 className="size-5" />
         </span>
         <h2 className="text-xl font-black text-slate-950">Giờ hoạt động</h2>

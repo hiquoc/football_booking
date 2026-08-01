@@ -8,12 +8,6 @@ import type {
 } from "@/lib/api/types";
 import { jsonBody, requestJson } from "./http";
 
-function todayInVietnam() {
-  return new Date().toLocaleDateString("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-  });
-}
-
 export function fetchMyBookings(
   page: number,
   size = 10,
@@ -21,7 +15,7 @@ export function fetchMyBookings(
 ) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   Object.entries(filters).forEach(([key, value]) => {
-    if (value) query.set(key, value);
+    if (value && value !== "ALL") query.set(key, value);
   });
   return requestJson<PageResponse<Booking>>(
     `/api/bookings?${query}`,
@@ -31,16 +25,28 @@ export function fetchMyBookings(
 export function fetchOwnerBookings(
   page: number,
   size = 10,
+  filters: { bookingDate?: string; fieldId?: string; fieldType?: string; subFieldType?: string; status?: string } = {},
+) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value && value !== "ALL") query.set(key, value);
+  });
+  return requestJson<PageResponse<Booking>>(
+    `/api/owner/bookings?${query}`,
+  );
+}
+
+export function fetchOwnerReservations(
+  page: number,
+  size = 10,
   filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
 ) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
-  query.set("bookingDate", filters.bookingDate ?? todayInVietnam());
-  query.set("status", filters.status ?? "COMPLETED");
   Object.entries(filters).forEach(([key, value]) => {
     if (value) query.set(key, value);
   });
   return requestJson<PageResponse<Booking>>(
-    `/api/owner/bookings?${query}`,
+    `/api/owner/reservations?${query}`,
   );
 }
 
@@ -64,6 +70,20 @@ export function submitBooking(input: CreateBookingInput) {
     method: "POST",
     ...jsonBody(input),
   });
+}
+
+export function submitReservation(input: CreateBookingInput) {
+  return requestJson<Booking>("/api/owner/reservations", {
+    method: "POST",
+    ...jsonBody(input),
+  });
+}
+
+export function submitReservationCancellation(id: string, reason?: string) {
+  return requestJson<Booking>(
+    `/api/owner/reservations/${encodeURIComponent(id)}/cancel`,
+    { method: "PATCH", ...jsonBody({ reason }) },
+  );
 }
 
 export function submitCancellation(id: string, reason?: string, owner = false) {

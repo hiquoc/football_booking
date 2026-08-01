@@ -6,6 +6,6 @@ import java.util.UUID;
 
 public class SubFieldNotFoundException extends NotFoundException {
     public SubFieldNotFoundException(UUID id) {
-        super("SubField not found with id: " + id);
+        super("SubField not found with id: " + id, "SUBFIELD_NOT_FOUND");
     }
 }

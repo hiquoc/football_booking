@@ -40,9 +40,9 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls="notification-panel"
         onClick={() => setOpen((current) => !current)}
-        className="relative grid size-10 place-items-center rounded-full border border-slate-200 text-slate-600 transition hover:border-sky-300 hover:text-sky-600"
+        className="relative grid size-10 place-items-center rounded-full border border-slate-200 text-slate-600 transition hover:border-green-300 hover:bg-green-50 hover:text-green-700"
       >
-        <Bell className="size-4" />
+        <Bell className="size-5 text-green-600" />
         {value > 0 ? (
           <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-black leading-5 text-white">
             {value > 99 ? "99+" : value}

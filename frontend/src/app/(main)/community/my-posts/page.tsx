@@ -5,8 +5,8 @@ import type { CommunityPostFilters } from "@/lib/api/types";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const metadata: Metadata = {
-  title: "Bai dang cua toi",
-  description: "Cac bai dang cong dong ma toi da tao.",
+  title: "Bài đăng của tôi",
+  description: "Các bài đăng cộng đồng mà tôi đã tạo.",
 };
 
 export default async function MyCommunityPostsPage({

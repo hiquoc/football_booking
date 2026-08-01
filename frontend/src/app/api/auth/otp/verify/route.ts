@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyOtpSchema } from "@/lib/api/auth-schemas";
-import { assertSameOrigin, routeError } from "@/lib/server/route-response";
+import { assertSameOrigin, errorJson, routeError } from "@/lib/server/route-response";
 import {
   setAccessCookie,
   setRefreshCookie,
@@ -27,20 +27,14 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => null);
-      return NextResponse.json(
-        { message: error?.message ?? "Verification failed" },
-        { status: response.status },
-      );
+      return errorJson(response.status, error?.statusCode ?? error?.code ?? "INVALID_CREDENTIALS", "Verification failed.");
     }
 
     const payload = await response.json();
     const accessToken: unknown = payload?.data ?? payload?.accessToken;
 
     if (typeof accessToken !== "string" || !accessToken) {
-      return NextResponse.json(
-        { message: "Invalid verify response" },
-        { status: 502 },
-      );
+      return errorJson(502, "SERVICE_UNAVAILABLE", "Invalid verify response.");
     }
 
     const nextResponse = NextResponse.json({ success: true });
@@ -50,10 +44,7 @@ export async function POST(request: Request) {
       response.headers.get("set-cookie"),
     );
     if (!refreshToken) {
-      return NextResponse.json(
-        { message: "Invalid verify response: refresh cookie is missing" },
-        { status: 502 },
-      );
+      return errorJson(502, "SERVICE_UNAVAILABLE", "Invalid verify response.");
     }
     setRefreshCookie(nextResponse.cookies, refreshToken);
 

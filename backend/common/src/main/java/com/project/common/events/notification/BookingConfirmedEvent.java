@@ -17,7 +17,24 @@ public record BookingConfirmedEvent(
         LocalDate bookingDate,
         LocalTime startTime,
         LocalTime endTime,
-        BigDecimal totalAmount,
+        BigDecimal subFieldPrice,
+        String bookingType,
         Instant occurredAt
 ) {
+    public BookingConfirmedEvent(
+            UUID bookingId,
+            String bookingCode,
+            UUID userId,
+            String userEmail,
+            UUID ownerId,
+            UUID subFieldId,
+            String fieldName,
+            LocalDate bookingDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            BigDecimal subFieldPrice,
+            Instant occurredAt) {
+        this(bookingId, bookingCode, userId, userEmail, ownerId, subFieldId, fieldName, bookingDate,
+                startTime, endTime, subFieldPrice, "NORMAL", occurredAt);
+    }
 }

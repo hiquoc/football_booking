@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { ApiResponse, ErrorResponse } from "@/lib/api/types";
+import { statusCodeFromPayload } from "../error-messages";
 
 export const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
 const DEFAULT_GATEWAY_TIMEOUT_MS = 25_000;
@@ -9,10 +10,14 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly code?: string | null,
+    public readonly statusCode?: string | null,
   ) {
     super(message);
     this.name = "ApiError";
+  }
+
+  get code() {
+    return this.statusCode;
   }
 }
 
@@ -54,10 +59,11 @@ export async function gatewayRequest<T>(
 
   if (!response.ok) {
     const error = payload as ErrorResponse | null;
+    const statusCode = statusCodeFromPayload(error);
     throw new ApiError(
-      error?.message ?? "The request could not be completed",
+      error?.message ?? "The request could not be completed.",
       response.status,
-      error?.code,
+      statusCode,
     );
   }
 

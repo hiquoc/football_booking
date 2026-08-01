@@ -13,21 +13,20 @@ export default async function LoginPage({
 }) {
   const nextPath = (await searchParams).next;
   return (
-    <main className="grid min-h-dvh bg-sky-50 lg:grid-cols-[1.35fr_0.65fr]">
-      <section className="relative hidden overflow-hidden p-12 text-slate-900 lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(to_bottom,black,transparent_90%)]" />
-        <div className="absolute -left-40 top-1/3 size-[32rem] rounded-full bg-sky-500/25 blur-3xl" />
+    <main className="grid min-h-dvh bg-slate-50 lg:grid-cols-[1.25fr_0.75fr]">
+      <section className="relative hidden overflow-hidden bg-[linear-gradient(to_bottom,#f0fdf4_0%,#ffffff_52%,#f8fafc_100%)] p-12 text-slate-900 lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(34,197,94,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(34,197,94,0.08)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(to_bottom,black,transparent_86%)]" />
         <Link
           href="/"
-          className="relative z-10 w-fit rounded-2xl bg-white px-4 py-3 shadow-sm"
+          className="relative z-10 w-fit rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
         >
           <BrandMark />
         </Link>
-        <div className="relative z-10 max-w-xl rounded-[2rem] border border-white/60 bg-white/60 p-8 shadow-sm backdrop-blur-md">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-600">
+        <div className="relative z-10 max-w-xl">
+          <p className="text-sm font-black uppercase text-green-600">
             Đam mê không giới hạn
           </p>
-          <h2 className="mt-5 text-6xl font-black leading-[1.1] tracking-[-0.04em]">
+          <h2 className="mt-5 text-6xl font-black leading-[1.1]">
             Kết nối đam mê,
             <br />
             Chinh phục sân cỏ.
@@ -50,8 +49,8 @@ export default async function LoginPage({
           PitchUp · TP. Hồ Chí Minh
         </p>
       </section>
-      <section className="flex min-h-dvh items-center justify-center bg-white px-5 py-12 sm:px-10">
-        <div className="w-full max-w-md">
+      <section className="flex min-h-dvh items-center justify-center border-l border-slate-200 bg-white px-5 py-12 sm:px-10">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-8">
           <Link href="/" className="mb-12 inline-block lg:hidden">
             <BrandMark />
           </Link>

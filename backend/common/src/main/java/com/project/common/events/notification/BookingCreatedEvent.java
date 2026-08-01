@@ -17,10 +17,30 @@ public record BookingCreatedEvent(
         LocalDate bookingDate,
         LocalTime startTime,
         LocalTime endTime,
-        BigDecimal totalAmount,
         Long platformBookingFee,
         BigDecimal subFieldPrice,
         Long bookingPrice,
+        String bookingType,
+        String reservationAction,
         Instant occurredAt
 ) {
+    public BookingCreatedEvent(
+            UUID bookingId,
+            String bookingCode,
+            UUID userId,
+            String userEmail,
+            UUID ownerId,
+            UUID subFieldId,
+            String fieldName,
+            LocalDate bookingDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            Long platformBookingFee,
+            BigDecimal subFieldPrice,
+            Long bookingPrice,
+            Instant occurredAt) {
+        this(bookingId, bookingCode, userId, userEmail, ownerId, subFieldId, fieldName, bookingDate,
+                startTime, endTime, platformBookingFee, subFieldPrice, bookingPrice,
+                "NORMAL", null, occurredAt);
+    }
 }

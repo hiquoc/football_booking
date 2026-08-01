@@ -11,12 +11,6 @@ import type {
 import { authenticatedGatewayRequest } from "./authenticated-gateway";
 import { gatewayRequest } from "./gateway";
 
-function todayInVietnam() {
-  return new Date().toLocaleDateString("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-  });
-}
-
 export function getMyBookings(
   page = 0,
   size = 10,
@@ -28,7 +22,7 @@ export function getMyBookings(
     sort: "createdAt,desc",
   });
   Object.entries(filters).forEach(([key, value]) => {
-    if (value) query.set(key, value);
+    if (value && value !== "ALL") query.set(key, value);
   });
   return authenticatedGatewayRequest<PageResponse<Booking>>(
     `/api/v1/bookings/my?${query}`,
@@ -38,20 +32,36 @@ export function getMyBookings(
 export function getOwnerBookings(
   page = 0,
   size = 10,
-  filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
+  filters: { bookingDate?: string; fieldId?: string; fieldType?: string; subFieldType?: string; status?: string } = {},
 ) {
   const query = new URLSearchParams({
     page: String(page),
     size: String(size),
     sort: "startDateTime,asc",
   });
-  query.set("bookingDate", filters.bookingDate ?? todayInVietnam());
-  query.set("status", filters.status ?? "COMPLETED");
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value && value !== "ALL") query.set(key, value);
+  });
+  return authenticatedGatewayRequest<PageResponse<Booking>>(
+    `/api/v1/bookings/owner?${query}`,
+  );
+}
+
+export function getOwnerReservations(
+  page = 0,
+  size = 10,
+  filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
+) {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort: "startDateTime,desc",
+  });
   Object.entries(filters).forEach(([key, value]) => {
     if (value) query.set(key, value);
   });
   return authenticatedGatewayRequest<PageResponse<Booking>>(
-    `/api/v1/bookings/owner?${query}`,
+    `/api/v1/bookings/owner/reservations?${query}`,
   );
 }
 
@@ -80,6 +90,23 @@ export function createBooking(input: CreateBookingInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function createReservation(input: CreateBookingInput) {
+  return authenticatedGatewayRequest<Booking>("/api/v1/bookings/owner/reservations", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function cancelReservation(bookingId: string, reason?: string) {
+  return authenticatedGatewayRequest<Booking>(
+    "/api/v1/bookings/owner/reservations/cancel",
+    {
+      method: "PATCH",
+      body: JSON.stringify({ bookingId, reason }),
+    },
+  );
 }
 
 export function cancelBooking(

@@ -21,7 +21,7 @@ const filters: Array<{ status: FieldStatus; label: string }> = [
 
 const statusStyles: Record<FieldStatus, string> = {
   PENDING: "bg-amber-100 text-amber-700",
-  APPROVED: "bg-sky-100 text-sky-700",
+  APPROVED: "bg-green-100 text-green-700",
   REJECTED: "bg-rose-100 text-rose-700",
 };
 
@@ -41,7 +41,11 @@ export function AdminFieldList({
           <Link
             key={filter.status}
             href={`/admin/fields?status=${filter.status}`}
-            className={`rounded-full px-4 py-2 text-sm font-black transition shadow-none ${status === filter.status ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-sky-400"}`}
+            className={`rounded-xl px-4 py-2 text-sm font-black transition shadow-none ${
+              status === filter.status
+                ? "bg-green-600 text-white"
+                : "border border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700"
+            }`}
           >
             {filter.label}
           </Link>
@@ -66,12 +70,12 @@ export function AdminFieldList({
             {query.data.content.map((field) => (
               <article
                 key={field.id}
-                className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm"
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
               >
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                   <div>
                     <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-black ${statusStyles[field.status]}`}
+                      className={`inline-flex rounded-lg px-3 py-1 text-xs font-black ${statusStyles[field.status]}`}
                     >
                       {filters.find((item) => item.status === field.status)?.label}
                     </span>
@@ -79,14 +83,14 @@ export function AdminFieldList({
                       {field.name}
                     </h2>
                     <p className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-                      <MapPin className="mt-0.5 size-4 shrink-0 text-sky-600" />
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-green-600" />
                       {formatFieldAddress(field)}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <Link
                       href={`/fields/${field.id}`}
-                      className="inline-flex items-center justify-center rounded-full bg-sky-500 px-4 py-2 text-sm font-black text-white hover:bg-sky-600"
+                      className="inline-flex items-center justify-center rounded-xl bg-green-600 px-4 py-2 text-sm font-black text-white hover:bg-green-700"
                     >
                       Xem chi tiết
                     </Link>

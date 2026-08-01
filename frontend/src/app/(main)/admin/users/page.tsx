@@ -11,7 +11,7 @@ export default function AdminUsersPage() {
       <PageHeading
         eyebrow="Tài khoản"
         title="Quản lý người dùng"
-        description="Danh sách tài khoản khách hàng, chủ sân và quản trị viên."
+        description="Danh sách tài khoản khách hàng, chủ sân, nhân viên và quản trị viên."
       />
       <AdminUsersPanel />
     </>

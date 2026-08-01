@@ -5,23 +5,8 @@ import Link from "next/link";
 import { MapPin, Star } from "lucide-react";
 import { useState } from "react";
 import type { FieldCardData } from "@/lib/api/types";
-import { formatFieldAddress } from "@/lib/field-format";
+import { formatFieldAddress, formatFieldType } from "@/lib/field-format";
 import { FavoriteButton } from "./favorite-button";
-
-const SPORT_NAMES = new Map<string, string>([
-  ["FOOTBALL", "Bóng đá"],
-  ["BADMINTON", "Cầu lông"],
-  ["TENNIS", "Tennis"],
-  ["BASKETBALL", "Bóng rổ"],
-  ["VOLLEYBALL", "Bóng chuyền"],
-  ["TABLE_TENNIS", "Bóng bàn"],
-  ["SWIMMING", "Bơi lội"],
-  ["YOGA", "Yoga"],
-  ["GYM", "Gym"],
-  ["DANCE", "Nhảy"],
-  ["MARTIAL_ARTS", "Võ thuật"],
-  ["OTHER", "Khác"],
-]);
 
 export function FieldCard({
   field,
@@ -31,12 +16,13 @@ export function FieldCard({
   canFavorite?: boolean;
 }) {
   const imageUrl = field.primaryImageUrl;
-  const sportNames = field.fieldTypes.map((type) => SPORT_NAMES.get(type) ?? type)
-  .sort((a,b)=>a==="Bóng đá" ? -1 : b==="Bóng đá" ? 1 : 0);
+  const sportNames = field.fieldTypes
+    .map((type) => formatFieldType(type))
+    .sort((a, b) => a === "Bóng đá" ? -1 : b === "Bóng đá" ? 1 : 0);
   const [imageError, setImageError] = useState(false);
 
   return (
-    <article className="group relative overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_55px_rgba(15,23,42,0.12)]">
+    <article className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1 hover:border-green-300 hover:shadow-[0_18px_42px_rgba(15,23,42,0.10)]">
       <div className="relative aspect-[16/10] overflow-hidden bg-[linear-gradient(135deg,#d1fae5,#99f6e4)]">
         {imageUrl && !imageError ? (
             <Image
@@ -49,7 +35,7 @@ export function FieldCard({
             />
         ) : (
           <div className="absolute inset-0 grid place-items-center field-pattern">
-            <span className="rounded-full border border-sky-950/10 bg-white/60 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-sky-900 backdrop-blur">
+            <span className="rounded-full border border-green-950/10 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-green-900 backdrop-blur">
               {imageError ? "Lỗi hình ảnh" : "Chưa có hình ảnh"}
             </span>
           </div>
@@ -59,7 +45,7 @@ export function FieldCard({
             {sportNames.slice(0, sportNames.length >= 3 ? 2 : 3).map((sportName) => (
               <span
                 key={sportName}
-                className="rounded-full bg-sky-100/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-sky-700 backdrop-blur"
+                className="rounded-full bg-green-100/95 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-green-700 backdrop-blur"
               >
                 {sportName}
               </span>
@@ -81,7 +67,7 @@ export function FieldCard({
                     {sportNames.map((sportName) => (
                       <span
                         key={sportName}
-                        className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700"
+                        className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-bold text-green-700"
                       >
                         {sportName}
                       </span>
@@ -99,37 +85,38 @@ export function FieldCard({
         ) : null}
       </div>
       <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <h3 className="text-lg font-black tracking-[-0.025em] text-slate-950">
+        <h3 className="text-xl font-black leading-7 text-slate-950">
             <Link
               href={`/fields/${field.id}`}
               className="after:absolute after:inset-0"
             >
               {field.name}
             </Link>
-          </h3>
-          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-slate-700">
+        </h3>
+        <p className="mt-3 flex items-start gap-2 text-sm leading-6 text-slate-500">
+          <MapPin
+            className="mt-1 size-4 shrink-0 text-green-600"
+            aria-hidden="true"
+          />
+          <span className="line-clamp-2">{formatFieldAddress(field)}</span>
+        </p>
+        <div className="mt-5 flex items-center gap-2 text-sm">
+          <span className="inline-flex items-center gap-1 font-black text-slate-800">
             <Star
               className="size-4 fill-amber-400 text-amber-400"
               aria-hidden="true"
             />
             {Number(field.ratingAverage ?? 0).toFixed(1)}
           </span>
-        </div>
-        <p className="mt-2 flex items-start gap-2 text-sm leading-6 text-slate-500">
-          <MapPin
-            className="mt-1 size-4 shrink-0 text-sky-500"
-            aria-hidden="true"
-          />
-          <span className="line-clamp-2">{formatFieldAddress(field)}</span>
-        </p>
-        <div className="relative mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
+          <span className="font-semibold text-slate-400">/</span>
+          <span className="font-semibold text-slate-500">
             {field.totalReviews ?? 0} đánh giá
           </span>
+        </div>
+        <div className="relative mt-5 flex items-center justify-end border-t border-slate-100 pt-4">
           <Link
             href={`/fields/${field.id}`}
-            className="relative z-10 text-sm font-black text-sky-600"
+            className="relative z-10 inline-flex min-h-10 items-center justify-center rounded-xl bg-green-600 px-4 text-sm font-black text-white hover:bg-green-700"
           >
             Xem chi tiết
           </Link>

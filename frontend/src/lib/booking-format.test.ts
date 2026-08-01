@@ -12,7 +12,7 @@ describe("booking display status", () => {
   it("formats expired unpaid bookings", () => {
     expect(getBookingStatus("EXPIRED")).toEqual({
       label: "Đã hết hạn",
-      className: "bg-slate-100 text-slate-600",
+      className: "bg-slate-500 text-white",
     });
   });
 
@@ -40,7 +40,7 @@ describe("booking display status", () => {
   it("falls back safely for an unknown backend status", () => {
     expect(getBookingStatus("NEW_STATUS")).toEqual({
       label: "Không xác định",
-      className: "bg-slate-100 text-slate-600",
+      className: "bg-slate-500 text-white",
     });
   });
 });

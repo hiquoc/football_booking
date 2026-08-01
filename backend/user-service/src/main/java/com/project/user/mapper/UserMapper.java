@@ -38,7 +38,8 @@ public interface UserMapper {
                         .id(user.getId())
                         .fullName(user.getFullName())
                         .avatarUrl(user.getAvatarUrl())
-                        .phoneNumber(user.getPhoneNumber())
+                        .phoneNumber(maskPhoneNumber(user.getPhoneNumber()))
+                        .email(maskEmail(user.getEmail()))
                         .bio(user.getBio())
                         .teamPhotoUrl(user.getTeamPhotoUrl())
                         .skillLevel(user.getSkillLevel())
@@ -74,5 +75,34 @@ public interface UserMapper {
         return java.math.BigDecimal.valueOf(wins)
                 .multiply(java.math.BigDecimal.valueOf(100))
                 .divide(java.math.BigDecimal.valueOf(totalMatches), 1, java.math.RoundingMode.HALF_UP);
+    }
+
+    private String maskPhoneNumber(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            return null;
+        }
+        String digits = phoneNumber.replaceAll("\\D", "");
+        if (digits.length() >= 4) {
+            return "******" + digits.substring(digits.length() - 4);
+        }
+        if (digits.length() >= 3) {
+            return "***" + digits.substring(digits.length() - 3);
+        }
+        return "***";
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        String trimmed = email.trim();
+        int atIndex = trimmed.indexOf('@');
+        if (atIndex <= 0) {
+            return "***";
+        }
+        String local = trimmed.substring(0, atIndex);
+        String domain = trimmed.substring(atIndex);
+        String visible = local.substring(0, Math.min(2, local.length()));
+        return visible + "***" + domain;
     }
 }

@@ -74,7 +74,7 @@ export function ClosureManager({ fieldId }: { fieldId: string }) {
             setSelectedSubFieldIds([selectedId]);
             setShow((value) => !value);
           }}
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-black text-white"
         >
           <Plus className="size-4" /> Thêm lịch đóng
         </button>
@@ -83,7 +83,7 @@ export function ClosureManager({ fieldId }: { fieldId: string }) {
         <form
           key={editing?.id ?? "new"}
           onSubmit={submit}
-          className="mb-6 grid gap-4 rounded-[1.5rem] border border-sky-200 bg-sky-50/50 p-5 sm:grid-cols-2"
+          className="mb-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:grid-cols-2"
         >
           <fieldset className="sm:col-span-2">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -96,7 +96,7 @@ export function ClosureManager({ fieldId }: { fieldId: string }) {
                       ? []
                       : availableSubFields.map((item) => item.id),
                   )}
-                  className="text-xs font-black text-sky-700"
+                  className="text-xs font-black text-green-700"
                 >
                   {selectedSubFieldIds.length === availableSubFields.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
                 </button>
@@ -118,9 +118,9 @@ export function ClosureManager({ fieldId }: { fieldId: string }) {
                         ? ids.filter((id) => id !== item.id)
                         : [...ids, item.id],
                     )}
-                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${checked ? "border-sky-500 bg-sky-500 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300"}`}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${checked ? "border-green-600 bg-green-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-green-300"}`}
                   >
-                    <span className={`grid size-5 place-items-center rounded-md border ${checked ? "border-white bg-white text-sky-600" : "border-slate-300"}`}>
+                    <span className={`grid size-5 place-items-center rounded-md border ${checked ? "border-white bg-white text-green-700" : "border-slate-300"}`}>
                       {checked ? <Check className="size-3.5" /> : null}
                     </span>
                     {item.name}
@@ -205,7 +205,7 @@ export function ClosureManager({ fieldId }: { fieldId: string }) {
                     setSelectedSubFieldIds([item.subFieldId]);
                     setShow(true);
                   }}
-                  className="grid size-9 place-items-center rounded-full border border-sky-100 text-sky-600 hover:border-sky-200 hover:bg-sky-50"
+                  className="grid size-9 place-items-center rounded-full border border-green-100 text-green-700 hover:border-green-200 hover:bg-green-50"
                   aria-label="Chỉnh sửa lịch đóng"
                 >
                   <Pencil className="size-4" />

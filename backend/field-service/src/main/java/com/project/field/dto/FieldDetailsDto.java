@@ -1,5 +1,6 @@
 package com.project.field.dto;
 
+import com.project.common.dto.PageResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,5 +18,5 @@ public class FieldDetailsDto {
     private FieldDto field;
     private List<OperatingHoursDto> operatingHours;
     private List<SubFieldDto> subFields;
-    private List<ReviewDto> reviews;
+    private PageResponse<ReviewDto> reviews;
 }

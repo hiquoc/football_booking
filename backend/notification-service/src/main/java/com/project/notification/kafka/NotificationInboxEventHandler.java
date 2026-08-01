@@ -93,25 +93,40 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
     }
 
     private void handleBookingCreated(BookingCreatedEvent event) {
+        if ("RESERVATION".equals(event.bookingType())) {
+            boolean updated = "UPDATED".equals(event.reservationAction());
+            notificationService.create(NotificationRequest.builder()
+                    .userId(event.ownerId())
+                    .code(updated ? NotificationCode.RESERVATION_UPDATED : NotificationCode.RESERVATION_CREATED)
+                    .title(updated ? "Đã cập nhật lịch giữ sân" : "Đã tạo lịch giữ sân")
+                    .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName(),
+                            event.bookingDate(), event.startTime(), event.endTime(), event.subFieldPrice()))
+                    .channels(List.of(NotificationChannel.IN_APP))
+                    .build());
+            return;
+        }
         notificationService.create(NotificationRequest.builder()
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.BOOKING_CREATED)
                 .title("Đã tạo yêu cầu đặt sân")
                 .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName(),
-                        event.bookingDate(), event.startTime(), event.endTime(), event.totalAmount()))
+                        event.bookingDate(), event.startTime(), event.endTime(), event.subFieldPrice()))
                 .channels(List.of(NotificationChannel.IN_APP))
                 .build());
     }
 
     private void handleBookingConfirmed(BookingConfirmedEvent event) {
+        if ("RESERVATION".equals(event.bookingType())) {
+            return;
+        }
         notificationService.create(NotificationRequest.builder()
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.BOOKING_CONFIRMED)
                 .title("Đặt sân đã được xác nhận")
                 .payload(bookingPayload(event.bookingId(), event.bookingCode(), event.subFieldId(), event.fieldName(),
-                        event.bookingDate(), event.startTime(), event.endTime(), event.totalAmount()))
+                        event.bookingDate(), event.startTime(), event.endTime(), event.subFieldPrice()))
                 .channels(List.of(NotificationChannel.IN_APP, NotificationChannel.EMAIL))
                 .build());
     }
@@ -121,6 +136,16 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 event.fieldName(), event.bookingDate(), event.startTime(), event.endTime(), null);
         payload.put("reason", event.reason());
         payload.put("cancelledBy", event.cancelledBy());
+        if ("RESERVATION".equals(event.bookingType())) {
+            notificationService.create(NotificationRequest.builder()
+                    .userId(event.ownerId())
+                    .code(NotificationCode.RESERVATION_CANCELLED)
+                    .title("Đã hủy lịch giữ sân")
+                    .payload(payload)
+                    .channels(List.of(NotificationChannel.IN_APP))
+                    .build());
+            return;
+        }
         notificationService.create(NotificationRequest.builder()
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
@@ -229,7 +254,7 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
 
     private Map<String, Object> bookingPayload(Object bookingId, String bookingCode, Object subFieldId,
                                                 String fieldName, Object bookingDate, Object startTime,
-                                                Object endTime, Object totalAmount) {
+                                                Object endTime, Object subFieldPrice) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("bookingId", bookingId);
         payload.put("bookingCode", bookingCode);
@@ -238,8 +263,8 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
         payload.put("bookingDate", bookingDate);
         payload.put("startTime", startTime);
         payload.put("endTime", endTime);
-        if (totalAmount != null) {
-            payload.put("totalAmount", totalAmount);
+        if (subFieldPrice != null) {
+            payload.put("subFieldPrice", subFieldPrice);
         }
         return payload;
     }

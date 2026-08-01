@@ -2,6 +2,23 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { ApiError } from "./gateway";
 
+export function errorJson(
+  status: number,
+  statusCode: string,
+  message: string,
+) {
+  return NextResponse.json(
+    {
+      status,
+      statusCode,
+      code: statusCode,
+      message,
+      timestamp: new Date().toISOString(),
+    },
+    { status },
+  );
+}
+
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("Origin");
   if (origin && new URL(origin).host !== new URL(request.url).host) {
@@ -11,19 +28,11 @@ export function assertSameOrigin(request: Request) {
 
 export function routeError(error: unknown) {
   if (error instanceof ZodError) {
-    return NextResponse.json(
-      { message: error.issues[0]?.message ?? "Invalid request" },
-      { status: 400 },
-    );
+    return errorJson(400, "VALIDATION_ERROR", "Validation failed.");
   }
   if (error instanceof ApiError) {
-    return NextResponse.json(
-      { message: error.message, code: error.code },
-      { status: error.status },
-    );
+    const statusCode = error.statusCode ?? "UNKNOWN_ERROR";
+    return errorJson(error.status, statusCode, error.message);
   }
-  return NextResponse.json(
-    { message: "An unexpected error occurred" },
-    { status: 500 },
-  );
+  return errorJson(500, "INTERNAL_SERVER_ERROR", "Unexpected server error.");
 }

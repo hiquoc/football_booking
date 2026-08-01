@@ -142,6 +142,9 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @CacheEvict(cacheNames = CacheNames.USER_BY_ID, allEntries = true)
     public UserDto changeUserRole(UUID targetUserId, UserType newRole) {
+        if (newRole == UserType.ADMIN) {
+            throw new ForbiddenException("Users cannot be upgraded to admin role");
+        }
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));
         user.setUserType(newRole);

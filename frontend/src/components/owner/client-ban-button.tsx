@@ -18,7 +18,11 @@ export function ClientBanButton({
   const [error, setError] = useState<string | null>(null);
 
   if (banned) {
-    return <span className="text-xs font-bold text-slate-400">Da cam</span>;
+    return (
+      <span className="inline-flex h-8 items-center rounded-lg bg-slate-500 px-3 text-xs font-black text-white">
+        Đã cấm
+      </span>
+    );
   }
 
   return (
@@ -33,14 +37,14 @@ export function ClientBanButton({
             await submitBanClient(fieldId, userId);
             router.refresh();
           } catch (err) {
-            setError(err instanceof Error ? err.message : "Khong the cam nguoi dung");
+            setError(err instanceof Error ? err.message : "Không thể cấm người dùng");
           } finally {
             setPending(false);
           }
         }}
-        className="inline-flex justify-center rounded-lg bg-rose-600 px-3 py-2 text-xs font-black text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex justify-center rounded-lg bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Dang cam..." : "Cam"}
+        {pending ? "Đang cấm..." : "Cấm"}
       </button>
       {error ? <span className="max-w-40 text-xs font-semibold text-rose-600">{error}</span> : null}
     </div>

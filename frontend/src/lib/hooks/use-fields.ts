@@ -8,6 +8,7 @@ import {
   fetchFields,
   fetchFieldCards,
   fetchFieldDetails,
+  fetchFieldReviews,
   fetchFavoriteFields,
   removeFavoriteField,
   fetchSubFields,
@@ -17,7 +18,7 @@ import {
 } from "@/lib/client/fields";
 import { fieldQueryKeys } from "@/lib/query-keys";
 import { useToast } from "@/components/providers/toast-provider";
-import type { Field, FieldCardData, FieldCardFilters, FieldDetails, FieldStatus, PageResponse } from "@/lib/api/types";
+import type { Field, FieldCardData, FieldCardFilters, FieldDetails, FieldStatus, PageResponse, Review } from "@/lib/api/types";
 
 export function useFields(page: number, size = 9, status?: FieldStatus) {
   return useQuery({
@@ -121,6 +122,14 @@ export function useFieldDetails(id: string) {
   });
 }
 
+export function useFieldReviews(id: string, page = 0, size = 6, initialData?: PageResponse<Review>) {
+  return useQuery({
+    queryKey: fieldQueryKeys.reviewPage(id, page, size),
+    queryFn: () => fetchFieldReviews(id, page, size),
+    initialData,
+  });
+}
+
 export function useSubFieldFilterOptions(search = "", enabled = true) {
   return useQuery({
     queryKey: fieldQueryKeys.subFieldFilterOptions(search),
@@ -162,6 +171,9 @@ export function useCreateReview(fieldId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: fieldQueryKeys.details(fieldId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.reviews(fieldId),
       });
     },
   });

@@ -22,7 +22,7 @@ export default async function OwnerFieldsPage() {
         action={
           <Link
             href="/owner/fields/new"
-            className="inline-flex items-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white"
+            className="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-black text-white"
           >
             <Plus className="size-4" /> Thêm sân
           </Link>

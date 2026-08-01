@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   LoaderCircle,
-  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -25,6 +24,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
   const verifyOtpMutation = useVerifyOtp();
   const [step, setStep] = useState<Step>("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const phoneForm = useForm<SendOtpInput>({
     resolver: zodResolver(sendOtpSchema),
@@ -37,6 +37,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
 
   async function sendOtp(input: SendOtpInput) {
     try {
+      setIsSubmitting(true);
       await sendOtpMutation.mutateAsync(input);
       setPhoneNumber(input.phoneNumber);
       otpForm.setValue("phoneNumber", input.phoneNumber);
@@ -44,15 +45,20 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
     } catch {
       // React Query stores the error for display below.
     }
+    finally {
+      setIsSubmitting(false);
+    }
   }
 
   async function verifyOtp(input: VerifyOtpInput) {
     try {
+      setIsSubmitting(true);
       await verifyOtpMutation.mutateAsync(input);
       window.location.replace(
         nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/",
       );
     } catch {
+      setIsSubmitting(false);
       // React Query stores the error for display below.
     }
   }
@@ -98,7 +104,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
             placeholder="000000"
             autoFocus
             {...otpForm.register("code")}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-center text-2xl font-bold tracking-wide text-slate-950 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-center text-2xl font-bold tracking-wide text-slate-950 outline-none transition focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
           />
           {otpForm.formState.errors.code && (
             <p className="mt-2 text-sm font-semibold text-rose-600">
@@ -123,7 +129,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
     >
       <div>
         <h1 className="text-4xl font-black tracking-[-0.045em] text-slate-950">
-          Đăng Nhập
+          Đăng nhập
         </h1>
         <p className="mt-2 text-base leading-6 text-slate-500">
           Đăng nhập bằng số điện thoại. Chúng tôi sẽ gửi cho bạn mã xác minh
@@ -144,7 +150,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
           placeholder="0862470050"
           autoFocus
           {...phoneForm.register("phoneNumber")}
-          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-lg tracking-wide font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10"
+          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-lg font-semibold tracking-wide text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
         />
         {phoneForm.formState.errors.phoneNumber && (
           <p className="mt-2 text-base font-semibold text-rose-600">
@@ -156,7 +162,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
         message={mutationError(sendOtpMutation.error, "Không thể gửi mã OTP")}
       />
       <SubmitButton
-        pending={sendOtpMutation.isPending}
+        pending={ isSubmitting }
         label="Gửi mã xác minh"
       />
       <p className="text-center text-xs leading-5 text-slate-400">
@@ -196,7 +202,7 @@ function SubmitButton({ pending, label }: { pending: boolean; label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white transition hover:bg-sky-500 hover:text-white disabled:cursor-wait disabled:opacity-60"
+      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 px-5 py-4 text-sm font-black text-white transition hover:bg-green-700 disabled:cursor-wait disabled:opacity-60"
     >
       {pending ? (
         <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />

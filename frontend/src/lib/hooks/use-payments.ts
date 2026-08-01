@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CreateCheckoutInput } from "@/lib/api/types";
 import { createCheckout, fetchPayment } from "@/lib/client/payments";
-import { bookingQueryKeys, paymentQueryKeys, userQueryKeys } from "@/lib/query-keys";
+import { bookingQueryKeys, paymentQueryKeys } from "@/lib/query-keys";
 export function usePayment(bookingId: string, enabled = true) {
   return useQuery({
     queryKey: paymentQueryKeys.byBooking(bookingId), queryFn: () => fetchPayment(bookingId), enabled,
@@ -21,7 +21,6 @@ export function useCreateCheckout() {
         void queryClient.invalidateQueries({ queryKey: paymentQueryKeys.byBooking(input.bookingId) });
         void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.detail(input.bookingId) });
       }
-      void queryClient.invalidateQueries({ queryKey: userQueryKeys.mePrivate });
     },
   });
 }

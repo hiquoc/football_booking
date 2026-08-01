@@ -14,6 +14,8 @@ export const fieldQueryKeys = {
   subFieldFilterOptions: (search = "") =>
     ["sub-fields", "filter-options", { search }] as const,
   reviews: (id: string) => ["reviews", id] as const,
+  reviewPage: (id: string, page: number, size: number) =>
+    [...fieldQueryKeys.reviews(id), { page, size }] as const,
 };
 
 export const bookingQueryKeys = {
@@ -22,6 +24,8 @@ export const bookingQueryKeys = {
     [...bookingQueryKeys.all, "mine", { page, size, filters }] as const,
   owner: (page: number, size = 10, filters: object = {}) =>
     [...bookingQueryKeys.all, "owner", { page, size, filters }] as const,
+  reservations: (page: number, size = 10, filters: object = {}) =>
+    [...bookingQueryKeys.all, "reservations", { page, size, filters }] as const,
   detail: (id: string) => [...bookingQueryKeys.all, id] as const,
   config: ["bookings", "config"] as const,
   availability: (subFieldId: string, date: string) =>
@@ -60,10 +64,15 @@ export const notificationQueryKeys = {
   unreadCount: ["notifications", "unread-count"] as const,
 };
 
-export const fieldTypeQueryKeys = { all: ["field-types"] as const };
+export const fieldTypeQueryKeys = {
+  all: ["field-types"] as const,
+  subFieldTypes: ["sub-field-types"] as const,
+};
 
 export const ownerFieldQueryKeys = {
   all: ["owner-fields"] as const,
+  managed: (page: number, size = 10) =>
+    [...ownerFieldQueryKeys.all, "managed", { page, size }] as const,
   list: (page: number, size = 10) =>
     [...ownerFieldQueryKeys.all, "list", { page, size }] as const,
   assigned: (page: number, size = 10) =>

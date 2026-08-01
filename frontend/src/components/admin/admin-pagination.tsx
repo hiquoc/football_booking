@@ -27,18 +27,18 @@ export function AdminPagination({
       {currentPage > 0 ? (
         <Link
           href={href(currentPage - 1)}
-          className="inline-flex items-center gap-2 rounded-full bg-slate-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-600 shadow-none"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-green-300 hover:text-green-700 shadow-none"
         >
           <ChevronLeft className="size-4" /> Trang trước
         </Link>
       ) : null}
-      <span className="text-sm font-semibold text-slate-500">
+      <span className="inline-flex min-h-10 items-center rounded-xl bg-green-50 px-4 text-sm font-black text-green-700">
         {currentPage + 1}/{totalPages}
       </span>
       {currentPage + 1 < totalPages ? (
         <Link
           href={href(currentPage + 1)}
-          className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-none"
+          className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-green-700 shadow-none"
         >
           Trang sau <ChevronRight className="size-4" />
         </Link>

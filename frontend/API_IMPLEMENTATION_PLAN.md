@@ -427,7 +427,6 @@ interface BookingResponse {
   endTime: string;
   durationMinutes: number;
   pricePerHour: number;
-  totalAmount: number;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   note: string | null;
   cancellationReason: string | null;

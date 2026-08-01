@@ -16,11 +16,13 @@ import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 import { AdminPagination } from "./admin-pagination";
 
 const roleLabels: Record<User["userType"], string> = {
-  CLIENT: "Khach hang",
-  OWNER: "Chu san",
-  EMPLOYEE: "Nhan vien",
-  ADMIN: "Quan tri vien",
+  CLIENT: "Khách hàng",
+  OWNER: "Chủ sân",
+  EMPLOYEE: "Nhân viên",
+  ADMIN: "Quản trị viên",
 };
+
+const assignableRoleLabels = Object.entries(roleLabels).filter(([value]) => value !== "ADMIN");
 
 export function AdminUserList({
   page,
@@ -34,8 +36,8 @@ export function AdminUserList({
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const query = useUsers(page, 10, phoneNumber);
   const currentUserQuery = useCurrentUser();
-  const roleMutation = useUpdateUserRole(page, 10, phoneNumber);
-  const statusMutation = useUpdateUserStatus(page, 10, phoneNumber);
+  const roleMutation = useUpdateUserRole();
+  const statusMutation = useUpdateUserStatus();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -64,7 +66,7 @@ export function AdminUserList({
     return (
       <section className="mt-8">
         <UserSearch value={phoneInput} onChange={setPhoneInput} />
-        <div className="mt-8"><DataError title="Khong the tai danh sach nguoi dung" /></div>
+        <div className="mt-8"><DataError title="Không thể tải danh sách người dùng" /></div>
       </section>
     );
   }
@@ -74,8 +76,8 @@ export function AdminUserList({
       <section className="mt-8">
         <UserSearch value={phoneInput} onChange={setPhoneInput} />
         <DataEmpty
-          title="Chua co nguoi dung"
-          description="Khong co tai khoan nao khop bo loc hien tai."
+          title="Chưa có người dùng"
+          description="Không có tài khoản nào khớp bộ lọc hiện tại."
         />
       </section>
     );
@@ -85,46 +87,47 @@ export function AdminUserList({
     <section className="mt-8">
       <UserSearch value={phoneInput} onChange={setPhoneInput} />
       <p className="mb-4 text-sm font-semibold text-slate-500">
-        Tong cong {query.data.totalElements} tai khoan
+        Tổng cộng {query.data.totalElements} tài khoản
       </p>
       {roleMutation.error ? (
         <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-          Khong the cap nhat vai tro. Du lieu truoc do da duoc khoi phuc.
+          Không thể cập nhật vai trò. Dữ liệu trước đó đã được khôi phục.
         </p>
       ) : null}
       {statusMutation.error ? (
         <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-          Khong the cap nhat trang thai cam. Du lieu truoc do da duoc khoi phuc.
+          Không thể cập nhật trạng thái cấm. Dữ liệu trước đó đã được khôi phục.
         </p>
       ) : null}
       <div className="space-y-4">
         {query.data.content.map((user) => {
           const isCurrentUser = user.id === currentUserId;
           const banned = user.status === "PLATFORM_BANNED" || Boolean(user.isPermanentBan);
+          const roleOptions = user.userType === "ADMIN" ? Object.entries(roleLabels) : assignableRoleLabels;
 
           return (
             <article
               key={user.id}
-              className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
             >
               <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="flex min-w-0 gap-4">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-sky-100 text-sky-700">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-full bg-green-50 text-green-700">
                     <UserRound className="size-5" />
                   </span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate font-black text-slate-950">
-                        {user.fullName || "Chua cap nhat ten"}
-                      </h2>
+                      <Link href={`/users/${user.id}/profile`} className="truncate font-black text-slate-950 hover:text-green-700">
+                        {user.fullName || "Chưa cập nhật tên"}
+                      </Link>
                       {isCurrentUser ? (
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-black text-slate-600">
-                          Ban
+                          Bạn
                         </span>
                       ) : null}
                       {banned ? (
                         <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-black text-rose-700">
-                          Bi cam
+                          Bị cấm
                         </span>
                       ) : null}
                     </div>
@@ -142,11 +145,11 @@ export function AdminUserList({
                 </div>
                 <div className="flex flex-wrap gap-2 sm:justify-end">
                   <select
-                    aria-label={`Vai tro cua ${user.fullName || user.phoneNumber}`}
-                    className="h-10 rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label={`Vai trò của ${user.fullName || user.phoneNumber}`}
+                    className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-700 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 disabled:cursor-not-allowed disabled:opacity-60"
                     value={user.userType}
                     disabled={isCurrentUser || roleMutation.isPending}
-                    title={isCurrentUser ? "Khong the doi vai tro cua chinh minh" : undefined}
+                    title={isCurrentUser ? "Không thể đổi vai trò của chính mình" : undefined}
                     onChange={(event) =>
                       roleMutation.mutate({
                         id: user.id,
@@ -154,16 +157,16 @@ export function AdminUserList({
                       })
                     }
                   >
-                    {Object.entries(roleLabels).map(([value, label]) => (
+                    {roleOptions.map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
                   <button
                     type="button"
-                    className={`inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60 ${banned ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                    className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60 ${banned ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
                       }`}
                     disabled={isCurrentUser || statusMutation.isPending}
-                    title={isCurrentUser ? "Khong the cam hoac bo cam chinh minh" : undefined}
+                    title={isCurrentUser ? "Không thể cấm hoặc bỏ cấm chính mình" : undefined}
                     onClick={() =>
                       statusMutation.mutate({
                         id: user.id,
@@ -172,15 +175,15 @@ export function AdminUserList({
                     }
                   >
                     {banned ? <ShieldCheck className="size-4" /> : <ShieldBan className="size-4" />}
-                    {banned ? "Bo cam" : "Cam"}
+                    {banned ? "Bỏ cấm" : "Cấm"}
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:border-sky-400"
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:border-green-300 hover:text-green-700"
                     onClick={() => setExpandedUserId(expandedUserId === user.id ? null : user.id)}
                   >
                     <Eye className="size-4" />
-                    Vi pham
+                    Vi phạm
                   </button>
                   <span className="inline-flex h-10 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold text-slate-500">
                     {user.status}
@@ -211,13 +214,13 @@ function UserSearch({
 }) {
   return (
     <label className="mb-6 block max-w-md">
-      <span className="mb-2 block text-sm font-black text-slate-700">Loc theo so dien thoai</span>
-      <span className="flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm focus-within:border-sky-400">
+      <span className="mb-2 block text-sm font-black text-slate-700">Lọc theo số điện thoại</span>
+      <span className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 shadow-sm focus-within:border-green-500 focus-within:ring-4 focus-within:ring-green-100">
         <Search className="size-4 text-slate-400" />
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="Nhap so dien thoai"
+          placeholder="Nhập số điện thoại"
           className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400"
         />
       </span>
@@ -231,7 +234,7 @@ function ViolationPanel({ userId }: { userId: string }) {
   if (query.isPending) {
     return (
       <div className="mt-4 rounded-lg bg-slate-50 p-4 text-sm font-semibold text-slate-500">
-        Dang tai trang thai vi pham...
+        Đang tải trạng thái vi phạm...
       </div>
     );
   }
@@ -239,7 +242,7 @@ function ViolationPanel({ userId }: { userId: string }) {
   if (query.isError) {
     return (
       <div className="mt-4 rounded-lg bg-rose-50 p-4 text-sm font-semibold text-rose-700">
-        Khong the tai thong tin vi pham.
+        Không thể tải thông tin vi phạm.
       </div>
     );
   }
@@ -260,14 +263,14 @@ function ViolationPanel({ userId }: { userId: string }) {
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="inline-flex items-center gap-2 font-black text-slate-800">
           <AlertTriangle className="size-4 text-amber-600" />
-          Trang thai: {activeCount > 0 ? `${activeCount} dang hieu luc` : "Khong co vi pham dang hieu luc"}
+          Trạng thái: {activeCount > 0 ? `${activeCount} đang hiệu lực` : "Không có vi phạm đang hiệu lực"}
         </span>
-        <span className="text-slate-500">Tong cong {totalViolations} ban ghi vi pham</span>
+        <span className="text-slate-500">Tổng cộng {totalViolations} bản ghi vi phạm</span>
       </div>
       {communityViolations.length > 0 || fieldViolations.length > 0 ? (
         <ViolationDetails communityViolations={communityViolations} fieldViolations={fieldViolations} />
       ) : (
-        <p className="mt-3 text-sm text-slate-500">Chua co vi pham nao.</p>
+        <p className="mt-3 text-sm text-slate-500">Chưa có vi phạm nào.</p>
       )}
     </div>
   );
@@ -284,23 +287,23 @@ function ViolationDetails({
     <div className="mt-3 space-y-4 border-t border-slate-200 pt-3 text-sm text-slate-600">
       {fieldViolations.length > 0 ? (
         <section>
-          <h3 className="text-xs font-black uppercase text-slate-500">Vang mat dat san</h3>
+          <h3 className="text-xs font-black uppercase text-slate-500">Vắng mặt đặt sân</h3>
           <div className="mt-2 space-y-2 text-xs font-semibold text-slate-500">
             {fieldViolations.map((violation) => (
               <div key={violation.id} className="flex flex-wrap gap-3">
                 <span>
-                  San:{" "}
+                  Sân:{" "}
                   <Link
                     href={`/fields/${encodeURIComponent(violation.fieldId)}`}
-                    className="font-black text-sky-700 underline-offset-2 hover:underline"
+                    className="font-black text-green-700 underline-offset-2 hover:underline"
                   >
                     {violation.fieldId}
                   </Link>
                 </span>
-                <span>So lan: {violation.violationCount}</span>
-                <span>Trang thai: {violation.banned ? "Bi cam dat san" : "Canh bao"}</span>
-                {violation.lastViolationDate ? <span>Lan cuoi: {formatDateTime(violation.lastViolationDate)}</span> : null}
-                {violation.banDate ? <span>Ngay cam: {formatDateTime(violation.banDate)}</span> : null}
+                <span>Số lần: {violation.violationCount}</span>
+                <span>Trạng thái: {violation.banned ? "Bị cấm đặt sân" : "Cảnh báo"}</span>
+                {violation.lastViolationDate ? <span>Lần cuối: {formatDateTime(violation.lastViolationDate)}</span> : null}
+                {violation.banDate ? <span>Ngày cấm: {formatDateTime(violation.banDate)}</span> : null}
               </div>
             ))}
           </div>
@@ -308,15 +311,15 @@ function ViolationDetails({
       ) : null}
       {communityViolations.length > 0 ? (
         <section>
-          <h3 className="text-xs font-black uppercase text-slate-500">Bai dang cong dong</h3>
+          <h3 className="text-xs font-black uppercase text-slate-500">Bài đăng cộng đồng</h3>
           <div className="mt-2 space-y-2 text-xs font-semibold text-slate-500">
             {communityViolations.map((violation) => (
               <div key={violation.id} className="flex flex-wrap gap-3">
-                <span>Ly do: {violation.reason}</span>
-                <span>Hanh dong: {violation.action}</span>
-                <span>Trang thai: {violation.status}</span>
-                <span>Ngay tao: {formatDateTime(violation.createdAt)}</span>
-                {violation.expireAt ? <span>Het han: {formatDateTime(violation.expireAt)}</span> : null}
+                <span>Lý do: {violation.reason}</span>
+                <span>Hành động: {violation.action}</span>
+                <span>Trạng thái: {violation.status}</span>
+                <span>Ngày tạo: {formatDateTime(violation.createdAt)}</span>
+                {violation.expireAt ? <span>Hết hạn: {formatDateTime(violation.expireAt)}</span> : null}
               </div>
             ))}
           </div>

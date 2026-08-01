@@ -19,13 +19,25 @@ import {
   fetchBookingConfig,
   fetchMyBookings,
   fetchOwnerBookings,
+  fetchOwnerReservations,
   submitBooking,
   submitCancellation,
   submitMatchResult,
+  submitReservation,
+  submitReservationCancellation,
 } from "@/lib/client/bookings";
 import { submitNoShowReport } from "@/lib/client/moderation";
 import { bookingQueryKeys } from "@/lib/query-keys";
 import { recurringBookingQueryKeys, userQueryKeys } from "@/lib/query-keys";
+
+type BookingListFilters = {
+  bookingDate?: string;
+  fieldId?: string;
+  fieldType?: string;
+  subFieldId?: string;
+  subFieldType?: string;
+  status?: string;
+};
 
 function incrementCompletedBookingCount(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.setQueryData(userQueryKeys.mePrivate, (old: unknown) => {
@@ -61,7 +73,7 @@ export function useMyBookings(
 export function useOwnerBookings(
   page: number,
   size = 10,
-  filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
+  filters: BookingListFilters = {},
 ) {
   return useQuery({
     queryKey: bookingQueryKeys.owner(page, size, filters),
@@ -69,18 +81,36 @@ export function useOwnerBookings(
   });
 }
 
-export function useBookingList(
+export function useOwnerReservations(
   page: number,
-  owner = false,
   size = 10,
   filters: { bookingDate?: string; subFieldId?: string; status?: string } = {},
 ) {
   return useQuery({
-    queryKey: owner
+    queryKey: bookingQueryKeys.reservations(page, size, filters),
+    queryFn: () => fetchOwnerReservations(page, size, filters),
+  });
+}
+
+export function useBookingList(
+  page: number,
+  owner = false,
+  size = 10,
+  filters: BookingListFilters = {},
+  reservations = false,
+) {
+  return useQuery({
+    queryKey: reservations
+      ? bookingQueryKeys.reservations(page, size, filters)
+      : owner
       ? bookingQueryKeys.owner(page, size, filters)
       : bookingQueryKeys.mine(page, size, filters),
     queryFn: () =>
-      owner ? fetchOwnerBookings(page, size, filters) : fetchMyBookings(page, size, filters),
+      reservations
+        ? fetchOwnerReservations(page, size, filters)
+        : owner
+          ? fetchOwnerBookings(page, size, filters)
+          : fetchMyBookings(page, size, filters),
   });
 }
 
@@ -132,6 +162,37 @@ export function useCreateBooking() {
           input.bookingDate ?? input.startDateTime.slice(0, 10),
         ),
       });
+    },
+  });
+}
+
+export function useCreateReservation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateBookingInput) => submitReservation(input),
+    retry: false,
+    onSuccess: (booking, input) => {
+      queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+      void queryClient.invalidateQueries({
+        queryKey: bookingQueryKeys.availability(
+          input.subFieldId,
+          input.bookingDate ?? input.startDateTime.slice(0, 10),
+        ),
+      });
+    },
+  });
+}
+
+export function useCancelReservation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      submitReservationCancellation(id, reason),
+    retry: false,
+    onSuccess: (booking) => {
+      queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
     },
   });
 }

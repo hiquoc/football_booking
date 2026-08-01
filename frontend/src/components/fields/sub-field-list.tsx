@@ -3,23 +3,31 @@ import Link from "next/link";
 import type { SubField } from "@/lib/api/types";
 import { formatCurrency, formatEnum, formatTime } from "@/lib/field-format";
 
-export function SubFieldList({ fields,isBookable }: { fields: SubField[] | null, isBookable?: boolean }) {
+export function SubFieldList({
+  fields,
+  isBookable,
+  reservationMode = false,
+}: {
+  fields: SubField[] | null;
+  isBookable?: boolean;
+  reservationMode?: boolean;
+}) {
   const activeFields = fields?.filter((field) => field.active) ?? [];
   const fieldId = activeFields[0]?.fieldId; 
 
   return (
     <section id="sub-fields" className="scroll-mt-28">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-600">
+      <p className="text-sm font-black uppercase text-green-600">
         Lựa chọn sân
       </p>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">
+        <h2 className="mt-2 text-3xl font-black text-slate-950">
           Các sân có thể đặt
         </h2>
         {fieldId ? (
           <Link
-            href={`/fields/${fieldId}/book`}
-            className="relative z-10 inline-flex w-fit items-center gap-2 rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white transition hover:bg-sky-400"
+            href={`/fields/${fieldId}/book${reservationMode ? "?mode=reservation" : ""}`}
+            className="relative z-10 inline-flex w-fit items-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-black text-white transition hover:bg-green-700"
           >
             <CalendarDays className="size-4" /> Đặt sân ngay
           </Link>
@@ -36,11 +44,11 @@ export function SubFieldList({ fields,isBookable }: { fields: SubField[] | null,
             return (
               <article
                 key={field.id}
-                className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm"
+                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-green-300 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.13em] text-sky-600">
+                    <p className="text-xs font-black uppercase tracking-[0.13em] text-green-600">
                       {formatEnum(field.subFieldType)}
                     </p>
                     <h3 className="mt-2 text-xl font-black text-slate-950">
@@ -59,9 +67,9 @@ export function SubFieldList({ fields,isBookable }: { fields: SubField[] | null,
                   </p>
                 ) : null}
                 {field.timePriceRules?.length ? (
-                  <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+                  <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
                     {[...field.timePriceRules]
-                    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                    // .sort((a, b) => a.startTime.localeCompare(b.startTime))
                     .map((rule) => (
                       <div
                         key={rule.id ?? `${rule.startTime}-${rule.endTime}`}

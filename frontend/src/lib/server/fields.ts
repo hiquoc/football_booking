@@ -1,7 +1,9 @@
 import "server-only";
 
 import { revalidateTag } from "next/cache";
+import { unstable_cache } from "next/cache";
 import type {
+  Booking,
   Field,
   FieldCardData,
   FieldCardFilters,
@@ -26,14 +28,72 @@ import {
   sessionGatewayRequest,
 } from "./authenticated-gateway";
 import { gatewayRequest } from "./gateway";
+import { getAccessToken } from "./session";
 
 const fieldCacheTag = (id: string) => `field-${id}`;
 
 export async function getFeaturedFields() {
-  return gatewayRequest<PageResponse<FieldCardData>>(
+  return sessionGatewayRequest<PageResponse<FieldCardData>>(
     "/api/v1/fields/cards?page=0&size=6&sortBy=rating&direction=desc",
     { next: { revalidate: 60 } },
   );
+}
+
+export async function getRecentlyBookedFieldCards(userId: string, limit = 4) {
+  const accessToken = await getAccessToken();
+  if (!accessToken) return [];
+
+  return unstable_cache(
+    async () => {
+      const bookings = await gatewayRequest<PageResponse<Booking>>(
+        "/api/v1/bookings/my?page=0&size=12&sort=createdAt,desc",
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      const fieldIds = Array.from(
+        new Set(
+          bookings.content
+            .map((booking) => booking.fieldId)
+            .filter((fieldId): fieldId is string => Boolean(fieldId)),
+        ),
+      ).slice(0, limit);
+
+      const fields = await Promise.all(
+        fieldIds.map((fieldId) =>
+          gatewayRequest<Field>(`/api/v1/fields/${encodeURIComponent(fieldId)}`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }).catch(() => null),
+        ),
+      );
+
+      return fields
+        .filter((field): field is Field => Boolean(field))
+        .map(fieldToCardData);
+    },
+    [`recently-booked-fields-${userId}`],
+    { revalidate: 120, tags: [`recently-booked-fields-${userId}`] },
+  )();
+}
+
+function fieldToCardData(field: Field): FieldCardData {
+  return {
+    id: field.id,
+    name: field.name,
+    address: field.address,
+    ward: field.ward,
+    province: field.province,
+    latitude: field.latitude,
+    longitude: field.longitude,
+    ratingAverage: field.ratingAverage,
+    totalReviews: field.totalReviews,
+    primaryImageUrl:
+      field.images.find((image) => image.isPrimary)?.imageUrl ??
+      field.images[0]?.imageUrl ??
+      null,
+    fieldTypes: field.fieldTypes.map((type) => type.name),
+    distanceKm: null,
+    isSaved: field.isSaved ?? field.isFavorite,
+    isFavorite: field.isFavorite ?? field.isSaved,
+  };
 }
 
 export async function getFieldCards(
@@ -146,9 +206,10 @@ export function getSubFieldFilterOptions(search?: string) {
   );
 }
 
-export async function getFieldReviews(id: string) {
-  return gatewayRequest<Review[]>(
-    `/api/v1/reviews/field/${encodeURIComponent(id)}`,
+export async function getFieldReviews(id: string, page = 0, size = 6) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return gatewayRequest<PageResponse<Review>>(
+    `/api/v1/reviews/field/${encodeURIComponent(id)}?${query}`,
     {
       next: { revalidate: 60 },
     },

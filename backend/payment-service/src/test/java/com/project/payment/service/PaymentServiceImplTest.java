@@ -34,7 +34,6 @@ class PaymentServiceImplTest {
         userId = UUID.randomUUID(); bookingId = UUID.randomUUID();
         when(bookings.findById(bookingId)).thenReturn(Optional.of(BookingPaymentProjection.builder()
                 .bookingId(bookingId).bookingCode("BK-1").userId(userId)
-                .totalAmount(new BigDecimal("300000.00"))
                 .subFieldPrice(new BigDecimal("300000.00"))
                 .bookingPrice(5000L)
                 .platformBookingFee(5000L)

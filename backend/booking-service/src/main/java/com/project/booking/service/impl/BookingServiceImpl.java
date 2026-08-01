@@ -6,6 +6,7 @@ import com.project.booking.client.UserBalanceClient;
 import com.project.booking.config.BookingDatabaseConstraints;
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
+import com.project.booking.dto.request.UpdateReservationRequest;
 import com.project.booking.dto.response.AvailabilityOperatingHoursResponse;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingResponse;
@@ -46,8 +47,11 @@ import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingPaymentStatus;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.BookingType;
 import com.project.common.enums.PaymentMethod;
 import com.project.common.enums.RecurringBookingStatus;
+import com.project.common.enums.SportType;
+import com.project.common.enums.SubFieldType;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
@@ -115,9 +119,56 @@ public class BookingServiceImpl implements BookingService {
     @Value("${booking.payment-timeout-minutes:35}")
     private int paymentTimeoutMinutes = 35;
 
+    @Value("${booking.balance-deduction-attempts:4}")
+    private int balanceDeductionAttempts = 4;
+
+    @Value("${booking.balance-deduction-retry-delay-ms:1250}")
+    private long balanceDeductionRetryDelayMs = 1_250L;
+
     @Override
     public BookingResponse createBooking(UUID userId, CreateBookingRequest request) {
         return createBooking(userId, request, null);
+    }
+
+    @Override
+    public BookingResponse createReservation(UUID ownerId, CreateBookingRequest request) {
+        normalizeRequestDateTimes(request);
+        return bookingLockManager.executeWithLock(
+                request.getSubFieldId(),
+                request.getStartDateTime(),
+                request.getEndDateTime(),
+                () -> createReservationWithExistingValidation(ownerId, request));
+    }
+
+    @Override
+    public BookingResponse updateReservation(UUID ownerId, UpdateReservationRequest request) {
+        CreateBookingRequest bookingRequest = request.toCreateBookingRequest();
+        normalizeRequestDateTimes(bookingRequest);
+        return bookingLockManager.executeWithLock(
+                bookingRequest.getSubFieldId(),
+                bookingRequest.getStartDateTime(),
+                bookingRequest.getEndDateTime(),
+                () -> updateReservationWithExistingValidation(ownerId, request.getReservationId(), bookingRequest));
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse cancelReservation(UUID ownerId, CancelBookingRequest request) {
+        Booking current = getOwnedReservation(ownerId, request.getBookingId());
+        if (!CANCELLABLE_STATUSES.contains(current.getStatus())) {
+            throw new BookingNotCancellableException(current.getId(), current.getStatus().name());
+        }
+        current.setStatus(BookingStatus.CANCELLED);
+        current.setCancellationReason(request.getReason());
+        current.setCancelledAt(LocalDateTime.now());
+        current.setCancelledBy(BookingCancelledBy.OWNER);
+        current.setPaymentStatus(BookingPaymentStatus.NOT_REQUIRED);
+        Booking cancelled = bookingRepository.save(current);
+        log.info("Reservation cancelled: reservationId={}, ownerId={}, fieldId={}, subFieldId={}, bookingType={}",
+                cancelled.getId(), ownerId, resolveFieldId(cancelled), cancelled.getSubFieldId(), cancelled.getBookingType());
+        availabilityCacheService.evict(cancelled.getSubFieldId(), cancelled.getBookingDate());
+        bookingNotificationEventPublisher.publishBookingCancelled(cancelled, null);
+        return bookingMapper.toResponse(cancelled);
     }
 
     @Override
@@ -132,6 +183,9 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public void validateRecurringOccurrence(UUID userId, CreateBookingRequest request, UUID recurringBookingId) {
         SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
+        if (subField.getOwnerId().equals(userId)) {
+            throw new BadRequestException("Owners cannot create normal bookings for their own fields. Create a reservation instead.");
+        }
         bookingModerationService.ensureCanBook(userId, subField.getFieldId());
         normalizeRequestDateTimes(request);
         validateBooking(subField, request, recurringBookingId);
@@ -148,6 +202,11 @@ public class BookingServiceImpl implements BookingService {
 
     private BookingResponse createBookingWithExistingValidation(UUID userId, CreateBookingRequest request, UUID sourceRecurringBookingId) {
         SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
+        if (subField.getOwnerId().equals(userId)) {
+            log.warn("Owner attempted normal booking on owned field: userId={}, ownerId={}, fieldId={}, subFieldId={}, bookingType={}",
+                    userId, subField.getOwnerId(), subField.getFieldId(), subField.getId(), BookingType.NORMAL);
+            throw new BadRequestException("Owners cannot create normal bookings for their own fields. Create a reservation instead.");
+        }
         bookingModerationService.ensureCanBook(userId, subField.getFieldId());
         normalizeRequestDateTimes(request);
 
@@ -173,10 +232,10 @@ public class BookingServiceImpl implements BookingService {
                 .endTime(request.getEndTime())
                 .durationMinutes(request.getDurationMinutes())
                 .pricePerHour(resolveStartPrice(subField, request))
-                .totalAmount(subFieldPrice)
                 .subFieldPrice(subFieldPrice)
                 .bookingPrice(bookingPrice)
                 .platformBookingFee(bookingPrice)
+                .bookingType(BookingType.NORMAL)
                 .paymentMethod(paymentMethod)
                 .status(BookingStatus.PENDING)
                 .paymentStatus(BookingPaymentStatus.UNPAID)
@@ -191,6 +250,91 @@ public class BookingServiceImpl implements BookingService {
         }
         confirmWithAccountBalanceIfPossible(saved);
         return bookingMapper.toResponse(saved, subField);
+    }
+
+    private BookingResponse createReservationWithExistingValidation(UUID ownerId, CreateBookingRequest request) {
+        SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
+        validateOwnerOwnsSubField(ownerId, subField);
+        normalizeRequestDateTimes(request);
+        validateBooking(subField, request, null);
+
+        Booking booking = reservationBuilder(ownerId, request, subField).build();
+        Booking saved = transactionTemplate.execute(status -> saveReservation(booking, subField, "created"));
+        if (saved == null) {
+            throw new IllegalStateException("Reservation transaction did not return a booking");
+        }
+        return bookingMapper.toResponse(saved, subField);
+    }
+
+    private BookingResponse updateReservationWithExistingValidation(UUID ownerId, UUID reservationId, CreateBookingRequest request) {
+        Booking current = getOwnedReservation(ownerId, reservationId);
+        SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(request.getSubFieldId());
+        validateOwnerOwnsSubField(ownerId, subField);
+        normalizeRequestDateTimes(request);
+        validateBookingForUpdate(subField, request, reservationId);
+
+        current.setSubFieldId(subField.getId());
+        current.setOwnerId(ownerId);
+        current.setBookingDate(request.getBookingDate());
+        current.setStartDateTime(request.getStartDateTime());
+        current.setEndDateTime(request.getEndDateTime());
+        current.setStartTime(request.getStartTime());
+        current.setEndTime(request.getEndTime());
+        current.setDurationMinutes(request.getDurationMinutes());
+        current.setPricePerHour(BigDecimal.ZERO);
+        current.setSubFieldPrice(BigDecimal.ZERO);
+        current.setBookingPrice(0L);
+        current.setPlatformBookingFee(0L);
+        current.setPaymentStatus(BookingPaymentStatus.NOT_REQUIRED);
+        current.setPaymentExpiresAt(null);
+        current.setNote(request.getNote());
+
+        Booking saved = transactionTemplate.execute(status -> saveReservation(current, subField, "updated"));
+        if (saved == null) {
+            throw new IllegalStateException("Reservation transaction did not return a booking");
+        }
+        return bookingMapper.toResponse(saved, subField);
+    }
+
+    private Booking.BookingBuilder reservationBuilder(UUID ownerId, CreateBookingRequest request, SubFieldResponse subField) {
+        return Booking.builder()
+                .bookingCode(BookingCodeGenerator.generate())
+                .clientId(ownerId)
+                .subFieldId(subField.getId())
+                .ownerId(ownerId)
+                .bookingDate(request.getBookingDate())
+                .startDateTime(request.getStartDateTime())
+                .endDateTime(request.getEndDateTime())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .durationMinutes(request.getDurationMinutes())
+                .pricePerHour(BigDecimal.ZERO)
+                .subFieldPrice(BigDecimal.ZERO)
+                .bookingPrice(0L)
+                .platformBookingFee(0L)
+                .bookingType(BookingType.RESERVATION)
+                .paymentMethod(PaymentMethod.ACCOUNT_BALANCE)
+                .status(BookingStatus.CONFIRMED)
+                .paymentStatus(BookingPaymentStatus.NOT_REQUIRED)
+                .paymentExpiresAt(null)
+                .note(request.getNote());
+    }
+
+    private Booking saveReservation(Booking booking, SubFieldResponse subField, String action) {
+        Booking saved;
+        try {
+            saved = bookingRepository.saveAndFlush(booking);
+        } catch (DataIntegrityViolationException ex) {
+            if (isBookingOverlapConstraintViolation(ex)) {
+                throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
+            }
+            throw ex;
+        }
+        availabilityCacheService.evict(saved.getSubFieldId(), saved.getBookingDate());
+        bookingNotificationEventPublisher.publishReservationChanged(saved, subField, action.toUpperCase());
+        log.info("Reservation {}: reservationId={}, ownerId={}, fieldId={}, subFieldId={}, bookingType={}",
+                action, saved.getId(), saved.getOwnerId(), subField.getFieldId(), saved.getSubFieldId(), saved.getBookingType());
+        return saved;
     }
 
     private Booking savePendingBooking(UUID userId, SubFieldResponse subField, Booking booking) {
@@ -293,7 +437,9 @@ public class BookingServiceImpl implements BookingService {
         if (completedCount > 0) {
             availabilityCacheService.evictAll();
             bookingRepository.saveAll(finishedBookings);
-            finishedBookings.forEach(bookingTrustEventPublisher::publishBookingCompleted);
+            finishedBookings.stream()
+                    .filter(booking -> booking.getBookingType() == BookingType.NORMAL)
+                    .forEach(bookingTrustEventPublisher::publishBookingCompleted);
             log.info("Completed {} confirmed bookings ending on or before {}", completedCount, now);
         }
         return completedCount;
@@ -314,18 +460,20 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<BookingResponse> getManagerBookings(UUID managerId, String managerRole, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable) {
+    public PageResponse<BookingResponse> getManagerBookings(UUID managerId, String managerRole, LocalDate bookingDate, UUID fieldId, SportType fieldType, SubFieldType subFieldType, BookingStatus status, Pageable pageable) {
         LocalDateTime bookingDateStart = bookingDate == null ? null : bookingDate.atStartOfDay();
         LocalDateTime bookingDateEnd = bookingDate == null ? null : bookingDate.plusDays(1).atStartOfDay();
+        Collection<SubFieldType> subFieldTypes = resolveSubFieldTypes(fieldType, subFieldType);
+        boolean filterSubFieldTypes = fieldType != null || subFieldType != null;
         List<UUID> managedFieldIds = "EMPLOYEE".equals(managerRole) ? fieldManagementClient.assignedFieldIds(managerId) : List.of();
         if ("EMPLOYEE".equals(managerRole) && managedFieldIds.isEmpty()) {
             return PageResponse.from(Page.empty(pageable));
         }
         Page<Booking> page = "EMPLOYEE".equals(managerRole)
                 ? bookingRepository.findEmployeeManagedBookings(
-                        managedFieldIds, bookingDateStart, bookingDateEnd, subFieldId, status, pageable)
+                        managedFieldIds, bookingDateStart, bookingDateEnd, fieldId, filterSubFieldTypes, subFieldTypes, status, pageable)
                 : bookingRepository.findOwnerBookings(
-                        managerId, bookingDateStart, bookingDateEnd, subFieldId, status, pageable);
+                        managerId, bookingDateStart, bookingDateEnd, fieldId, filterSubFieldTypes, subFieldTypes, status, pageable);
         Page<BookingResponse> responses = page.map(bookingMapper::toResponse);
         enrichClientProfiles(responses.getContent());
         Map<UUID, MatchResultResponse> resultByBookingId = matchResultRepository.findByBookingIdIn(
@@ -334,6 +482,33 @@ public class BookingServiceImpl implements BookingService {
                 .collect(Collectors.toMap(MatchResult::getBookingId, bookingMapper::toMatchResultResponse));
         responses.getContent().forEach(response -> response.setMatchResult(resultByBookingId.get(response.getId())));
         return PageResponse.from(responses);
+    }
+
+    private Collection<SubFieldType> resolveSubFieldTypes(SportType fieldType, SubFieldType subFieldType) {
+        if (subFieldType != null) {
+            return List.of(subFieldType);
+        }
+        if (fieldType != null) {
+            return SubFieldType.forFieldType(fieldType);
+        }
+        return Arrays.asList(SubFieldType.values());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<BookingResponse> getManagerReservations(UUID managerId, String managerRole, LocalDate bookingDate, UUID subFieldId, BookingStatus status, Pageable pageable) {
+        LocalDateTime bookingDateStart = bookingDate == null ? null : bookingDate.atStartOfDay();
+        LocalDateTime bookingDateEnd = bookingDate == null ? null : bookingDate.plusDays(1).atStartOfDay();
+        List<UUID> managedFieldIds = "EMPLOYEE".equals(managerRole) ? fieldManagementClient.assignedFieldIds(managerId) : List.of();
+        if ("EMPLOYEE".equals(managerRole) && managedFieldIds.isEmpty()) {
+            return PageResponse.from(Page.empty(pageable));
+        }
+        Page<Booking> page = "EMPLOYEE".equals(managerRole)
+                ? bookingRepository.findEmployeeManagedReservations(
+                        managedFieldIds, bookingDateStart, bookingDateEnd, subFieldId, status, BookingType.RESERVATION, pageable)
+                : bookingRepository.findOwnerReservations(
+                        managerId, bookingDateStart, bookingDateEnd, subFieldId, status, BookingType.RESERVATION, pageable);
+        return PageResponse.from(page.map(bookingMapper::toResponse));
     }
 
     private void enrichClientProfiles(List<BookingResponse> responses) {
@@ -365,6 +540,29 @@ public class BookingServiceImpl implements BookingService {
             return;
         }
         throw new UnauthorizedException("You are not authorised to manage this booking");
+    }
+
+    private UUID resolveFieldId(Booking booking) {
+        return booking.getSubField() != null ? booking.getSubField().getFieldId() : null;
+    }
+
+    private Booking getOwnedReservation(UUID ownerId, UUID reservationId) {
+        Booking booking = bookingRepository.findById(reservationId)
+                .orElseThrow(() -> new BookingNotFoundException(reservationId));
+        if (!ownerId.equals(booking.getOwnerId()) || booking.getBookingType() != BookingType.RESERVATION) {
+            log.warn("Permission denied for reservation: userId={}, ownerId={}, fieldId={}, subFieldId={}, reservationId={}, bookingType={}",
+                    ownerId, booking.getOwnerId(), resolveFieldId(booking), booking.getSubFieldId(), reservationId, booking.getBookingType());
+            throw new UnauthorizedException("You are not authorised to manage this reservation");
+        }
+        return booking;
+    }
+
+    private void validateOwnerOwnsSubField(UUID ownerId, SubFieldResponse subField) {
+        if (!ownerId.equals(subField.getOwnerId())) {
+            log.warn("Permission denied for reservation: userId={}, ownerId={}, fieldId={}, subFieldId={}, bookingType={}",
+                    ownerId, subField.getOwnerId(), subField.getFieldId(), subField.getId(), BookingType.RESERVATION);
+            throw new UnauthorizedException("You are not authorised to reserve this field");
+        }
     }
 
     @Override
@@ -489,12 +687,13 @@ public class BookingServiceImpl implements BookingService {
             confirmPendingBookingImmediately(booking, null);
             return;
         }
-        BalanceDeductionResponse deduction = userBalanceClient.deduct(new BalanceDeductionRequest(
+        BalanceDeductionRequest request = new BalanceDeductionRequest(
                 booking.getClientId(),
                 payableAmount,
                 booking.getId(),
                 booking.getBookingCode(),
-                BOOKING_PAYMENT_REASON));
+                BOOKING_PAYMENT_REASON);
+        BalanceDeductionResponse deduction = deductBalanceWithRetry(booking, request);
         if (!deduction.deducted()) {
             log.info("Booking remains pending due to insufficient balance: bookingId={}, balance={}", booking.getId(), deduction.balance());
             return;
@@ -505,6 +704,30 @@ public class BookingServiceImpl implements BookingService {
         } catch (RuntimeException ex) {
             log.error("Balance was deducted but immediate booking confirmation failed; payment success inbox will retry: bookingId={}",
                     booking.getId(), ex);
+        }
+    }
+
+    private BalanceDeductionResponse deductBalanceWithRetry(Booking booking, BalanceDeductionRequest request) {
+        BalanceDeductionResponse deduction = null;
+        int maxAttempts = Math.max(1, balanceDeductionAttempts);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            deduction = userBalanceClient.deduct(request);
+            if (deduction.deducted() || attempt == maxAttempts) {
+                return deduction;
+            }
+            log.info("Retrying wallet deduction after insufficient balance: bookingId={}, attempt={}, balance={}",
+                    booking.getId(), attempt, deduction.balance());
+            sleepBeforeBalanceRetry(booking);
+        }
+        return deduction;
+    }
+
+    private void sleepBeforeBalanceRetry(Booking booking) {
+        try {
+            Thread.sleep(Math.max(0L, balanceDeductionRetryDelayMs));
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            log.warn("Wallet deduction retry interrupted: bookingId={}", booking.getId());
         }
     }
 
@@ -550,6 +773,19 @@ public class BookingServiceImpl implements BookingService {
         validateStartTimeAlignment(request.getStartTime());
         validateNoConflict(request.getSubFieldId(), request.getStartDateTime(), request.getEndDateTime(),
                 Boolean.TRUE.equals(subField.getHasRecurring()), sourceRecurringBookingId);
+    }
+
+    private void validateBookingForUpdate(SubFieldResponse subField, CreateBookingRequest request, UUID bookingId) {
+        validateSubFieldActive(subField);
+        validateBookingStartNotPast(request.getStartDateTime());
+        validateClosureDate(subField.getId(), request.getStartDateTime().toLocalDate(), request.getEndDateTime().toLocalDate());
+        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(
+                subField.getId(), request.getBookingDate().getDayOfWeek());
+        validateWithinOperatingHours(subField.getId(), request.getStartDateTime(), request.getEndDateTime(), hours);
+        validateDuration(request, subField);
+        validateStartTimeAlignment(request.getStartTime());
+        validateNoConflictExcludingBooking(request.getSubFieldId(), request.getStartDateTime(), request.getEndDateTime(),
+                Boolean.TRUE.equals(subField.getHasRecurring()), bookingId);
     }
 
     private void normalizeRequestDateTimes(CreateBookingRequest request) {
@@ -745,6 +981,31 @@ public class BookingServiceImpl implements BookingService {
                         endDateTime.toLocalTime(),
                         RecurringBookingStatus.ACTIVE,
                         sourceRecurringBookingId).isEmpty();
+        if (isConflict || recurringConflict) {
+            throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
+        }
+    }
+
+    private void validateNoConflictExcludingBooking(
+            UUID subFieldId,
+            LocalDateTime startDateTime,
+            LocalDateTime endDateTime,
+            boolean hasActiveRecurring,
+            UUID bookingId) {
+        boolean isConflict = bookingRepository.existsConflictingBookingsExcludingBooking(
+                subFieldId,
+                startDateTime,
+                endDateTime,
+                RESERVING_STATUSES,
+                bookingId);
+        boolean recurringConflict = hasActiveRecurring
+                && !recurringBookingRepository.findActiveConflictsForDate(
+                        subFieldId,
+                        startDateTime.toLocalDate(),
+                        startDateTime.toLocalTime(),
+                        endDateTime.toLocalTime(),
+                        RecurringBookingStatus.ACTIVE,
+                        null).isEmpty();
         if (isConflict || recurringConflict) {
             throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
         }

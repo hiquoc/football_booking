@@ -3,6 +3,7 @@ package com.project.booking.entity;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingPaymentStatus;
 import com.project.common.enums.BookingStatus;
+import com.project.common.enums.BookingType;
 import com.project.common.enums.PaymentMethod;
 import com.project.common.entity.BaseEntity;
 import jakarta.persistence.*;
@@ -70,9 +71,6 @@ public class Booking extends BaseEntity {
     @Column(name = "price_per_hour", precision = 10, scale = 2, nullable = false)
     private BigDecimal pricePerHour;
 
-    @Column(name = "total_amount", precision = 10, scale = 2, nullable = false)
-    private BigDecimal totalAmount;
-
     @Column(name = "sub_field_price", precision = 10, scale = 2, nullable = false)
     private BigDecimal subFieldPrice;
 
@@ -83,6 +81,11 @@ public class Booking extends BaseEntity {
     @Builder.Default
     @Column(name = "platform_booking_fee", nullable = false)
     private Long platformBookingFee = 0L;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "booking_type", length = 20, nullable = false)
+    private BookingType bookingType = BookingType.NORMAL;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

@@ -25,12 +25,15 @@ import com.project.field.service.SubFieldService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -184,6 +187,13 @@ public class SubFieldServiceImpl implements SubFieldService {
                             .build();
                 })
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.FIELD_TYPES, key = "'lookup:sub-field-types'", sync = true)
+    public List<SubFieldType> getSubFieldTypes() {
+        return Arrays.asList(SubFieldType.values());
     }
 
     private List<SubField> findFilterOptionsForUser(String search, UserPrincipal currentUser) {

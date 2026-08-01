@@ -23,7 +23,7 @@ export function ReviewForm({ fieldId }: { fieldId: string }) {
   return (
     <form
       onSubmit={submit}
-      className="mt-6 rounded-[1.5rem] border border-slate-200 bg-white p-5"
+      className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
     >
       <h3 className="font-black text-slate-900">Chia sẻ trải nghiệm của bạn</h3>
       <div className="mt-3 flex gap-1" aria-label="Chọn số sao">
@@ -50,7 +50,7 @@ export function ReviewForm({ fieldId }: { fieldId: string }) {
         placeholder="Sân, dịch vụ và trải nghiệm thi đấu thế nào?"
       />
       {mutation.isSuccess ? (
-        <p className="mt-3 text-sm font-semibold text-sky-700">
+        <p className="mt-3 text-sm font-semibold text-green-700">
           Cảm ơn bạn đã đánh giá.
         </p>
       ) : null}
@@ -63,7 +63,7 @@ export function ReviewForm({ fieldId }: { fieldId: string }) {
       ) : null}
       <button
         disabled={mutation.isPending}
-        className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-2.5 text-sm font-black text-white"
+        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-black text-white hover:bg-green-700"
       >
         {mutation.isPending ? (
           <LoaderCircle className="size-4 animate-spin" />

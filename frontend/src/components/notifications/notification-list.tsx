@@ -40,7 +40,7 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
           <button
             onClick={() => markAll.mutate()}
             disabled={markAll.isPending}
-            className={`action-button min-h-0 bg-sky-50 text-sky-700 hover:bg-sky-100 ${compact ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"}`}
+            className={`action-button min-h-0 bg-green-50 text-green-700 hover:bg-green-100 ${compact ? "px-3 py-2 text-xs" : "px-4 py-2.5 text-sm"}`}
           >
             {markAll.isPending ? (
               <LoaderCircle className="size-4 animate-spin" />
@@ -58,10 +58,10 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
           return (
             <article
               key={item.id}
-              className={`flex w-full border-b border-slate-100 text-left last:border-0 ${compact ? "gap-3 p-3" : "gap-4 p-5"} ${item.isRead ? "bg-white" : "bg-sky-50/60"}`}
+              className={`flex w-full border-b border-slate-100 text-left last:border-0 ${compact ? "gap-3 p-3" : "gap-4 p-5"} ${item.isRead ? "bg-white" : "bg-green-50/60"}`}
             >
               <span
-                className={`grid shrink-0 place-items-center rounded-xl ${compact ? "size-9" : "size-10"} ${item.isRead ? "bg-slate-100 text-slate-400" : "bg-sky-500 text-slate-950"}`}
+                className={`grid shrink-0 place-items-center rounded-xl ${compact ? "size-9" : "size-10"} ${item.isRead ? "bg-slate-100 text-slate-400" : "bg-green-600 text-white"}`}
               >
                 <Bell className="size-4" />
               </span>
@@ -80,7 +80,7 @@ export function NotificationList({ page = 0, compact = false, onNavigate }: Noti
                     type="button"
                     onClick={() => markOne.mutate(item.id)}
                     disabled={markOne.isPending}
-                    className="action-button !min-h-0 h-8 border border-sky-200 bg-white px-2 py-1 text-xs text-sky-700 hover:bg-sky-50 !shadow-none"
+                    className="action-button !min-h-0 h-8 border border-green-200 bg-white px-2 py-1 text-xs text-green-700 hover:bg-green-50 !shadow-none"
                   >
                     <Check className="size-3.5" /> Đã đọc
                   </button>

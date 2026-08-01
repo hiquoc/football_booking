@@ -1,6 +1,7 @@
 package com.project.field.controller;
 
 import com.project.common.dto.ApiResponse;
+import com.project.common.dto.PageResponse;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import com.project.field.dto.ReviewDto;
@@ -14,10 +15,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -57,6 +59,7 @@ public class ReviewController {
                                         "id": "123e4567-e89b-12d3-a456-426614174000",
                                         "fieldId": "123e4567-e89b-12d3-a456-426614174001",
                                         "userId": "550e8400-e29b-41d4-a716-446655440000",
+                                        "fullName": "Nguyen Van A",
                                         "rating": 5,
                                         "comment": "Great facility, well-maintained pitch!"
                                       }
@@ -73,10 +76,14 @@ public class ReviewController {
         return ApiResponse.success("Review submitted successfully", reviewService.create(user, request));
     }
 
-    @Operation(summary = "Get reviews for a field", description = "Returns all reviews submitted for the specified field, ordered by most recent.")
+    @Operation(summary = "Get reviews for a field", description = "Returns paginated reviews submitted for the specified field, ordered by newest first. Reviewer contact data is not exposed; fullName is either the user's name or a masked fallback.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reviews returned")
     @GetMapping("/field/{fieldId}")
-    public ApiResponse<List<ReviewDto>> getByFieldId(@PathVariable UUID fieldId) {
-        return ApiResponse.success(reviewService.getByFieldId(fieldId));
+    public ApiResponse<PageResponse<ReviewDto>> getByFieldId(
+            @PathVariable UUID fieldId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "6") int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(1, Math.min(size, 20)));
+        return ApiResponse.success(reviewService.getByFieldId(fieldId, pageable));
     }
 }

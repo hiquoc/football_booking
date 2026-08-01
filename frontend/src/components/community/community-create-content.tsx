@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
+import { BackLink } from "@/components/ui/back-link";
 import type { PublicProfile } from "@/lib/api/types";
 import { useMyBookings } from "@/lib/hooks/use-bookings";
 import { useCreateCommunityPost } from "@/lib/hooks/use-community";
@@ -40,13 +41,20 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8">
-      <h1 className="text-3xl font-black text-slate-950">Đăng bài cộng đồng</h1>
-      <p className="mt-2 text-slate-600">Chọn một lịch đặt sân đã xác nhận. Thông tin sân và khung giờ sẽ được khóa theo lịch đặt.</p>
-      <form onSubmit={submit} className="mt-6 space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="mx-auto w-full max-w-4xl px-5 py-10 sm:px-8">
+      <BackLink href="/community" className="mb-5">Quay lại cộng đồng</BackLink>
+      <header className="mb-6">
+        <p className="text-sm font-bold uppercase tracking-wider text-green-600">Cộng đồng</p>
+        <h1 className="mt-2 text-3xl font-black text-slate-950">Đăng bài cộng đồng</h1>
+        <p className="mt-2 max-w-2xl text-slate-600">
+          Chọn một lịch đặt sân đã xác nhận. Thông tin sân và khung giờ sẽ được khóa theo lịch đặt.
+        </p>
+      </header>
+
+      <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <label className="block text-sm font-bold text-slate-700">
           Lịch đặt sân
-          <select name="bookingId" required className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <select name="bookingId" required className={inputClassName}>
             <option value="">Chọn lịch đặt</option>
             {confirmedBookings.map((booking) => (
               <option key={booking.id} value={booking.id}>
@@ -55,22 +63,25 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
             ))}
           </select>
         </label>
+
         <label className="block text-sm font-bold text-slate-700">
           Mục đích
-          <select value={postType} onChange={(event) => setPostType(event.target.value as typeof postType)} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2">
+          <select value={postType} onChange={(event) => setPostType(event.target.value as typeof postType)} className={inputClassName}>
             <option value="LOOKING_OPPONENT">Tìm đối thủ</option>
             <option value="LOOKING_PLAYER">Tìm thêm cầu thủ</option>
           </select>
         </label>
+
         <Input name="title" label="Tiêu đề" required />
         <label className="block text-sm font-bold text-slate-700">
           Mô tả
-          <textarea name="description" rows={4} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2" />
+          <textarea name="description" rows={4} className={inputClassName} />
         </label>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-bold text-slate-700">
             Trình độ
-            <select name="skillLevel" defaultValue={profile?.personal.skillLevel ?? "AVERAGE"} required className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2">
+            <select name="skillLevel" defaultValue={profile?.personal.skillLevel ?? "AVERAGE"} required className={inputClassName}>
               {skillLevelOptions.map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
@@ -78,8 +89,10 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
           </label>
           <Input name="contactPhone" label="Zalo" defaultValue={profile?.personal.phoneNumber ?? ""} required />
         </div>
+
         {postType === "LOOKING_PLAYER" ? <Input name="playersNeeded" label="Số cầu thủ cần thêm" type="number" min={1} required /> : null}
-        <button disabled={create.isPending || bookings.isPending} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">
+
+        <button disabled={create.isPending || bookings.isPending} className="action-button bg-green-600 px-5 text-white hover:bg-green-700 disabled:opacity-60">
           {create.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} Đăng bài
         </button>
         {create.error ? <p className="text-sm font-semibold text-rose-600">{create.error.message}</p> : null}
@@ -88,12 +101,14 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
   );
 }
 
+const inputClassName = "mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100";
+
 function Input(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   const { label, ...inputProps } = props;
   return (
     <label className="block text-sm font-bold text-slate-700">
       {label}
-      <input {...inputProps} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2" />
+      <input {...inputProps} className={inputClassName} />
     </label>
   );
 }

@@ -8,8 +8,10 @@ export default async function BookingDetailPage({
   params: Promise<{ id: string }>;
 }) {
   return (
-    <div className="mx-auto min-h-[70vh] max-w-5xl px-5 py-12 sm:px-8">
-      <BookingDetailContent bookingId={(await params).id} />
+    <div className="min-h-[70vh] bg-slate-50">
+      <div className="mx-auto w-full max-w-[90rem] px-5 py-10 sm:px-8 sm:py-12">
+        <BookingDetailContent bookingId={(await params).id} />
+      </div>
     </div>
   );
 }

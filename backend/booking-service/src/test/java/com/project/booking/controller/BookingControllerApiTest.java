@@ -204,13 +204,15 @@ class BookingControllerApiTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any()))
                 .thenReturn(bookingPageResponse());
 
         mockMvc.perform(get("/api/v1/bookings/owner")
                         .headers(ownerHeaders())
                         .param("bookingDate", LocalDate.now().plusDays(3).toString())
-                        .param("subFieldId", SUB_FIELD_ID.toString())
+                        .param("fieldId", UUID.randomUUID().toString())
                         .param("status", "PENDING"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].id").value(BOOKING_ID.toString()));
@@ -291,7 +293,7 @@ class BookingControllerApiTest {
                 .endTime(LocalTime.of(9, 0))
                 .durationMinutes(60)
                 .pricePerHour(new BigDecimal("100000"))
-                .totalAmount(new BigDecimal("100000"))
+                .subFieldPrice(new BigDecimal("100000"))
                 .status(BookingStatus.PENDING)
                 .build();
     }

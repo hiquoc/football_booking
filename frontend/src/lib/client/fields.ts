@@ -64,8 +64,11 @@ export function fetchSubFieldFilterOptions(search = "") {
   );
 }
 
-export function fetchFieldReviews(id: string) {
-  return requestJson<Review[]>(`/api/fields/${encodeURIComponent(id)}/reviews`);
+export function fetchFieldReviews(id: string, page = 0, size = 6) {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return requestJson<PageResponse<Review>>(
+    `/api/fields/${encodeURIComponent(id)}/reviews?${query}`,
+  );
 }
 
 export function submitFieldReview(

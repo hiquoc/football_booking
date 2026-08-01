@@ -13,6 +13,7 @@ public class ReviewDto {
     private UUID id;
     private UUID fieldId;
     private UUID userId;
+    private String fullName;
     private Integer rating;
     private String comment;
     private LocalDateTime createdAt;

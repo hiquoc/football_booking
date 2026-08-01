@@ -11,7 +11,6 @@ public class BookingPaymentProjection {
     @Column(name="booking_code", nullable=false, length=50) private String bookingCode;
     @Column(name="user_id", nullable=false) private UUID userId;
     @Column(name="user_email") private String userEmail;
-    @Column(name="total_amount", nullable=false, precision=19, scale=2) private BigDecimal totalAmount;
     @Column(name="sub_field_price", nullable=false, precision=19, scale=2) private BigDecimal subFieldPrice;
     @Builder.Default
     @Column(name="booking_price", nullable=false) private Long bookingPrice = 0L;

@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/server/session";
 import { getMyPublicProfile } from "@/lib/server/users";
 
 export const metadata: Metadata = {
-  title: "Chi tiet bai dang cong dong",
+  title: "Chi tiết bài đăng cộng đồng",
 };
 
 export default async function CommunityDetailPage({ params }: { params: Promise<{ id: string }> }) {

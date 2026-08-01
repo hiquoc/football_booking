@@ -4,6 +4,8 @@ import com.project.common.enums.BookingStatus;
 import com.project.booking.entity.Booking;
 import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingPaymentStatus;
+import com.project.common.enums.BookingType;
+import com.project.common.enums.SubFieldType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -57,6 +59,22 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 LocalDateTime endDateTime,
                 Collection<BookingStatus> reservingStatuses,
                 UUID sourceRecurringBookingId);
+
+        @Query("""
+                    SELECT COUNT(b) > 0
+                    FROM Booking b
+                    WHERE b.subFieldId = :subFieldId
+                      AND b.startDateTime < :endDateTime
+                      AND b.endDateTime > :startDateTime
+                      AND b.status IN :reservingStatuses
+                      AND b.id <> :bookingId
+                """)
+        boolean existsConflictingBookingsExcludingBooking(
+                UUID subFieldId,
+                LocalDateTime startDateTime,
+                LocalDateTime endDateTime,
+                Collection<BookingStatus> reservingStatuses,
+                UUID bookingId);
 
         default boolean existsConflictingBookings(
                 UUID subFieldId,
@@ -191,15 +209,18 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     FROM Booking b
                     WHERE b.ownerId = :ownerId
                       AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
-                      AND (CAST(:subFieldId AS uuid) IS NULL OR b.subFieldId = :subFieldId)
-                      AND (CAST(:status AS string) IS NULL OR b.status = :status)
-                    ORDER BY b.startDateTime ASC
+                      AND (CAST(:fieldId AS uuid) IS NULL OR b.subField.fieldId = :fieldId)
+                      AND (:filterSubFieldTypes = false OR b.subField.subFieldType IN :subFieldTypes)
+                      AND (CAST(:status AS string) IS NULL OR :status="" OR b.status = :status)
+                    ORDER BY b.startDateTime DESC
                 """)
         Page<Booking> findOwnerBookings(
                 @Param("ownerId") UUID ownerId,
                 @Param("bookingDateStart") LocalDateTime bookingDateStart,
                 @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
-                @Param("subFieldId") UUID subFieldId,
+                @Param("fieldId") UUID fieldId,
+                @Param("filterSubFieldTypes") boolean filterSubFieldTypes,
+                @Param("subFieldTypes") Collection<SubFieldType> subFieldTypes,
                 @Param("status") BookingStatus status,
                 Pageable pageable);
 
@@ -209,16 +230,59 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     FROM Booking b
                     WHERE b.subField.fieldId IN :fieldIds
                       AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
-                      AND (CAST(:subFieldId AS uuid) IS NULL OR b.subFieldId = :subFieldId)
+                      AND (CAST(:fieldId AS uuid) IS NULL OR b.subField.fieldId = :fieldId)
+                      AND (:filterSubFieldTypes = false OR b.subField.subFieldType IN :subFieldTypes)
                       AND (CAST(:status AS string) IS NULL OR b.status = :status)
-                    ORDER BY b.startDateTime ASC
+                    ORDER BY b.startDateTime DESC
                 """)
         Page<Booking> findEmployeeManagedBookings(
                 @Param("fieldIds") Collection<UUID> fieldIds,
                 @Param("bookingDateStart") LocalDateTime bookingDateStart,
                 @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
+                @Param("fieldId") UUID fieldId,
+                @Param("filterSubFieldTypes") boolean filterSubFieldTypes,
+                @Param("subFieldTypes") Collection<SubFieldType> subFieldTypes,
+                @Param("status") BookingStatus status,
+                Pageable pageable);
+
+        @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.ownerId = :ownerId
+                      AND b.bookingType = :bookingType
+                      AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
+                      AND (CAST(:subFieldId AS uuid) IS NULL OR b.subFieldId = :subFieldId)
+                      AND (CAST(:status AS string) IS NULL OR b.status = :status)
+                    ORDER BY b.startDateTime DESC
+                """)
+        Page<Booking> findOwnerReservations(
+                @Param("ownerId") UUID ownerId,
+                @Param("bookingDateStart") LocalDateTime bookingDateStart,
+                @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
                 @Param("subFieldId") UUID subFieldId,
                 @Param("status") BookingStatus status,
+                @Param("bookingType") BookingType bookingType,
+                Pageable pageable);
+
+        @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.subField.fieldId IN :fieldIds
+                      AND b.bookingType = :bookingType
+                      AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
+                      AND (CAST(:subFieldId AS uuid) IS NULL OR b.subFieldId = :subFieldId)
+                      AND (CAST(:status AS string) IS NULL OR b.status = :status)
+                    ORDER BY b.startDateTime DESC
+                """)
+        Page<Booking> findEmployeeManagedReservations(
+                @Param("fieldIds") Collection<UUID> fieldIds,
+                @Param("bookingDateStart") LocalDateTime bookingDateStart,
+                @Param("bookingDateEnd") LocalDateTime bookingDateEnd,
+                @Param("subFieldId") UUID subFieldId,
+                @Param("status") BookingStatus status,
+                @Param("bookingType") BookingType bookingType,
                 Pageable pageable);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -6,19 +6,19 @@ export function FieldContactCard({ field }: { field: Field }) {
   const mapUrl = `https://www.openstreetmap.org/?mlat=${field.latitude}&mlon=${field.longitude}#map=17/${field.latitude}/${field.longitude}`;
 
   return (
-    <section className="rounded-[1.75rem] border border-sky-100 bg-sky-50 p-6 text-slate-900">
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
       <h2 className="text-xl font-black">Thông tin liên hệ</h2>
       <div className="mt-5 space-y-4 text-sm">
         <a
           href={`tel:${field.phoneNumber}`}
-          className="flex items-center gap-3 text-slate-600 transition hover:text-sky-600"
+          className="flex items-center gap-3 text-slate-600 transition hover:text-green-700"
         >
           <Phone className="size-4" /> {field.phoneNumber}
         </a>
         {field.email ? (
           <a
             href={`mailto:${field.email}`}
-            className="flex items-center gap-3 break-all text-slate-600 transition hover:text-sky-600"
+            className="flex items-center gap-3 break-all text-slate-600 transition hover:text-green-700"
           >
             <Mail className="size-4" /> {field.email}
           </a>
@@ -32,7 +32,7 @@ export function FieldContactCard({ field }: { field: Field }) {
         href={mapUrl}
         target="_blank"
         rel="noreferrer"
-        className="mt-6 flex w-full justify-center rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white transition hover:bg-sky-600"
+        className="mt-6 flex w-full justify-center rounded-xl bg-green-600 px-5 py-3 text-sm font-black text-white transition hover:bg-green-700"
       >
         Xem trên bản đồ
       </a>

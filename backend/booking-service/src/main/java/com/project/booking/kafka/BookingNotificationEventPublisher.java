@@ -33,12 +33,34 @@ public class BookingNotificationEventPublisher {
                         booking.getBookingDate(),
                         booking.getStartTime(),
                         booking.getEndTime(),
-                        booking.getTotalAmount(),
                         booking.getPlatformBookingFee(),
                         booking.getSubFieldPrice(),
                         booking.getBookingPrice(),
+                        booking.getBookingType().name(),
+                        null,
                         Instant.now()));
         log.info("Stored booking created notification outbox event: bookingId={}", booking.getId());
+    }
+
+    public void publishReservationChanged(Booking booking, SubFieldResponse subField, String action) {
+        save(booking, NotificationEventTopics.BOOKING_CREATED, new BookingCreatedEvent(
+                        booking.getId(),
+                        booking.getBookingCode(),
+                        booking.getClientId(),
+                        null,
+                        booking.getOwnerId(),
+                        booking.getSubFieldId(),
+                        subField.getFieldName(),
+                        booking.getBookingDate(),
+                        booking.getStartTime(),
+                        booking.getEndTime(),
+                        booking.getPlatformBookingFee(),
+                        booking.getSubFieldPrice(),
+                        booking.getBookingPrice(),
+                        booking.getBookingType().name(),
+                        action,
+                        Instant.now()));
+        log.info("Stored reservation {} notification outbox event: reservationId={}", action, booking.getId());
     }
 
     public void publishBookingCancelled(Booking booking, String userEmail) {
@@ -55,6 +77,7 @@ public class BookingNotificationEventPublisher {
                         booking.getEndTime(),
                         booking.getCancellationReason(),
                         booking.getCancelledBy() != null ? booking.getCancelledBy().name() : null,
+                        booking.getBookingType().name(),
                         Instant.now()));
         log.info("Stored booking cancelled notification outbox event: bookingId={}", booking.getId());
     }
@@ -71,7 +94,8 @@ public class BookingNotificationEventPublisher {
                         booking.getBookingDate(),
                         booking.getStartTime(),
                         booking.getEndTime(),
-                        booking.getTotalAmount(),
+                        booking.getSubFieldPrice(),
+                        booking.getBookingType().name(),
                         Instant.now()));
         log.info("Stored booking confirmed notification outbox event: bookingId={}", booking.getId());
     }

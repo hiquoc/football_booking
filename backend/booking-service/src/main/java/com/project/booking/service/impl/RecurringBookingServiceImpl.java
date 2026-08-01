@@ -27,11 +27,9 @@ import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
 import com.project.common.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -42,7 +40,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RecurringBookingServiceImpl implements RecurringBookingService {
@@ -235,61 +232,6 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         return PageResponse.from(page.map(this::toResponseWithLatestBooking));
     }
 
-    @Override
-    public void processDue(LocalDateTime now) {
-        recurringBookingRepository
-                .findByStatusAndNextProcessAtLessThanEqualOrderByNextProcessAtAsc(RecurringBookingStatus.ACTIVE, now)
-                .forEach(recurringBooking -> {
-                    try {
-                        processOne(recurringBooking.getId());
-                    } catch (RuntimeException ex) {
-                        log.error("Failed to process recurring booking id={}", recurringBooking.getId(), ex);
-                    }
-                });
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void processOne(UUID id) {
-        RecurringBooking recurringBooking = getRequired(id);
-        if (recurringBooking.getStatus() != RecurringBookingStatus.ACTIVE
-                || recurringBooking.getNextProcessAt() == null
-                || recurringBooking.getNextProcessAt().isAfter(LocalDateTime.now())) {
-            return;
-        }
-        LocalDate playDate = recurringBooking.getNextProcessAt().toLocalDate().plusDays(generationLeadDays);
-        if (playDate.isAfter(recurringBooking.getEndDate())) {
-            completeRecurringBooking(recurringBooking);
-            recurringBookingRepository.save(recurringBooking);
-            refreshHasRecurring(recurringBooking.getSubFieldId());
-            return;
-        }
-        if (!bookingRepository.existsBySourceRecurringBookingIdAndBookingDate(recurringBooking.getId(), playDate)) {
-            int durationMinutes = (int) Duration.between(
-                    recurringBooking.getStartTime(),
-                    recurringBooking.getEndTime()).toMinutes();
-            bookingService.createRecurringOccurrence(
-                    recurringBooking.getUserId(),
-                    recurringBooking.getId(),
-                    CreateBookingRequest.builder()
-                            .subFieldId(recurringBooking.getSubFieldId())
-                            .bookingDate(playDate)
-                            .startTime(recurringBooking.getStartTime())
-                            .durationMinutes(durationMinutes)
-                            .paymentMethod(PaymentMethod.ACCOUNT_BALANCE)
-                            .note("Generated from recurring booking " + recurringBooking.getId())
-                            .build());
-        }
-        LocalDate nextOccurrenceDate = playDate.plusDays(recurringBooking.getIntervalDays());
-        if (nextOccurrenceDate.isAfter(recurringBooking.getEndDate())) {
-            completeRecurringBooking(recurringBooking);
-            recurringBookingRepository.save(recurringBooking);
-            refreshHasRecurring(recurringBooking.getSubFieldId());
-        } else {
-            recurringBooking.setNextProcessAt(nextProcessAt(nextOccurrenceDate));
-            recurringBookingRepository.save(recurringBooking);
-        }
-    }
-
     private RecurringBookingResponse changeOwnedStatus(UUID userId, UUID id, RecurringBookingStatus status, boolean cancelLatestConfirmedBooking) {
         RecurringBooking recurringBooking = getOwned(userId, id);
         if (cancelLatestConfirmedBooking) {
@@ -446,11 +388,6 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         if (recurringBooking.getStatus() == RecurringBookingStatus.COMPLETED) {
             throw new BadRequestException("Completed recurring bookings cannot be resumed");
         }
-    }
-
-    private void completeRecurringBooking(RecurringBooking recurringBooking) {
-        recurringBooking.setStatus(RecurringBookingStatus.COMPLETED);
-        recurringBooking.setNextProcessAt(null);
     }
 
     private Optional<RecurringBooking> findExactActiveRule(UUID userId, CreateRecurringBookingRequest request) {

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.project.common.dto.PageResponse;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -198,7 +199,7 @@ public class FieldController {
                 .field(field)
                 .operatingHours(fieldScheduleService.getFieldOperatingHours(id))
                 .subFields(field.getSubFields())
-                .reviews(reviewService.getByFieldId(id))
+                .reviews(reviewService.getByFieldId(id, PageRequest.of(0, 6)))
                 .build());
     }
 

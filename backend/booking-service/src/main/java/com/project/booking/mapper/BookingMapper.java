@@ -27,10 +27,10 @@ public interface BookingMapper {
     @Mapping(target = "endTime",       source = "booking.endTime")
     @Mapping(target = "durationMinutes", source = "booking.durationMinutes")
     @Mapping(target = "pricePerHour",  source = "booking.pricePerHour")
-    @Mapping(target = "totalAmount",   source = "booking.totalAmount")
     @Mapping(target = "subFieldPrice", source = "booking.subFieldPrice")
     @Mapping(target = "bookingPrice", source = "booking.bookingPrice")
     @Mapping(target = "platformBookingFee", source = "booking.platformBookingFee")
+    @Mapping(target = "bookingType", source = "booking.bookingType")
     @Mapping(target = "paymentMethod", source = "booking.paymentMethod")
     @Mapping(target = "status",        source = "booking.status")
     @Mapping(target = "paymentStatus", source = "booking.paymentStatus")
@@ -43,6 +43,7 @@ public interface BookingMapper {
     @Mapping(target = "createdAt",     source = "booking.createdAt")
     @Mapping(target = "updatedAt",     source = "booking.updatedAt")
     @Mapping(target = "subFieldName",  source = "subField.name")
+    @Mapping(target = "fieldId",       source = "subField.fieldId")
     @Mapping(target = "fieldName",     source = "subField.fieldName")
     BookingResponse toResponse(Booking booking, SubFieldResponse subField);
 
@@ -51,6 +52,7 @@ public interface BookingMapper {
     @Mapping(target = "clientName", ignore = true)
     @Mapping(target = "clientPhoneNumber", ignore = true)
     @Mapping(target = "clientAvatarUrl", ignore = true)
+    @Mapping(target = "fieldId", ignore = true)
     @Mapping(target = "matchResult", ignore = true)
     BookingResponse toResponse(Booking booking);
 

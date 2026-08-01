@@ -43,7 +43,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
             key={item}
             type="button"
             onClick={() => setStatus(item)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-bold ${status === item ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-600"}`}
+            className={`rounded-xl border px-3 py-1.5 text-xs font-bold ${status === item ? "border-green-600 bg-green-50 text-green-700" : "border-slate-200 text-slate-600 hover:border-green-300 hover:text-green-700"}`}
           >
             {statusFilterLabel(item)}
           </button>
@@ -61,7 +61,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <CalendarClock className="size-5 text-sky-600" />
+                    <CalendarClock className="size-5 text-green-600" />
                     <h2 className="font-black text-slate-950">{item.fieldName ?? "Sân"} - {item.subFieldName ?? "Sân con"}</h2>
                   </div>
                   <p className="mt-2 text-sm text-slate-600">
@@ -134,7 +134,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                     />
                   ) : null}
                   {item.status === "PAUSED" ? (
-                    <button type="button" onClick={() => action.mutate({ id: item.id, action: "resume" })} className="action-button bg-emerald-500 px-4 text-white">
+                    <button type="button" onClick={() => action.mutate({ id: item.id, action: "resume" })} className="action-button bg-green-600 px-4 text-white">
                       <Play className="size-4" /> Tiếp tục
                     </button>
                   ) : null}
@@ -175,7 +175,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                   }}
                 >
                   <input name="endDate" type="date" min={item.startDate} defaultValue={item.endDate} className="input-field" />
-                  <button type="submit" className="action-button bg-sky-500 px-4 text-white">
+                  <button type="submit" className="action-button bg-green-600 px-4 text-white">
                     <Save className="size-4" /> Lưu ngày kết thúc
                   </button>
                 </form>
@@ -230,9 +230,9 @@ function ConfirmableAction({
 }
 
 function badgeClass(status: RecurringBookingStatus) {
-  if (status === "ACTIVE") return "bg-emerald-50 text-emerald-700";
+  if (status === "ACTIVE") return "bg-green-50 text-green-700";
   if (status === "PAUSED") return "bg-amber-50 text-amber-700";
-  if (status === "COMPLETED") return "bg-sky-50 text-sky-700";
+  if (status === "COMPLETED") return "bg-green-50 text-green-700";
   return "bg-slate-100 text-slate-600";
 }
 

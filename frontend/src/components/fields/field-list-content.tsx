@@ -9,6 +9,7 @@ import type { Province } from "vietnam-divisions-js/provinces";
 import { ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, LocateFixed, Search, X } from "lucide-react";
 import { useFieldCards } from "@/lib/hooks/use-fields";
 import type { FieldCardFilters, User } from "@/lib/api/types";
+import { fieldTypeOptions, subFieldTypeOptions } from "@/lib/field-format";
 import { FieldCard } from "./field-card";
 
 export function FieldListContent({
@@ -65,25 +66,6 @@ export function FieldListContent({
   );
 }
 
-const sports = [
-  ["FOOTBALL", "Bóng đá"],
-  ["BASKETBALL", "Bóng rổ"],
-  ["BADMINTON", "Cầu lông"],
-  ["VOLLEYBALL", "Bóng chuyền"],
-  ["TENNIS", "Quần vợt"],
-] as const;
-
-const subFieldTypes = [
-  ["FOOTBALL_5V5", "Bóng đá 5 người"],
-  ["FOOTBALL_7V7", "Bóng đá 7 người"],
-  ["FOOTBALL_11V11", "Bóng đá 11 người"],
-  ["BASKETBALL_HALF_COURT", "Bóng rổ nửa sân"],
-  ["BASKETBALL_FULL_COURT", "Bóng rổ toàn sân"],
-  ["BADMINTON", "Cầu lông"],
-  ["VOLLEYBALL", "Bóng chuyền"],
-  ["TENNIS", "Quần vợt"],
-] as const;
-
 function FieldFilters({
   filters,
   onPendingChange,
@@ -99,6 +81,7 @@ function FieldFilters({
   const [districts, setDistricts] = useState<District[]>([]);
   const [selectedProvinceCode, setSelectedProvinceCode] = useState(filters.provinceCode ?? "");
   const [selectedDistrict, setSelectedDistrict] = useState(filters.district ?? "");
+  const [keywordInput, setKeywordInput] = useState(filters.keyword ?? "");
   const sortValue = `${filters.sortBy ?? "rating"}:${filters.direction ?? "desc"}`;
   const isNearby = Boolean(
     filters.latitude &&
@@ -138,6 +121,23 @@ function FieldFilters({
     params.delete("page");
     startTransition(() => router.push(`/fields${params.size ? `?${params}` : ""}`));
   };
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const keyword = keywordInput.trim();
+      if (keyword === (filters.keyword ?? "")) return;
+      const params = filtersToParams(filters);
+      params.delete("page");
+      if (keyword) {
+        params.set("keyword", keyword);
+      } else {
+        params.delete("keyword");
+      }
+      startTransition(() => router.replace(`/fields${params.size ? `?${params}` : ""}`));
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [filters, keywordInput, router]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -200,14 +200,15 @@ function FieldFilters({
         <input
           name="keyword"
           type="search"
-          defaultValue={filters.keyword ?? ""}
+          value={keywordInput}
+          onChange={(event) => setKeywordInput(event.target.value)}
           placeholder="Nhập tên sân"
-          className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-sky-500"
+          className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
         />
       </label>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <FilterSelect name="fieldType" label="Môn thể thao" defaultValue={filters.fieldType} options={sports} />
-        <FilterSelect name="subFieldType" label="Loại sân" defaultValue={filters.subFieldType} options={subFieldTypes} />
+        <FilterSelect name="fieldType" label="Môn thể thao" defaultValue={filters.fieldType} options={fieldTypeOptions} />
+        <FilterSelect name="subFieldType" label="Loại sân" defaultValue={filters.subFieldType} options={subFieldTypeOptions} />
         <label className="text-sm font-bold text-slate-700">
           Tỉnh / thành phố
           <select
@@ -218,7 +219,7 @@ function FieldFilters({
               setSelectedDistrict("");
               setDistricts([]);
             }}
-            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-sky-500"
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
           >
             <option value="">Tất cả</option>
             {provinces.map((province) => (
@@ -235,7 +236,7 @@ function FieldFilters({
             value={selectedDistrict}
             disabled={!selectedProvinceCode}
             onChange={(event) => setSelectedDistrict(event.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-400"
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-400"
           >
             <option value="">Tất cả</option>
             {districts.map((district) => (
@@ -249,7 +250,7 @@ function FieldFilters({
       <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end">
         <label className="flex-1 text-sm font-bold text-slate-700">
           Sắp xếp
-          <select name="sort" defaultValue={sortValue} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-sky-500">
+          <select name="sort" defaultValue={sortValue} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100">
             <option value="rating:desc">Đánh giá cao nhất</option>
             <option value="reviews:desc">Nhiều đánh giá nhất</option>
             <option value="newest:desc">Mới nhất</option>
@@ -266,8 +267,8 @@ function FieldFilters({
           aria-pressed={isNearby}
           className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-70 ${
             isNearby
-              ? "border-sky-500 bg-sky-500 text-white shadow-sm shadow-sky-200"
-              : "border-sky-200 text-sky-700 hover:bg-sky-50"
+              ? "border-green-600 bg-green-600 text-white shadow-sm shadow-green-200"
+              : "border-green-200 text-green-700 hover:bg-green-50"
           }`}
         >
           {isLocating ? (
@@ -277,7 +278,7 @@ function FieldFilters({
           )}
           {isLocating ? "Đang định vị..." : isNearby ? "Tắt lọc gần tôi" : "Gần tôi"}
         </button>
-        <button disabled={isLocating || isPending} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-sky-600 disabled:cursor-wait disabled:opacity-60">
+        <button disabled={isLocating || isPending} className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:cursor-wait disabled:opacity-60">
           <Search className="size-4" /> Lọc sân
         </button>
         <Link href="/fields" className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">
@@ -293,7 +294,7 @@ function FilterSelect({ name, label, defaultValue, options }: { name: string; la
   return (
     <label className="text-sm font-bold text-slate-700">
       {label}
-      <select name={name} defaultValue={defaultValue ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-sky-500">
+      <select name={name} defaultValue={defaultValue ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100">
         <option value="">Tất cả</option>
         {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select>
@@ -326,7 +327,7 @@ function EmptyFieldList() {
       </p>
       <Link
         href="/fields"
-        className="mt-6 inline-flex rounded-full bg-sky-500 px-5 py-3 text-sm font-black text-white"
+        className="mt-6 inline-flex rounded-full bg-green-600 px-5 py-3 text-sm font-black text-white"
       >
         Xóa bộ lọc
       </Link>
@@ -352,7 +353,7 @@ function Pagination({
       {current > 1 ? (
         <Link
           href={fieldPageHref(current - 1, filters)}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-sky-400"
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-green-400"
         >
           <ChevronLeft className="size-4" /> Trang trước
         </Link>
@@ -360,7 +361,7 @@ function Pagination({
       {current < total ? (
         <Link
           href={fieldPageHref(current + 1, filters)}
-          className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-500 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-green-600 hover:text-white"
         >
           Trang sau <ChevronRight className="size-4" />
         </Link>

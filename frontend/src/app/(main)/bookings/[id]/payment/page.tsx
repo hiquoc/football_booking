@@ -11,7 +11,7 @@ export default async function PaymentPage({
   const query = await searchParams;
   return (
     <div className="min-h-[70vh] px-5 py-12">
-      <PaymentContent bookingId={(await params).id} returned={Boolean(query.checkout || query.topup)} />
+      <PaymentContent bookingId={(await params).id} returned={Boolean(query.checkout || query.topup)} topUpStatus={query.topup} />
     </div>
   );
 }
