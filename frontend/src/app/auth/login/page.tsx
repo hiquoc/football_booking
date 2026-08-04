@@ -3,15 +3,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { BrandMark } from "@/components/ui/brand-mark";
 import { LoginForm } from "@/components/auth/login-form";
+import {
+  AUTH_REDIRECT_PARAM,
+  safeAuthRedirect,
+} from "@/lib/auth-redirect";
 
 export const metadata: Metadata = { title: "Đăng nhập" };
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; redirect?: string }>;
 }) {
-  const nextPath = (await searchParams).next;
+  const params = await searchParams;
+  const nextPath = safeAuthRedirect(
+    params[AUTH_REDIRECT_PARAM] ?? params.next,
+  );
   return (
     <main className="grid min-h-dvh bg-slate-50 lg:grid-cols-[1.25fr_0.75fr]">
       <section className="relative hidden overflow-hidden bg-[linear-gradient(to_bottom,#f0fdf4_0%,#ffffff_52%,#f8fafc_100%)] p-12 text-slate-900 lg:flex lg:flex-col lg:justify-between">

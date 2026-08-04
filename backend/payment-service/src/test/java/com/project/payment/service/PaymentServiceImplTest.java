@@ -49,7 +49,7 @@ class PaymentServiceImplTest {
     @Test void checkoutUsesRequestedWalletTopUpAmountAndSelectedStrategy() {
         when(stripe.createCheckout(any())).thenReturn(new ProviderCheckoutResult("cs_test_1", "https://checkout.stripe.com/test", java.time.Instant.now().plusSeconds(1800)));
         var response = service.createCheckout(userId,
-                new CreateCheckoutRequest(bookingId, new BigDecimal("5000"), "vnd", PaymentProvider.STRIPE));
+                new CreateCheckoutRequest(bookingId, new BigDecimal("5000"), "vnd", PaymentProvider.STRIPE, null));
         assertEquals("https://checkout.stripe.com/test", response.checkoutUrl());
         verify(stripe).createCheckout(argThat(request -> request.amount().compareTo(new BigDecimal("5000")) == 0
                 && request.currency().equals("VND") && request.attempt() == 1));
@@ -60,10 +60,27 @@ class PaymentServiceImplTest {
         when(stripe.createCheckout(any())).thenReturn(new ProviderCheckoutResult("cs_test_2", "https://checkout.stripe.com/shortfall", java.time.Instant.now().plusSeconds(1800)));
 
         var response = service.createCheckout(userId,
-                new CreateCheckoutRequest(bookingId, BigDecimal.ONE, "VND", PaymentProvider.STRIPE));
+                new CreateCheckoutRequest(bookingId, BigDecimal.ONE, "VND", PaymentProvider.STRIPE, null));
 
         assertEquals("https://checkout.stripe.com/shortfall", response.checkoutUrl());
         verify(stripe).createCheckout(argThat(request -> request.amount().compareTo(BigDecimal.ONE) == 0));
+    }
+
+    @Test void checkoutPassesSafeReturnPathToProvider() {
+        when(stripe.createCheckout(any())).thenReturn(new ProviderCheckoutResult("cs_test_3", "https://checkout.stripe.com/return", java.time.Instant.now().plusSeconds(1800)));
+
+        service.createCheckout(userId,
+                new CreateCheckoutRequest(null, new BigDecimal("20000"), "VND", PaymentProvider.STRIPE,
+                        "/fields/field-1/book?date=2026-08-10&slot=2026-08-10T18%3A00"));
+
+        verify(stripe).createCheckout(argThat(request -> "/fields/field-1/book?date=2026-08-10&slot=2026-08-10T18%3A00".equals(request.returnPath())));
+    }
+
+    @Test void checkoutRejectsUnsafeReturnPath() {
+        assertThrows(com.project.common.exception.BadRequestException.class, () -> service.createCheckout(userId,
+                new CreateCheckoutRequest(null, new BigDecimal("20000"), "VND", PaymentProvider.STRIPE,
+                        "//evil.example")));
+        verify(stripe, never()).createCheckout(any());
     }
 
     @Test void successfulWebhookUpdatesPaymentAndPublishesOutboxEvent() {

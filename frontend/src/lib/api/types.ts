@@ -511,7 +511,7 @@ export interface Payment {
 }
 export interface CheckoutResponse { paymentId: string; checkoutUrl: string; }
 export interface CreateCheckoutInput {
-  bookingId?: string; amount: number; currency: string; provider?: PaymentProvider;
+  bookingId?: string; amount: number; currency: string; provider?: PaymentProvider; returnPath?: string;
 }
 
 export interface AvatarUploadSlot {

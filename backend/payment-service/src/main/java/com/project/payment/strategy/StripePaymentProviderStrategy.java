@@ -98,15 +98,23 @@ public class StripePaymentProviderStrategy implements PaymentProviderStrategy {
     }
 
     private String successUrl(ProviderCheckoutRequest request) {
-        return request.bookingId() == null
-                ? properties.frontendUrl() + "/profile?topup=returned"
-                : properties.frontendUrl() + "/bookings/" + request.bookingId() + "/payment?topup=returned";
+        return properties.frontendUrl() + appendTopUpStatus(defaultReturnPath(request), "returned");
     }
 
     private String cancelUrl(ProviderCheckoutRequest request) {
+        return properties.frontendUrl() + appendTopUpStatus(defaultReturnPath(request), "cancelled");
+    }
+
+    private String defaultReturnPath(ProviderCheckoutRequest request) {
+        if (request.returnPath() != null && !request.returnPath().isBlank()) return request.returnPath();
         return request.bookingId() == null
-                ? properties.frontendUrl() + "/profile?topup=cancelled"
-                : properties.frontendUrl() + "/bookings/" + request.bookingId() + "/payment?topup=cancelled";
+                ? "/profile"
+                : "/bookings/" + request.bookingId() + "/payment";
+    }
+
+    private String appendTopUpStatus(String returnPath, String status) {
+        String separator = returnPath.contains("?") ? "&" : "?";
+        return returnPath + separator + "topup=" + status;
     }
 
     private StripeObject deserializeUnsafe(Event event) {

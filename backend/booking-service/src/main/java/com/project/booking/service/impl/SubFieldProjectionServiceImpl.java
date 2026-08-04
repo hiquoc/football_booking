@@ -60,13 +60,10 @@ public class SubFieldProjectionServiceImpl implements SubFieldProjectionService 
 
     @Override
     @Transactional(readOnly = true)
-    public ResolvedOperatingHours resolveOperatingHours(UUID subFieldId, DayOfWeek dayOfWeek) {
-        SubFieldProjection subField = subFieldRepository.findById(subFieldId)
-                .orElseThrow(() -> new NotFoundException("SubField not found with id: " + subFieldId));
-
+    public ResolvedOperatingHours resolveOperatingHours(UUID subFieldId, UUID fieldId, DayOfWeek dayOfWeek) {
         return subFieldOperatingHoursRepository.findBySubFieldIdAndDayOfWeek(subFieldId, dayOfWeek)
                 .map(this::toResolvedHours)
-                .orElseGet(() -> fieldOperatingHoursRepository.findByFieldIdAndDayOfWeek(subField.getFieldId(), dayOfWeek)
+                .orElseGet(() -> fieldOperatingHoursRepository.findByFieldIdAndDayOfWeek(fieldId, dayOfWeek)
                         .map(this::toResolvedHours)
                         .orElseThrow(() -> new NotFoundException("Operating hours not configured for subField: "
                                 + subFieldId + " on " + dayOfWeek)));

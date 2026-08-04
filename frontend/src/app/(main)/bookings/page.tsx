@@ -20,7 +20,7 @@ export default async function BookingsPage({
   };
   return (
     <div className="min-h-[70vh] bg-slate-50">
-      <section className="border-b border-slate-200 bg-white py-12 sm:py-16">
+      <section className="border-b border-slate-200 bg-white py-8 sm:py-10">
         <div className="mx-auto w-full max-w-[90rem] px-5 sm:px-8">
           <BackLink href="/" className="mb-5">
             Trang chủ

@@ -8,5 +8,5 @@ import java.util.UUID;
 public interface SubFieldProjectionService {
     SubFieldResponse getRequiredSubField(UUID subFieldId);
 
-    ResolvedOperatingHours resolveOperatingHours(UUID subFieldId, DayOfWeek dayOfWeek);
+    ResolvedOperatingHours resolveOperatingHours(UUID subFieldId, UUID fieldId, DayOfWeek dayOfWeek);
 }

@@ -6,6 +6,11 @@ import {
   expiredCookieOptions,
   refreshCookieOptions,
 } from "@/lib/server/session";
+import {
+  AUTH_REDIRECT_PARAM,
+  requestedPathFromUrl,
+  safeAuthRedirect,
+} from "@/lib/auth-redirect";
 
 const protectedPrefixes = [
   "/bookings",
@@ -14,6 +19,14 @@ const protectedPrefixes = [
   "/owner",
   "/admin",
 ];
+
+function isProtectedPath(pathname: string) {
+  return (
+    protectedPrefixes.some((prefix) => pathname.startsWith(prefix)) ||
+    /^\/fields\/[^/]+\/book(?:\/|$)/.test(pathname) ||
+    pathname === "/community/new"
+  );
+}
 
 function tokenIsExpired(token?: string) {
   if (!token) return true;
@@ -82,9 +95,7 @@ export async function proxy(request: NextRequest) {
   ) {
     return NextResponse.next();
   }
-  const isProtected = protectedPrefixes.some((prefix) =>
-    request.nextUrl.pathname.startsWith(prefix),
-  );
+  const isProtected = isProtectedPath(request.nextUrl.pathname);
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
   const accessTokenExpired = tokenIsExpired(accessToken);
@@ -105,12 +116,16 @@ export async function proxy(request: NextRequest) {
 
   if (isProtected && !hasValidSession && !hasRefreshToken) {
     const loginUrl = new URL("/auth/login", request.url);
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
+    loginUrl.searchParams.set(AUTH_REDIRECT_PARAM, requestedPathFromUrl(request.nextUrl));
     return clearSessionCookies(NextResponse.redirect(loginUrl));
   }
 
   if (request.nextUrl.pathname === "/auth/login" && hasValidSession) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const redirectPath = safeAuthRedirect(
+      request.nextUrl.searchParams.get(AUTH_REDIRECT_PARAM) ??
+        request.nextUrl.searchParams.get("next"),
+    );
+    return NextResponse.redirect(new URL(redirectPath, request.url));
   }
 
   if (refreshFailed) {

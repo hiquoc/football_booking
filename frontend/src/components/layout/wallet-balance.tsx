@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle, Plus, WalletCards, X } from "lucide-react";
 import { formatCurrency } from "@/lib/field-format";
@@ -10,6 +10,10 @@ import {
   consumePendingTopUp,
   rememberPendingTopUp,
 } from "@/lib/client/top-up-balance";
+import {
+  OPEN_WALLET_TOP_UP_PANEL_EVENT,
+  type OpenWalletTopUpPanelDetail,
+} from "@/lib/client/wallet-top-up-panel";
 import { useCreateCheckout } from "@/lib/hooks/use-payments";
 import { useCurrentUser } from "@/lib/hooks/use-profile";
 
@@ -19,9 +23,17 @@ export function WalletBalance() {
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
   const checkout = useCreateCheckout();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number>(TOP_UP_AMOUNTS[0]);
-  const balance = currentUser.data?.balance ?? 0;
+  const [returnPath, setReturnPath] = useState<string | undefined>();
+  const [mounted, setMounted] = useState(false);
+  const balance = mounted ? (currentUser.data?.balance ?? 0) : 0;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -35,23 +47,52 @@ export function WalletBalance() {
     if (topUpStatus === "cancelled") clearPendingTopUp();
   }, [currentUser.data, queryClient]);
 
+  useEffect(() => {
+    function openPanel(event: Event) {
+      setReturnPath((event as CustomEvent<OpenWalletTopUpPanelDetail>).detail?.returnPath);
+      setOpen(true);
+    }
+
+    window.addEventListener(OPEN_WALLET_TOP_UP_PANEL_EVENT, openPanel);
+    return () => window.removeEventListener(OPEN_WALLET_TOP_UP_PANEL_EVENT, openPanel);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeOnOutsidePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+  }, [open]);
+
   async function topUp() {
-    const input = { amount, currency: "VND", provider: "STRIPE" as const };
+    const input = {
+      amount,
+      currency: "VND",
+      provider: "STRIPE" as const,
+      returnPath: returnPath ?? currentReturnPath(),
+    };
     const result = await checkout.mutateAsync(input);
     rememberPendingTopUp(result, input);
     window.location.assign(result.checkoutUrl);
   }
 
   return (
-    <div className="relative hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 sm:flex">
+    <div ref={rootRef} className="relative hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 sm:flex">
       <WalletCards className="size-4 text-green-600" />
       <span className="leading-tight">
         <span className="block text-[10px] text-slate-400">Ví</span>
-        <span>{currentUser.isPending ? "--" : formatCurrency(balance)}</span>
+        <span>{!mounted || currentUser.isPending ? "--" : formatCurrency(balance)}</span>
       </span>
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setReturnPath(undefined);
+          setOpen((value) => !value);
+        }}
         className="grid size-8 place-items-center rounded-full bg-green-600 text-white hover:bg-green-700"
         title="Nạp tiền"
       >
@@ -112,4 +153,12 @@ export function WalletBalance() {
       ) : null}
     </div>
   );
+}
+
+function currentReturnPath() {
+  if (typeof window === "undefined") return undefined;
+  const params = new URLSearchParams(window.location.search);
+  params.delete("topup");
+  const query = params.toString();
+  return query ? `${window.location.pathname}?${query}` : window.location.pathname;
 }

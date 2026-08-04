@@ -115,6 +115,15 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 LocalDate endDate,
                 Collection<BookingStatus> statuses);
 
+        boolean existsByClientIdAndStatus(UUID clientId, BookingStatus status);
+
+        boolean existsByClientIdAndSubFieldIdAndStartDateTimeAndEndDateTimeAndStatusIn(
+                UUID clientId,
+                UUID subFieldId,
+                LocalDateTime startDateTime,
+                LocalDateTime endDateTime,
+                Collection<BookingStatus> statuses);
+
         @Query("""
                     SELECT COUNT(b) > 0
                     FROM Booking b
@@ -324,9 +333,6 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
         int markPaymentRefunded(
                 @Param("bookingId") UUID bookingId,
                 @Param("refundedStatus") BookingPaymentStatus refundedStatus);
-
-        @EntityGraph(attributePaths = "subField")
-        Optional<Booking> findFirstByClientIdAndStatusOrderByCreatedAtAsc(UUID clientId, BookingStatus status);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""

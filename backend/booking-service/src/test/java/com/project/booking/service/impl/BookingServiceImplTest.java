@@ -189,7 +189,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(10, 0)), anyCollection())).thenReturn(false);
@@ -227,7 +227,7 @@ class BookingServiceImplTest {
                 .refundEnabled(true)
                 .build());
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
@@ -263,7 +263,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
@@ -296,7 +296,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
@@ -349,7 +349,7 @@ class BookingServiceImplTest {
                 .refundEnabled(true)
                 .build());
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
@@ -365,6 +365,31 @@ class BookingServiceImplTest {
     }
 
     @Test
+    void createBookingRejectsExistingPendingBeforeResolvingBookingFee() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(bookingRepository.existsByClientIdAndStatus(userId, BookingStatus.PENDING)).thenReturn(true);
+
+        assertThrows(BadRequestException.class, () -> bookingService.createBooking(userId, request));
+
+        verify(userProjectionRepository, never()).findById(userId);
+        verify(bookingRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void createBookingTreatsMidnightEndTimeAsEndOfDay() {
         UUID userId = UUID.randomUUID();
         UUID subFieldId = UUID.randomUUID();
@@ -377,7 +402,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(new ResolvedOperatingHours(LocalTime.of(6, 0), LocalTime.of(23, 59), false));
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(23, 0)), eq(LocalTime.of(23, 59)), anyCollection())).thenReturn(false);
@@ -423,7 +448,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(bookingDate.getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(bookingDate.getDayOfWeek())))
                 .thenReturn(new ResolvedOperatingHours(LocalTime.MIDNIGHT, LocalTime.of(23, 59), false, true));
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(bookingDate),
                 eq(LocalTime.MIDNIGHT), eq(LocalTime.of(1, 0)), anyCollection())).thenReturn(false);
@@ -453,7 +478,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(bookingDate.getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(bookingDate.getDayOfWeek())))
                 .thenReturn(new ResolvedOperatingHours(LocalTime.of(18, 0), LocalTime.of(2, 0), false, false));
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(bookingDate),
                 eq(LocalTime.of(18, 0)), eq(LocalTime.of(2, 0)), anyCollection())).thenReturn(false);
@@ -489,9 +514,9 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(DayOfWeek.SUNDAY)))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(DayOfWeek.SUNDAY)))
                 .thenReturn(new ResolvedOperatingHours(LocalTime.of(6, 0), LocalTime.of(23, 59), false));
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(DayOfWeek.MONDAY)))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(DayOfWeek.MONDAY)))
                 .thenReturn(new ResolvedOperatingHours(null, null, false, true));
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(sunday),
                 eq(LocalTime.of(23, 0)), eq(LocalTime.of(1, 30)), anyCollection())).thenReturn(false);
@@ -521,10 +546,9 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(activeSubField(subFieldId));
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
-                .thenReturn(openHours());
 
         assertThrows(BadRequestException.class, () -> bookingService.createBooking(UUID.randomUUID(), request));
+        verify(subFieldProjectionService, never()).resolveOperatingHours(any(), any(), any());
         verify(bookingRepository, never()).existsConflictingBookings(any(), any(), any(), any(), anyCollection());
         verify(bookingRepository, never()).saveAndFlush(any());
     }
@@ -540,7 +564,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(activeSubField(subFieldId));
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(true);
@@ -562,7 +586,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
@@ -588,7 +612,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(10, 0)), anyCollection())).thenReturn(false);
@@ -600,6 +624,39 @@ class BookingServiceImplTest {
                 () -> bookingService.createBooking(userId, request));
 
         assertEquals("The selected time slot is no longer available.", exception.getMessage());
+    }
+
+    @Test
+    void createBookingMapsDatabaseOverlapFromSameClientToAlreadyBookedMessage() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(90)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(10, 0)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("150000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenThrow(new DataIntegrityViolationException(
+                "violates exclusion constraint \"bookings_no_overlapping_active_bookings\""));
+        when(bookingRepository.existsByClientIdAndSubFieldIdAndStartDateTimeAndEndDateTimeAndStatusIn(
+                eq(userId),
+                eq(subFieldId),
+                eq(LocalDateTime.of(request.getBookingDate(), LocalTime.of(8, 30))),
+                eq(LocalDateTime.of(request.getBookingDate(), LocalTime.of(10, 0))),
+                anyCollection())).thenReturn(true);
+
+        BookingConflictException exception = assertThrows(BookingConflictException.class,
+                () -> bookingService.createBooking(userId, request));
+
+        assertEquals("You have already booked this field successfully.", exception.getMessage());
     }
 
     @Test
@@ -646,7 +703,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any()))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), any()))
                 .thenReturn(openHours());
         when(bookingRepository.findOverlappingBookings(
                 eq(subFieldId), any(LocalDateTime.class), any(LocalDateTime.class), anyCollection()))
@@ -671,7 +728,7 @@ class BookingServiceImplTest {
         SubFieldResponse subField = activeSubFieldAllDay(subFieldId);
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any()))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), any()))
                 .thenReturn(new ResolvedOperatingHours(null, null, false, true));
         when(bookingRepository.findOverlappingBookings(
                 eq(subFieldId), any(LocalDateTime.class), any(LocalDateTime.class), anyCollection()))
@@ -871,7 +928,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
@@ -913,7 +970,7 @@ class BookingServiceImplTest {
                 .build();
 
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
-        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), eq(request.getBookingDate().getDayOfWeek())))
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
                 .thenReturn(openHours());
         when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
                 eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(true);
@@ -1003,3 +1060,4 @@ class BookingServiceImplTest {
         return new ResolvedOperatingHours(LocalTime.of(6, 0), LocalTime.of(23, 0), false);
     }
 }
+

@@ -208,16 +208,12 @@ public class BookingServiceImpl implements BookingService {
             throw new BadRequestException("Owners cannot create normal bookings for their own fields. Create a reservation instead.");
         }
         bookingModerationService.ensureCanBook(userId, subField.getFieldId());
-        normalizeRequestDateTimes(request);
 
         validateBooking(subField, request, sourceRecurringBookingId);
 
+        ensureNoPendingPayment(userId);
         long bookingPrice = resolveBookingPrice(userId);
         PaymentMethod paymentMethod = PaymentMethod.ACCOUNT_BALANCE;
-        if (pendingBookingReservationService.find(userId).isPresent()
-                || bookingRepository.findFirstByClientIdAndStatusOrderByCreatedAtAsc(userId, BookingStatus.PENDING).isPresent()) {
-            throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.");
-        }
         BigDecimal subFieldPrice = pricingStrategy.calculate(subField, request);
         LocalDateTime paymentExpiresAt = LocalDateTime.now().plusMinutes(paymentTimeoutMinutes);
         Booking booking = Booking.builder()
@@ -342,10 +338,10 @@ public class BookingServiceImpl implements BookingService {
         try {
             saved = bookingRepository.saveAndFlush(booking);
         } catch (DataIntegrityViolationException ex) {
-            /// them check neu chinh nguoi dung da book san nay de tra ve loi Ban da dat san thanh cong thay vi tra loi
-            /// Booking existing = bookingRepository.findByClientIdAndSubFieldIdAndBookingDateAndTime(...);
-            ///
             if (isBookingOverlapConstraintViolation(ex)) {
+                if (hasSameClientBooking(booking)) {
+                    throw new BookingConflictException("You have already booked this field successfully.");
+                }
                 throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
             }
             throw ex;
@@ -357,6 +353,15 @@ public class BookingServiceImpl implements BookingService {
         availabilityCacheService.evict(saved.getSubFieldId(), saved.getBookingDate());
         bookingNotificationEventPublisher.publishBookingCreated(saved, subField, null);
         return saved;
+    }
+
+    private boolean hasSameClientBooking(Booking booking) {
+        return bookingRepository.existsByClientIdAndSubFieldIdAndStartDateTimeAndEndDateTimeAndStatusIn(
+                booking.getClientId(),
+                booking.getSubFieldId(),
+                booking.getStartDateTime(),
+                booking.getEndDateTime(),
+                RESERVING_STATUSES);
     }
 
     @Override
@@ -582,7 +587,8 @@ public class BookingServiceImpl implements BookingService {
     public AvailabilityResponse getAvailability(UUID subFieldId, LocalDate date) {
         validateBookingDateNotPast(date);
         SubFieldResponse subField = subFieldProjectionService.getRequiredSubField(subFieldId);
-        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(subFieldId, date.getDayOfWeek());
+        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(
+                subFieldId, subField.getFieldId(), date.getDayOfWeek());
 
         LocalDate scheduleStartDate = date.minusDays(1);
         LocalDate scheduleEndDate = date.plusDays(7);
@@ -608,7 +614,7 @@ public class BookingServiceImpl implements BookingService {
                 .openTime(hours.closed() ? null : hours.openTime())
                 .closeTime(hours.closed() ? null : hours.closeTime())
                 .open24Hours(hours.open24Hours())
-                .operatingHours(buildAvailabilityOperatingHours(subFieldId, scheduleStartDate, scheduleEndDate))
+                .operatingHours(buildAvailabilityOperatingHours(subField, scheduleStartDate, scheduleEndDate))
                 .unavailableSlots(unavailableSlots)
                 .build();
     }
@@ -634,13 +640,13 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private List<AvailabilityOperatingHoursResponse> buildAvailabilityOperatingHours(
-            UUID subFieldId,
+            SubFieldResponse subField,
             LocalDate startDate,
             LocalDate endDate) {
         return startDate.datesUntil(endDate.plusDays(1))
                 .map(day -> {
                     ResolvedOperatingHours resolved = subFieldProjectionService.resolveOperatingHours(
-                            subFieldId, day.getDayOfWeek());
+                            subField.getId(), subField.getFieldId(), day.getDayOfWeek());
                     return AvailabilityOperatingHoursResponse.builder()
                             .date(day)
                             .openTime(resolved.closed() ? null : resolved.openTime())
@@ -679,6 +685,13 @@ public class BookingServiceImpl implements BookingService {
 
         BookingConfig config = bookingConfigService.getConfig();
         return completedBookingCount == 0 ? config.getFirstBookingFee() : config.getNotFirstBookingFee();
+    }
+
+    private void ensureNoPendingPayment(UUID userId) {
+        if (pendingBookingReservationService.find(userId).isPresent()
+                || bookingRepository.existsByClientIdAndStatus(userId, BookingStatus.PENDING)) {
+            throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.");
+        }
     }
 
     private void confirmWithAccountBalanceIfPossible(Booking booking) {
@@ -765,12 +778,13 @@ public class BookingServiceImpl implements BookingService {
     private void validateBooking(SubFieldResponse subField, CreateBookingRequest request, UUID sourceRecurringBookingId) {
         validateSubFieldActive(subField);
         validateBookingStartNotPast(request.getStartDateTime());
-        validateClosureDate(subField.getId(), request.getStartDateTime().toLocalDate(), request.getEndDateTime().toLocalDate());
-        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(
-                subField.getId(), request.getBookingDate().getDayOfWeek());
-        validateWithinOperatingHours(subField.getId(), request.getStartDateTime(), request.getEndDateTime(), hours);
         validateDuration(request, subField);
         validateStartTimeAlignment(request.getStartTime());
+        validateClosureDate(subField.getId(), request.getStartDateTime().toLocalDate(), request.getEndDateTime().toLocalDate());
+        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(
+                subField.getId(), subField.getFieldId(), request.getBookingDate().getDayOfWeek());
+        validateWithinOperatingHours(
+                subField.getId(), subField.getFieldId(), request.getStartDateTime(), request.getEndDateTime(), hours);
         validateNoConflict(request.getSubFieldId(), request.getStartDateTime(), request.getEndDateTime(),
                 Boolean.TRUE.equals(subField.getHasRecurring()), sourceRecurringBookingId);
     }
@@ -778,12 +792,13 @@ public class BookingServiceImpl implements BookingService {
     private void validateBookingForUpdate(SubFieldResponse subField, CreateBookingRequest request, UUID bookingId) {
         validateSubFieldActive(subField);
         validateBookingStartNotPast(request.getStartDateTime());
-        validateClosureDate(subField.getId(), request.getStartDateTime().toLocalDate(), request.getEndDateTime().toLocalDate());
-        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(
-                subField.getId(), request.getBookingDate().getDayOfWeek());
-        validateWithinOperatingHours(subField.getId(), request.getStartDateTime(), request.getEndDateTime(), hours);
         validateDuration(request, subField);
         validateStartTimeAlignment(request.getStartTime());
+        validateClosureDate(subField.getId(), request.getStartDateTime().toLocalDate(), request.getEndDateTime().toLocalDate());
+        ResolvedOperatingHours hours = subFieldProjectionService.resolveOperatingHours(
+                subField.getId(), subField.getFieldId(), request.getBookingDate().getDayOfWeek());
+        validateWithinOperatingHours(
+                subField.getId(), subField.getFieldId(), request.getStartDateTime(), request.getEndDateTime(), hours);
         validateNoConflictExcludingBooking(request.getSubFieldId(), request.getStartDateTime(), request.getEndDateTime(),
                 Boolean.TRUE.equals(subField.getHasRecurring()), bookingId);
     }
@@ -832,13 +847,13 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
-    private void validateWithinOperatingHours(UUID subFieldId, LocalDateTime startDateTime, LocalDateTime endDateTime,
+    private void validateWithinOperatingHours(UUID subFieldId, UUID fieldId, LocalDateTime startDateTime, LocalDateTime endDateTime,
                                               ResolvedOperatingHours startDateHours) {
         LocalDateTime cursor = startDateTime;
         while (cursor.isBefore(endDateTime)) {
             ResolvedOperatingHours hours = cursor.toLocalDate().equals(startDateTime.toLocalDate())
                     ? startDateHours
-                    : subFieldProjectionService.resolveOperatingHours(subFieldId, cursor.getDayOfWeek());
+                    : subFieldProjectionService.resolveOperatingHours(subFieldId, fieldId, cursor.getDayOfWeek());
             LocalDateTime windowEnd = operatingWindowEnd(cursor, hours);
             if (!cursor.isBefore(windowEnd)) {
                 throwOutsideOperatingHours(hours);

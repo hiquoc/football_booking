@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -26,29 +26,45 @@ import { useCurrentTime } from "@/lib/hooks/use-current-time";
 import { useFieldBookingData } from "@/lib/hooks/use-fields";
 import { useCurrentUser } from "@/lib/hooks/use-profile";
 import { DataEmpty, DataError, FormSkeleton } from "@/components/ui/data-state";
+import { openWalletTopUpPanel } from "@/lib/client/wallet-top-up-panel";
 
 const DEFAULT_FIRST_BOOKING_FEE = 5000;
 const DEFAULT_RETURNING_BOOKING_FEE = 1000;
+const BOOKING_DRAFT_NOTE_PREFIX = "football.bookingDraftNote.";
+
+export type BookingFormInitialSelection = Partial<{
+  subFieldId: string;
+  date: string;
+  slot: string;
+  duration: number;
+  recurringEnabled: boolean;
+  recurringIntervalDays: number;
+  recurringEndDate: string;
+}>;
 
 export function BookingForm({
   fieldId,
   initialDate,
+  initialSelection,
   reservationMode = false,
 }: {
   fieldId: string;
   initialDate: string;
+  initialSelection?: BookingFormInitialSelection;
   reservationMode?: boolean;
 }) {
+  const query = initialBookingQuery(initialDate, initialSelection);
   const { field, subFields } = useFieldBookingData(fieldId);
   const [subFieldType, setSubFieldType] = useState("");
-  const [subFieldId, setSubFieldId] = useState("");
-  const [date, setDate] = useState(initialDate);
-  const [selectedSlotKey, setSelectedSlotKey] = useState("");
-  const [duration, setDuration] = useState(90);
+  const [subFieldId, setSubFieldId] = useState(query.subFieldId);
+  const [date, setDate] = useState(query.date);
+  const [selectedSlotKey, setSelectedSlotKey] = useState(query.slot);
+  const [duration, setDuration] = useState(query.duration);
   const [note, setNote] = useState("");
-  const [recurringEnabled, setRecurringEnabled] = useState(false);
-  const [recurringIntervalDays, setRecurringIntervalDays] = useState(7);
+  const [recurringEnabled, setRecurringEnabled] = useState(query.recurringEnabled);
+  const [recurringIntervalDays, setRecurringIntervalDays] = useState(query.recurringIntervalDays);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const addDays = (dateString: string, days: number) => {
     if (!dateString || !days) return dateString;
     const d = new Date(dateString);
@@ -56,7 +72,7 @@ export function BookingForm({
     return d.toISOString().split("T")[0]; // yyyy-MM-dd
   };
 
-  const [recurringEndDate, setRecurringEndDate] = useState(addDays(date, 7));
+  const [recurringEndDate, setRecurringEndDate] = useState(query.recurringEndDate || addDays(date, 7));
   const createMutation = useCreateBooking();
   const createReservationMutation = useCreateReservation();
   const createRecurringMutation = useCreateRecurringBooking();
@@ -68,7 +84,8 @@ export function BookingForm({
   const subFieldTypes = [
     ...new Set(activeSubFields.map((item) => item.subFieldType)),
   ];
-  const selectedType = subFieldType || subFieldTypes[0] || "";
+  const querySubFieldType = activeSubFields.find((item) => item.id === subFieldId)?.subFieldType;
+  const selectedType = subFieldType || querySubFieldType || subFieldTypes[0] || "";
   const candidates = activeSubFields.filter(
     (item) => item.subFieldType === selectedType,
   );
@@ -104,13 +121,13 @@ export function BookingForm({
     selectedStartTime,
     effectiveDuration,
   );
-  const completedBookingCount = currentUser.data?.completedBookingCount;
+  const completedBookingCount = mounted ? currentUser.data?.completedBookingCount : undefined;
   const platformBookingFee =
     completedBookingCount === undefined || completedBookingCount === 0
       ? (bookingConfig.data?.firstBookingFee ?? DEFAULT_FIRST_BOOKING_FEE)
       : (bookingConfig.data?.notFirstBookingFee ?? DEFAULT_RETURNING_BOOKING_FEE);
   const estimatedTotalWithFee = reservationMode ? 0 : platformBookingFee;
-  const walletBalance = currentUser.data ? currentUser.data.balance : null;
+  const walletBalance = mounted && currentUser.data ? currentUser.data.balance : null;
   const remainingBalance =
     estimatedTotalWithFee === null || walletBalance === null
       ? null
@@ -124,6 +141,50 @@ export function BookingForm({
     recurringEndDate,
     recurringIntervalDays,
   );
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedNote = window.sessionStorage.getItem(bookingDraftNoteKey(fieldId));
+    if (storedNote === null) return;
+    const frame = window.requestAnimationFrame(() => setNote(storedNote));
+    return () => window.cancelAnimationFrame(frame);
+  }, [fieldId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = bookingDraftNoteKey(fieldId);
+    if (note.trim()) {
+      window.sessionStorage.setItem(key, note);
+    } else {
+      window.sessionStorage.removeItem(key);
+    }
+  }, [fieldId, note]);
+
+  useEffect(() => {
+    syncBookingSelectionUrl({
+      date,
+      subFieldId: selectedId,
+      duration: effectiveDuration,
+      slot: selectedSlotKey,
+      recurringEnabled,
+      recurringIntervalDays,
+      recurringEndDate,
+      reservationMode,
+    });
+  }, [
+    date,
+    selectedId,
+    effectiveDuration,
+    selectedSlotKey,
+    recurringEnabled,
+    recurringIntervalDays,
+    recurringEndDate,
+    reservationMode,
+  ]);
 
 
   if (field.isPending || subFields.isPending) return <FormSkeleton />;
@@ -168,8 +229,8 @@ export function BookingForm({
         window.location.assign(
           firstBooking
             ? (firstBooking.paymentStatus === "PAID"
-                ? `/bookings/${firstBooking.id}`
-                : `/bookings/${firstBooking.id}/payment`)
+              ? `/bookings/${firstBooking.id}`
+              : `/bookings/${firstBooking.id}/payment`)
             : "/recurring-bookings",
         );
         return;
@@ -286,15 +347,15 @@ export function BookingForm({
             </div>
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               {selectedSubField.timePriceRules
-              .sort((a, b) => a.startTime.localeCompare(b.startTime))
-              .map((rule) => (
-                <div key={rule.id} className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm last:border-0">
-                  <span className="font-semibold text-slate-600">
-                    {rule.startTime.slice(0, 5)} - {rule.endTime.slice(0, 5)}
-                  </span>
-                  <strong className="text-slate-950">{formatCurrency(rule.hourlyPrice)}/giờ</strong>
-                </div>
-              ))}
+                .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                .map((rule) => (
+                  <div key={rule.id} className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm last:border-0">
+                    <span className="font-semibold text-slate-600">
+                      {rule.startTime.slice(0, 5)} - {rule.endTime.slice(0, 5)}
+                    </span>
+                    <strong className="text-slate-950">{formatCurrency(rule.hourlyPrice)}/giờ</strong>
+                  </div>
+                ))}
             </div>
           </section>
         ) : null}
@@ -475,9 +536,30 @@ export function BookingForm({
                 <strong className="text-emerald-700">{formatCurrency(remainingBalance)}</strong>
               </div>
             ) : (
-              <p className="mt-3 rounded-xl bg-amber-50 p-3 text-amber-700">
-                Balance is not enough. Please top up your wallet before creating this booking.
-              </p>
+              <div className="mt-3 flex flex-col gap-3 rounded-xl bg-amber-50 p-3 text-amber-700 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  Số dư ví không đủ để thanh toán. Vui lòng nạp thêm tiền vào ví.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openWalletTopUpPanel({
+                    returnPath: buildBookingSelectionPath({
+                      date,
+                      subFieldId: selectedId,
+                      duration: effectiveDuration,
+                      slot: selectedSlotKey,
+                      recurringEnabled,
+                      recurringIntervalDays,
+                      recurringEndDate,
+                      reservationMode,
+                      includeTopUpStatus: false,
+                    }),
+                  })}
+                  className="action-button min-h-0 shrink-0 bg-green-600 px-4 py-2 text-xs text-white hover:bg-green-700"
+                >
+                  Nạp tiền
+                </button>
+              </div>
             )}
           </div>
         </BookingStep>
@@ -526,6 +608,17 @@ export function BookingForm({
               ? "Chọn giờ để xem giá"
               : formatCurrency(estimatedTotalWithFee)}
           </strong>
+          {estimatedTotalWithFee === bookingConfig.data?.firstBookingFee && (
+            <div className="mt-1 text-sm text-slate-500">
+              <span>
+                Phí đặt sân lần đầu là {formatCurrency(bookingConfig.data?.firstBookingFee)}.
+              </span>
+              <br />
+              <span>
+                Sau khi hoàn tất 1 trận sẽ là {formatCurrency(bookingConfig.data?.notFirstBookingFee)}.
+              </span>
+            </div>
+          )}
         </div>
         {createMutation.error || createRecurringMutation.error ? (
           <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
@@ -548,7 +641,7 @@ export function BookingForm({
           {createMutation.isPending || createRecurringMutation.isPending ? (
             <LoaderCircle className="size-4 animate-spin" />
           ) : null}
-          {recurringEnabled ? "Tạo đặt sân định kỳ" : "Xác nhận đặt sân"}
+          {!hasEnoughBalance ? "Số dư không đủ" : (recurringEnabled ? "Tạo đặt sân định kỳ" : "Xác nhận đặt sân")}
         </button>
       </aside>
     </form>
@@ -563,6 +656,102 @@ function formatLocalDateTime(value: Date) {
   const minutes = String(value.getMinutes()).padStart(2, "0");
   const seconds = String(value.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+function initialBookingQuery(
+  initialDate: string,
+  selection: BookingFormInitialSelection | undefined,
+) {
+  const selectedDate = selection?.date;
+  const selectedSlot = selection?.slot;
+  const selectedDuration = selection?.duration;
+  const selectedRecurringInterval = selection?.recurringIntervalDays;
+  const selectedRecurringEndDate = selection?.recurringEndDate;
+  return {
+    subFieldId: selection?.subFieldId ?? "",
+    date: validDate(selectedDate) && selectedDate >= initialDate ? selectedDate : initialDate,
+    slot: validSlot(selectedSlot) ? selectedSlot : "",
+    duration: validDuration(selectedDuration) ? selectedDuration : 90,
+    recurringEnabled: selection?.recurringEnabled ?? false,
+    recurringIntervalDays: validRecurringInterval(selectedRecurringInterval)
+      ? selectedRecurringInterval
+      : 7,
+    recurringEndDate: validDate(selectedRecurringEndDate) ? selectedRecurringEndDate : "",
+  };
+}
+
+function syncBookingSelectionUrl(selection: {
+  date: string;
+  subFieldId: string;
+  duration: number;
+  slot: string;
+  recurringEnabled: boolean;
+  recurringIntervalDays: number;
+  recurringEndDate: string;
+  reservationMode: boolean;
+}) {
+  if (typeof window === "undefined") return;
+  const next = buildBookingSelectionPath({ ...selection, includeTopUpStatus: true });
+  const current = `${window.location.pathname}${window.location.search}`;
+  if (next !== current) window.history.replaceState(null, "", next);
+}
+
+function buildBookingSelectionPath(selection: {
+  date: string;
+  subFieldId: string;
+  duration: number;
+  slot: string;
+  recurringEnabled: boolean;
+  recurringIntervalDays: number;
+  recurringEndDate: string;
+  reservationMode: boolean;
+  includeTopUpStatus: boolean;
+}) {
+  if (typeof window === "undefined") return undefined;
+  const params = new URLSearchParams(window.location.search);
+  if (!selection.includeTopUpStatus) params.delete("topup");
+  params.set("date", selection.date);
+  setOrDelete(params, "subFieldId", selection.subFieldId);
+  params.set("duration", String(selection.duration));
+  setOrDelete(params, "slot", selection.slot);
+  if (selection.recurringEnabled) {
+    params.set("recurring", "1");
+    params.set("intervalDays", String(selection.recurringIntervalDays));
+    setOrDelete(params, "endDate", selection.recurringEndDate);
+  } else {
+    params.delete("recurring");
+    params.delete("intervalDays");
+    params.delete("endDate");
+  }
+  if (selection.reservationMode) params.set("mode", "reservation");
+
+  const query = params.toString();
+  return query ? `${window.location.pathname}?${query}` : window.location.pathname;
+}
+
+function bookingDraftNoteKey(fieldId: string) {
+  return `${BOOKING_DRAFT_NOTE_PREFIX}${fieldId}`;
+}
+
+function setOrDelete(params: URLSearchParams, key: string, value: string) {
+  if (value) params.set(key, value);
+  else params.delete(key);
+}
+
+function validDate(value: string | undefined): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function validSlot(value: string | undefined): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value));
+}
+
+function validDuration(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 1;
+}
+
+function validRecurringInterval(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 7;
 }
 
 function buildRecurringPreview(startDate: string, endDate: string, intervalDays: number) {

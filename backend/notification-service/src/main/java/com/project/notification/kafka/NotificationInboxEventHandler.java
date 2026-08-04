@@ -202,7 +202,7 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .userId(event.userId())
                 .recipientEmail(event.userEmail())
                 .code(NotificationCode.WALLET_TOP_UP_SUCCEEDED)
-                .title("Nap vi thanh cong")
+                .title("Nạp ví thành công")
                 .payload(payload)
                 .channels(List.of(NotificationChannel.IN_APP))
                 .build());
@@ -231,7 +231,7 @@ public class NotificationInboxEventHandler implements InboxEventHandler {
                 .userId(event.employeeId())
                 .recipientEmail(event.employeeEmail())
                 .code(NotificationCode.FIELD_EMPLOYEE_ASSIGNED)
-                .title("Ban da duoc phan cong quan ly san")
+                .title("Bạn đã được phân công quản lý sân")
                 .payload(Map.of(
                         "assignmentId", event.assignmentId(),
                         "fieldId", event.fieldId(),

@@ -8,4 +8,5 @@ public record CreateCheckoutRequest(
         UUID bookingId,
         @NotNull @DecimalMin(value="0.01") BigDecimal amount,
         @NotBlank @Pattern(regexp="^[A-Za-z]{3}$") String currency,
-        @Schema(defaultValue="STRIPE") PaymentProvider provider) {}
+        @Schema(defaultValue="STRIPE") PaymentProvider provider,
+        @Size(max = 3000) String returnPath) {}

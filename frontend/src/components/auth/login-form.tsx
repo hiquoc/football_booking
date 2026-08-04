@@ -6,6 +6,7 @@ import {
   ArrowRight,
   LoaderCircle,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -16,10 +17,12 @@ import {
 } from "@/lib/api/auth-schemas";
 import { ClientRequestError } from "@/lib/client/http";
 import { useSendOtp, useVerifyOtp } from "@/lib/hooks/use-auth";
+import { safeAuthRedirect } from "@/lib/auth-redirect";
 
 type Step = "phone" | "otp";
 
 export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
+  const router = useRouter();
   const sendOtpMutation = useSendOtp();
   const verifyOtpMutation = useVerifyOtp();
   const [step, setStep] = useState<Step>("phone");
@@ -54,9 +57,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
     try {
       setIsSubmitting(true);
       await verifyOtpMutation.mutateAsync(input);
-      window.location.replace(
-        nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/",
-      );
+      router.replace(safeAuthRedirect(nextPath));
     } catch {
       setIsSubmitting(false);
       // React Query stores the error for display below.
