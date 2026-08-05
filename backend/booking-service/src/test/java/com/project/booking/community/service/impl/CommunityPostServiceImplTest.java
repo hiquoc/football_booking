@@ -7,6 +7,7 @@ import com.project.booking.community.enums.CommunityApplicationStatus;
 import com.project.booking.community.enums.CommunityPostStatus;
 import com.project.booking.community.enums.CommunityPostType;
 import com.project.booking.community.kafka.CommunityNotificationEventPublisher;
+import com.project.booking.community.kafka.CommunityPostApplicationsHandlingEventPublisher;
 import com.project.booking.community.kafka.MatchEvaluationEventPublisher;
 import com.project.booking.community.mapper.CommunityMapper;
 import com.project.booking.community.repository.CommunityApplicationRepository;
@@ -14,6 +15,7 @@ import com.project.booking.community.repository.CommunityPostRepository;
 import com.project.booking.community.repository.MatchEvaluationRepository;
 import com.project.booking.community.service.CommunityModerationService;
 import com.project.booking.repository.BookingRepository;
+import com.project.booking.repository.MatchResultRepository;
 import com.project.booking.repository.UserProjectionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,11 +52,15 @@ class CommunityPostServiceImplTest {
     @Mock
     private CommunityNotificationEventPublisher notifications;
     @Mock
+    private CommunityPostApplicationsHandlingEventPublisher applicationHandlingEvents;
+    @Mock
     private MatchEvaluationEventPublisher evaluationEvents;
     @Mock
     private CommunityModerationService moderationService;
     @Mock
     private UserProjectionRepository userProjectionRepository;
+    @Mock
+    private MatchResultRepository matchResultRepository;
 
     @InjectMocks
     private CommunityPostServiceImpl service;
@@ -92,7 +98,7 @@ class CommunityPostServiceImplTest {
                 .status(CommunityApplicationStatus.PENDING)
                 .build();
 
-        when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+        when(postRepository.findPostOnlyById(postId)).thenReturn(Optional.of(post));
         when(applicationRepository.findByIdAndPostId(acceptedApplicationId, postId))
                 .thenReturn(Optional.of(acceptedApplication));
         when(applicationRepository.findByPostIdAndStatus(postId, CommunityApplicationStatus.PENDING))
@@ -116,5 +122,59 @@ class CommunityPostServiceImplTest {
                 eq("COMMUNITY_APPLICATION_REJECTED"),
                 eq("Yeu cau tham gia da bi tu choi"),
                 ArgumentMatchers.argThat(payload -> rejectedApplicationId.equals(payload.get("applicationId"))));
+    }
+
+    @Test
+    void closeRejectsPendingApplicationsButKeepsAcceptedApplications() {
+        UUID ownerId = UUID.randomUUID();
+        UUID postId = UUID.randomUUID();
+        CommunityPost post = openPlayerPost(ownerId, postId);
+
+        when(postRepository.findPostOnlyById(postId)).thenReturn(Optional.of(post));
+
+        var response = service.close(ownerId, postId);
+
+        assertThat(response.getStatus()).isEqualTo(CommunityPostStatus.CLOSED);
+        assertThat(response.getApplications()).isNull();
+        verify(applicationHandlingEvents).publish(postId, "COMMUNITY_POST_CLOSED", "Bai dang da dong");
+    }
+
+    @Test
+    void markFullRejectsPendingApplications() {
+        UUID ownerId = UUID.randomUUID();
+        UUID postId = UUID.randomUUID();
+        CommunityPost post = openPlayerPost(ownerId, postId);
+
+        when(postRepository.findPostOnlyById(postId)).thenReturn(Optional.of(post));
+
+        service.markFull(ownerId, postId);
+
+        verify(applicationHandlingEvents).publish(postId, "COMMUNITY_PLAYER_RECRUITMENT_FULL", "Da tuyen du nguoi cho tran dau");
+    }
+
+    private static CommunityPost openPlayerPost(UUID ownerId, UUID postId) {
+        return CommunityPost.builder()
+                .id(postId)
+                .bookingId(UUID.randomUUID())
+                .ownerId(ownerId)
+                .postType(CommunityPostType.LOOKING_PLAYER)
+                .status(CommunityPostStatus.OPEN)
+                .acceptedPlayersCount(1)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(18, 0))
+                .endTime(LocalTime.of(19, 0))
+                .build();
+    }
+
+    private static CommunityApplication application(
+            CommunityPost post,
+            UUID applicantId,
+            CommunityApplicationStatus status) {
+        return CommunityApplication.builder()
+                .id(UUID.randomUUID())
+                .post(post)
+                .applicantId(applicantId)
+                .status(status)
+                .build();
     }
 }

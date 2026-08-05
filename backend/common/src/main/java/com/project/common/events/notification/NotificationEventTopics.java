@@ -18,6 +18,7 @@ public final class NotificationEventTopics {
     public static final String USER_BALANCE_UPDATED = "user.balance.updated";
     public static final String USER_PROFILE_UPDATED = "user.profile.updated";
     public static final String COMMUNITY_NOTIFICATION = "community.notification";
+    public static final String COMMUNITY_POST_APPLICATIONS_HANDLING_REQUESTED = "community.post-applications.handling-requested";
     public static final String FIELD_EMPLOYEE_ASSIGNED = "field.employee.assigned";
     public static final String MATCH_EVALUATION_SUBMITTED = "match.evaluation.submitted";
     public static final String PLAYER_MATCH_STATISTICS_ADJUSTED = "player.match-statistics.adjusted";

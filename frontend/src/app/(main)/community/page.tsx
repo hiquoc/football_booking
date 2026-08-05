@@ -51,6 +51,6 @@ function parseFilters(params: Record<string, string | string[] | undefined>): Co
     fieldName: value("fieldName"),
     status: (status === "all" ? "all" : status ?? (ownerId || applicantId ? "all" : "OPEN")) as CommunityPostFilters["status"],
     keyword: value("keyword"),
-    sortBy: value("sortBy") === "newest" ? "newest" : "upcoming",
+    sortBy: value("sortBy") === "asc" ? "asc" : "desc",
   };
 }

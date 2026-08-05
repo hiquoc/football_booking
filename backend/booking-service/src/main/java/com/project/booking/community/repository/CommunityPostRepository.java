@@ -22,6 +22,9 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, UU
     @EntityGraph(attributePaths = "applications")
     Optional<CommunityPost> findById(UUID id);
 
+    @Query("SELECT p FROM CommunityPost p WHERE p.id = :id")
+    Optional<CommunityPost> findPostOnlyById(@Param("id") UUID id);
+
     boolean existsByBookingIdAndStatusIn(UUID bookingId, Collection<CommunityPostStatus> statuses);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -52,7 +55,6 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, UU
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") LocalTime currentTime);
 
-    @EntityGraph(attributePaths = "applications")
     @Query("""
             SELECT p
             FROM CommunityPost p

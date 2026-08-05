@@ -8,6 +8,7 @@ import com.project.booking.community.enums.CommunityApplicationStatus;
 import com.project.booking.community.enums.CommunityPostStatus;
 import com.project.booking.community.enums.CommunityPostType;
 import com.project.booking.community.kafka.CommunityNotificationEventPublisher;
+import com.project.booking.community.kafka.CommunityPostApplicationsHandlingEventPublisher;
 import com.project.booking.community.kafka.MatchEvaluationEventPublisher;
 import com.project.booking.community.mapper.CommunityMapper;
 import com.project.booking.community.repository.CommunityApplicationRepository;
@@ -51,6 +52,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     private final BookingRepository bookingRepository;
     private final CommunityMapper mapper;
     private final CommunityNotificationEventPublisher notifications;
+    private final CommunityPostApplicationsHandlingEventPublisher applicationHandlingEvents;
     private final MatchEvaluationEventPublisher evaluationEvents;
     private final CommunityModerationService moderationService;
     private final UserProjectionRepository userProjectionRepository;
@@ -123,8 +125,8 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         CommunityPost post = ownedOpenPost(userId, postId);
         post.setStatus(CommunityPostStatus.CLOSED);
         post.setClosedAt(LocalDateTime.now());
-        notifyApplicants(post, "COMMUNITY_POST_CLOSED", "Bai dang da dong");
-        return withOwnerStatistics(mapper.toPostResponse(post, true));
+        applicationHandlingEvents.publish(post.getId(), "COMMUNITY_POST_CLOSED", "Bai dang da dong");
+        return withOwnerStatistics(mapper.toPostResponse(post, false));
     }
 
     @Override
@@ -136,8 +138,8 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         }
         post.setStatus(CommunityPostStatus.FULL);
         post.setClosedAt(LocalDateTime.now());
-        notifyApplicants(post, "COMMUNITY_PLAYER_RECRUITMENT_FULL", "Da tuyen du nguoi cho tran dau");
-        return withOwnerStatistics(mapper.toPostResponse(post, true));
+        applicationHandlingEvents.publish(post.getId(), "COMMUNITY_PLAYER_RECRUITMENT_FULL", "Da tuyen du nguoi cho tran dau");
+        return withOwnerStatistics(mapper.toPostResponse(post, false));
     }
 
     @Override
@@ -290,7 +292,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         posts.forEach(post -> {
             post.setStatus(CommunityPostStatus.CLOSED);
             post.setClosedAt(now);
-            notifyApplicants(post, "COMMUNITY_POST_CLOSED", "Bai dang da dong");
+            applicationHandlingEvents.publish(post.getId(), "COMMUNITY_POST_CLOSED", "Bai dang da dong");
         });
         return posts.size();
     }
@@ -305,7 +307,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     }
 
     private CommunityPost openPost(UUID postId) {
-        CommunityPost post = postRepository.findById(postId)
+        CommunityPost post = postRepository.findPostOnlyById(postId)
                 .orElseThrow(() -> new BadRequestException("Community post not found"));
         if (post.getStatus() != CommunityPostStatus.OPEN) {
             throw new BadRequestException("This community post is not open");
@@ -377,13 +379,6 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
-    }
-
-    private void notifyApplicants(CommunityPost post, String code, String title) {
-        post.getApplications().stream()
-                .filter(app -> app.getStatus() == CommunityApplicationStatus.PENDING || app.getStatus() == CommunityApplicationStatus.ACCEPTED)
-                .forEach(app -> notifications.publish(app.getApplicantId(), code, title,
-                        payload(post, Map.of("applicationId", app.getId()))));
     }
 
     private Map<String, Object> payload(CommunityPost post, Map<String, Object> extra) {

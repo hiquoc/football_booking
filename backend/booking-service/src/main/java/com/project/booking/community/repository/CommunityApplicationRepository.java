@@ -2,6 +2,7 @@ package com.project.booking.community.repository;
 
 import com.project.booking.community.entity.CommunityApplication;
 import com.project.booking.community.enums.CommunityApplicationStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -50,7 +51,19 @@ public interface CommunityApplicationRepository extends JpaRepository<CommunityA
             @Param("postId") UUID postId,
             @Param("status") CommunityApplicationStatus status);
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            SELECT a
+            FROM CommunityApplication a
+            WHERE a.post.id = :postId
+              AND a.status = :status
+            ORDER BY a.id
+            """)
+    List<CommunityApplication> findByPostIdAndStatus(
+            @Param("postId") UUID postId,
+            @Param("status") CommunityApplicationStatus status,
+            Pageable pageable);
+
+    @Modifying(flushAutomatically = true)
     @Query("""
             UPDATE CommunityApplication a
             SET a.status = :rejectedStatus,
@@ -75,6 +88,19 @@ public interface CommunityApplicationRepository extends JpaRepository<CommunityA
             """)
     int rejectPendingApplicationsForPost(
             @Param("postId") UUID postId,
+            @Param("pendingStatus") CommunityApplicationStatus pendingStatus,
+            @Param("rejectedStatus") CommunityApplicationStatus rejectedStatus);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE CommunityApplication a
+            SET a.status = :rejectedStatus,
+                a.decidedAt = CURRENT_TIMESTAMP
+            WHERE a.id IN :applicationIds
+              AND a.status = :pendingStatus
+            """)
+    int rejectPendingApplicationsById(
+            @Param("applicationIds") Collection<UUID> applicationIds,
             @Param("pendingStatus") CommunityApplicationStatus pendingStatus,
             @Param("rejectedStatus") CommunityApplicationStatus rejectedStatus);
 }

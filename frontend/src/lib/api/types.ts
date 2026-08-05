@@ -695,7 +695,7 @@ export interface CommunityPostFilters {
   fieldName?: string;
   status?: CommunityPostStatus | "all";
   keyword?: string;
-  sortBy?: "newest" | "upcoming";
+  sortBy?: "desc" | "asc";
 }
 
 export interface CreateCommunityPostInput {

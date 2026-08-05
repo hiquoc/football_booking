@@ -70,8 +70,9 @@ export function useCommunityPostAction(id: string) {
   return useMutation({
     mutationFn: (action: "close" | "full") => submitCommunityPostAction(id, action),
     retry: false,
-    onSuccess: (post) => {
-      queryClient.setQueryData(communityQueryKeys.detail(post.id), post);
+    onSuccess: async (post) => {
+      await queryClient.invalidateQueries({ queryKey: communityQueryKeys.detail(post.id) });
+      await queryClient.refetchQueries({ queryKey: communityQueryKeys.detail(post.id), type: "active" });
       void queryClient.invalidateQueries({ queryKey: communityQueryKeys.all });
     },
   });

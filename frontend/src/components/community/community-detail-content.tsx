@@ -110,12 +110,15 @@ export function CommunityDetailContent({
       <div className="grid gap-7 lg:grid-cols-[minmax(0,1.35fr)_minmax(24rem,0.85fr)]">
         <main className="space-y-5">
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black leading-none text-slate-700">
-                {postTypeLabels[post.postType]}
-              </span>
-              <CommunityPostStatusButton status={post.status} />
-              <SkillLevelButton value={String(post.skillLevel)} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black leading-none text-slate-700">
+                  {postTypeLabels[post.postType]}
+                </span>
+                <FieldTypeBadge value={post.fieldType} />
+                <SkillLevelButton value={String(post.skillLevel)} />
+              </div>
+              <CommunityPostStatusButton status={post.status} className="shrink-0" />
             </div>
 
             {editing ? (
@@ -179,7 +182,7 @@ export function CommunityDetailContent({
               <Info label="Sân con" value={post.subFieldName ?? "Chưa cập nhật"} />
               <Info label="Ngày" value={post.bookingDate} />
               <Info label="Giờ" value={timeRange(post.startTime, post.endTime)} />
-              <Info label="Loại sân" value={formatFieldType(post.fieldType)} />
+              {/* <Info label="Loại sân" value={formatFieldType(post.fieldType)} /> */}
               <Info label="Liên hệ Zalo" value={post.contactPhone} />
               {post.postType === "LOOKING_PLAYER" ? <Info label="Cầu thủ" value={`Cần ${post.playersNeeded}, đã nhận ${post.acceptedPlayersCount}`} /> : null}
             </dl>
@@ -356,12 +359,12 @@ export function CommunityDetailContent({
                         <CommunityPostStatusButton status={application.status} size="sm" className="shrink-0" />
                       </div>
                       {application.message ? <p className="mt-2 text-sm text-slate-600">{application.message}</p> : null}
-                      {pendingAction ? (
+                      {/* {pendingAction ? (
                         <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-xs font-bold text-green-700">
                           <LoaderCircle className="size-4 animate-spin" />
                           {pendingAction === "accept" ? "Đang chấp nhận..." : "Đang từ chối..."}
                         </div>
-                      ) : null}
+                      ) : null} */}
                       {isOwner && application.status === "PENDING" && post.status === "OPEN" ? (
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
                           <button
@@ -402,6 +405,14 @@ function Info({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="font-bold text-slate-500">{label}</dt>
       <dd className="mt-1 font-black text-slate-950">{value}</dd>
     </div>
+  );
+}
+
+function FieldTypeBadge({ value }: { value: string | null | undefined }) {
+  return (
+    <span className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm font-black leading-none text-slate-700">
+      {formatFieldType(value)}
+    </span>
   );
 }
 

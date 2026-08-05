@@ -4,23 +4,26 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
 import { BackLink } from "@/components/ui/back-link";
-import type { PublicProfile } from "@/lib/api/types";
+import type { User } from "@/lib/api/types";
 import { useMyBookings } from "@/lib/hooks/use-bookings";
 import { useCreateCommunityPost } from "@/lib/hooks/use-community";
 import { skillLevelOptions } from "./community-labels";
 
-export function CommunityCreateContent({ profile }: { profile: PublicProfile | null }) {
+export function CommunityCreateContent({ profile }: { profile: User | null }) {
   const router = useRouter();
-  const bookings = useMyBookings(0, 30);
+  const bookings = useMyBookings(0, 30, { status: "CONFIRMED" });
   const create = useCreateCommunityPost();
   const [postType, setPostType] = useState<"LOOKING_OPPONENT" | "LOOKING_PLAYER">("LOOKING_OPPONENT");
   const confirmedBookings = useMemo(
     () => bookings.data?.content.filter((booking) => booking.status === "CONFIRMED") ?? [],
     [bookings.data],
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const form = new FormData(event.currentTarget);
     const playersNeeded = Number(form.get("playersNeeded"));
     create.mutate(
@@ -32,11 +35,14 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
         skillLevel: String(form.get("skillLevel")),
         contactPhone: String(form.get("contactPhone")).trim(),
         playersNeeded: postType === "LOOKING_PLAYER" ? playersNeeded : undefined,
-        ownerDisplayName: profile?.personal.fullName,
-        ownerAvatarUrl: profile?.personal.avatarUrl,
-        ownerTeamPhotoUrl: profile?.personal.teamPhotoUrl,
+        ownerDisplayName: profile?.fullName,
+        ownerAvatarUrl: profile?.avatarUrl,
+        ownerTeamPhotoUrl: profile?.teamPhotoUrl,
       },
-      { onSuccess: (post) => router.push(`/community/${post.id}`) },
+      {
+        onSuccess: (post) => router.push(`/community/${post.id}`),
+        onError: () => setIsSubmitting(false)
+      },
     );
   };
 
@@ -81,19 +87,19 @@ export function CommunityCreateContent({ profile }: { profile: PublicProfile | n
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-bold text-slate-700">
             Trình độ
-            <select name="skillLevel" defaultValue={profile?.personal.skillLevel ?? "AVERAGE"} required className={inputClassName}>
+            <select name="skillLevel" defaultValue={profile?.skillLevel ?? "AVERAGE"} required className={inputClassName}>
               {skillLevelOptions.map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </label>
-          <Input name="contactPhone" label="Zalo" defaultValue={profile?.personal.phoneNumber ?? ""} required />
+          <Input name="contactPhone" label="Zalo" defaultValue={profile?.phoneNumber ?? ""} required />
         </div>
 
         {postType === "LOOKING_PLAYER" ? <Input name="playersNeeded" label="Số cầu thủ cần thêm" type="number" min={1} required /> : null}
 
-        <button disabled={create.isPending || bookings.isPending} className="action-button bg-green-600 px-5 text-white hover:bg-green-700 disabled:opacity-60">
-          {create.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} Đăng bài
+        <button disabled={isSubmitting} className="action-button bg-green-600 px-5 text-white hover:bg-green-700 disabled:opacity-60">
+          {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : null} Đăng bài
         </button>
         {create.error ? <p className="text-sm font-semibold text-rose-600">{create.error.message}</p> : null}
       </form>

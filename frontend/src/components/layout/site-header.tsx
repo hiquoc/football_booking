@@ -68,7 +68,7 @@ export async function SiteHeader() {
               className="hidden items-center gap-2.5 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-3 text-sm font-bold text-slate-700 hover:border-green-300 hover:bg-green-50 hover:text-green-700 sm:inline-flex"
             >
               <span
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-green-100 bg-cover bg-center text-xs font-black text-green-700 ring-1 ring-green-200"
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-green-100 bg-cover bg-center font-black text-green-700 ring-1 ring-green-200"
                 style={user.avatarUrl ? { backgroundImage: `url(${user.avatarUrl})` } : undefined}
                 role={user.avatarUrl ? "img" : undefined}
                 aria-label={user.avatarUrl ? "Ảnh đại diện" : undefined}
