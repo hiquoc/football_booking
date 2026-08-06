@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public interface FieldClosureProjectionRepository extends JpaRepository<SubFieldClosureProjection, UUID> {
@@ -23,6 +24,18 @@ public interface FieldClosureProjectionRepository extends JpaRepository<SubField
                   AND c.endDate >= :startDate
             """)
     boolean existsOverlappingDateRange(
+            @Param("subFieldId") UUID subFieldId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    @Query("""
+                SELECT c
+                FROM SubFieldClosureProjection c
+                WHERE c.subFieldId = :subFieldId
+                  AND c.startDate <= :endDate
+                  AND c.endDate >= :startDate
+            """)
+    List<SubFieldClosureProjection> findOverlappingDateRange(
             @Param("subFieldId") UUID subFieldId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);

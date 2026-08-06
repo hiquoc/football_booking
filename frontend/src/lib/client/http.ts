@@ -1,5 +1,6 @@
 import {
   localizedErrorMessage,
+  shouldUsePayloadMessage,
   statusCodeFromHttpStatus,
   statusCodeFromPayload,
 } from "../error-messages";
@@ -74,11 +75,14 @@ function throwRequestError(payload: unknown, status: number) {
     payloadStatusCode === "UNKNOWN_ERROR"
       ? statusCodeFromHttpStatus(status)
       : payloadStatusCode;
+  const developerMessage = payloadDeveloperMessage(payload);
   throw new ClientRequestError(
-    localizedErrorMessage(statusCode),
+    shouldUsePayloadMessage(statusCode) && developerMessage
+      ? developerMessage
+      : localizedErrorMessage(statusCode),
     status,
     statusCode,
-    payloadDeveloperMessage(payload),
+    developerMessage,
   );
 }
 

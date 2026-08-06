@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  clockTimeOptions,
   closingTimeOptions,
+  formatTimeLabel,
   requireLocalTimePayload,
   toClosingTimeInputValue,
   toClosingTimePayload,
@@ -33,5 +35,10 @@ describe("time formatting", () => {
       value: "23:59",
       label: "12:00 CH",
     });
+  });
+
+  it("formats midnight visually as zero hour", () => {
+    expect(clockTimeOptions()[0]).toEqual({ value: "00:00", label: "0:00 SA" });
+    expect(formatTimeLabel("00:00:00")).toBe("0:00 SA");
   });
 });

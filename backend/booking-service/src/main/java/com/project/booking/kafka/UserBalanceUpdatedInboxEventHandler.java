@@ -45,6 +45,7 @@ public class UserBalanceUpdatedInboxEventHandler implements InboxEventHandler {
         pendingBookingReservationService.find(balance.userId())
                 .flatMap(bookingRepository::findById)
                 .filter(booking -> booking.getStatus() == BookingStatus.PENDING)
+                .filter(booking -> booking.getSourceRecurringBookingId() == null)
                 .filter(booking -> balance.balance() >= payableAmount(booking))
                 .ifPresent(booking -> balanceEventPublisher.publishDeductionRequested(booking, REASON));
     }

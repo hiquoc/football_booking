@@ -14,10 +14,14 @@ public class BusinessException extends RuntimeException {
     }
 
     public BusinessException(String message, HttpStatus status, String code) {
+        this(message, status, code, null);
+    }
+
+    public BusinessException(String message, HttpStatus status, String code, String developerMessage) {
         super(message);
         this.status = status;
         this.code = code != null ? code : defaultCode(status);
-        this.developerMessage = defaultDeveloperMessage(this.code, status);
+        this.developerMessage = developerMessage != null ? developerMessage : defaultDeveloperMessage(this.code, status);
     }
 
     private static String defaultCode(HttpStatus status) {
@@ -45,6 +49,8 @@ public class BusinessException extends RuntimeException {
             case "USER_NOT_FOUND" -> "User not found.";
             case "BOOKING_CONFLICT" -> "Booking already exists.";
             case "RESERVATION_CONFLICT" -> "Reservation already exists.";
+            case "SUBFIELD_CLOSED" -> "Sub-field is closed on the selected booking date.";
+            case "RECURRING_SUBFIELD_CLOSED_ON_DATE" -> "A recurring booking occurrence falls on a sub-field closure date.";
             case "INSUFFICIENT_BALANCE" -> "Insufficient balance.";
             case "UNAUTHORIZED" -> "Authentication is required.";
             case "FORBIDDEN" -> "Access is forbidden.";

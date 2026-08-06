@@ -11,7 +11,7 @@ import {
   consumePendingTopUp,
   rememberPendingTopUp,
 } from "@/lib/client/top-up-balance";
-import { useBooking } from "@/lib/hooks/use-bookings";
+import { useBooking, usePayBooking } from "@/lib/hooks/use-bookings";
 import { useCountdown } from "@/lib/hooks/use-countdown";
 import { useCreateCheckout, usePayment } from "@/lib/hooks/use-payments";
 import { useCurrentUser } from "@/lib/hooks/use-profile";
@@ -24,9 +24,11 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
   const queryClient = useQueryClient();
   const booking = useBooking(bookingId);
   const bookingConfirmed = booking.data?.status === "CONFIRMED";
+  const recurringBooking = Boolean(booking.data?.sourceRecurringBookingId);
   const currentUser = useCurrentUser();
-  const payment = usePayment(bookingId, returned && !bookingConfirmed);
+  const payment = usePayment(bookingId, returned && !bookingConfirmed && Boolean(booking.data) && !recurringBooking);
   const checkout = useCreateCheckout();
+  const walletPayment = usePayBooking();
   const [selectedTopUpAmount, setSelectedTopUpAmount] = useState<number>(TOP_UP_AMOUNTS[0]);
   const bookingDeadline = booking.data
     ? (booking.data.paymentExpiresAt ?? new Date(new Date(booking.data.createdAt).getTime() + 5 * 60 * 1000).toISOString())
@@ -50,6 +52,7 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
 
   const data = booking.data;
   const status = payment.data?.status;
+  const recurringPending = Boolean(data.sourceRecurringBookingId);
 
   if (data.status === "CONFIRMED") {
     return (
@@ -62,7 +65,7 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
     );
   }
 
-  if (status === "SUCCESS") {
+  if (status === "SUCCESS" && !recurringPending) {
     return (
       <Result
         icon={<LoaderCircle className="animate-spin" />}
@@ -95,7 +98,7 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
     );
   }
 
-  if (returned && payment.isError) return <DataError title="Chưa thể xác nhận trạng thái nạp ví" />;
+  if (returned && !recurringPending && payment.isError) return <DataError title="Chưa thể xác nhận trạng thái nạp ví" />;
   if (data.status !== "PENDING") {
     return (
       <Result
@@ -112,6 +115,38 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
   const missingAmount = Math.max(bookingPrice - walletBalance, 0);
 
   if (missingAmount <= 0) {
+    if (recurringPending) {
+      return (
+        <div className="mx-auto max-w-xl rounded-[2rem] border border-slate-200 bg-white p-7 shadow-xl sm:p-9">
+          <span className="grid size-12 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><CreditCard className="size-6" /></span>
+          <h1 className="mt-5 text-3xl font-black text-slate-950">Thanh toán lịch đặt</h1>
+          <p className="mt-2 text-sm text-slate-500">Ví của bạn đã đủ để thanh toán lịch đặt định kì {data.bookingCode}.</p>
+          <div className="mt-7 rounded-2xl bg-slate-50 p-5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Phí đặt sân</span>
+              <strong>{formatCurrency(bookingPrice)}</strong>
+            </div>
+            <div className="mt-3 flex justify-between">
+              <span className="text-slate-500">Số dư ví</span>
+              <strong>{formatCurrency(walletBalance)}</strong>
+            </div>
+            <div className="mt-3 flex justify-between border-t border-slate-200 pt-3">
+              <span className="font-semibold text-slate-500">Thời gian giữ lịch còn lại</span>
+              <strong className={expired ? "text-rose-600" : "tabular-nums text-sky-700"}>{formatRemaining(remainingSeconds)}</strong>
+            </div>
+          </div>
+          {walletPayment.error ? <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{walletPayment.error.message}</p> : null}
+          <button
+            onClick={() => walletPayment.mutate(data.id)}
+            disabled={walletPayment.isPending || expired}
+            className="action-button mt-6 w-full bg-green-600 px-5 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {walletPayment.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
+            {expired ? "Đã hết thời gian giữ lịch" : "Thanh toán"}
+          </button>
+        </div>
+      );
+    }
     return (
       <Result
         icon={<LoaderCircle className="animate-spin" />}
@@ -124,9 +159,9 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
 
   async function pay() {
     try {
-      const input = { bookingId: data.id, amount: selectedTopUpAmount, currency: "VND", provider: "STRIPE" as const };
+      const input = { bookingId: recurringPending ? undefined : data.id, amount: selectedTopUpAmount, currency: "VND", provider: "STRIPE" as const };
       const result = await checkout.mutateAsync(input);
-      rememberPendingTopUp(result, input);
+      rememberPendingTopUp(result, { ...input, bookingId: data.id });
       window.location.assign(result.checkoutUrl);
     } catch {
       // Mutation state renders the error.
@@ -177,7 +212,9 @@ export function PaymentContent({ bookingId, returned, topUpStatus }: { bookingId
       </div>
       <p className="mt-5 flex gap-2 text-xs leading-5 text-slate-400">
         <LockKeyhole className="size-4 shrink-0" />
-        Sau khi nạp ví thành công, hệ thống sẽ tự động trừ phí đặt sân và xác nhận lịch.
+        {recurringPending
+          ? "Sau khi nạp ví thành công, quay lại màn hình này và bấm Thanh toán để hoàn tất."
+          : "Sau khi nạp ví thành công, hệ thống sẽ tự động trừ phí đặt sân và xác nhận lịch."}
       </p>
       {checkout.error ? <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">Không thể tạo phiên nạp ví. Vui lòng thử lại sau.</p> : null}
       <button onClick={pay} disabled={checkout.isPending || expired} className="action-button mt-6 w-full bg-sky-500 px-5 text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50">

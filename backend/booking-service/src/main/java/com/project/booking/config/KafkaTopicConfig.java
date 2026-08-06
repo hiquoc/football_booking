@@ -1,5 +1,6 @@
 package com.project.booking.config;
 
+import com.project.booking.events.RecurringBookingEventTopics;
 import com.project.common.events.field.FieldEventTopics;
 import com.project.common.events.notification.NotificationEventTopics;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -91,6 +92,11 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic matchEvaluationSubmittedTopic() {
         return topic(NotificationEventTopics.MATCH_EVALUATION_SUBMITTED);
+    }
+
+    @Bean
+    public NewTopic recurringOccurrenceRequestedTopic() {
+        return topic(RecurringBookingEventTopics.RECURRING_OCCURRENCE_REQUESTED);
     }
 
     @Bean

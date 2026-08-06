@@ -144,11 +144,15 @@ export function useFieldBookingData(id: string) {
     queryKey: fieldQueryKeys.detail(id),
     queryFn: () => fetchField(id),
   });
+  const operatingHours = useQuery({
+    queryKey: fieldQueryKeys.operatingHours(id),
+    queryFn: () => fetchFieldOperatingHours(id),
+  });
   const subFields = useQuery({
     queryKey: fieldQueryKeys.subFields(id),
     queryFn: () => fetchSubFields(id),
   });
-  return { field, subFields };
+  return { field, operatingHours, subFields };
 }
 
 export function useFieldEditorData(id: string) {

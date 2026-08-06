@@ -17,6 +17,7 @@ import com.project.field.kafka.FieldEventPublisher;
 import com.project.field.mapper.SubFieldMapper;
 import com.project.field.repository.FieldOperatingHoursRepository;
 import com.project.field.repository.FieldRepository;
+import com.project.field.repository.FieldTypeRepository;
 import com.project.field.repository.SubFieldRepository;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,7 @@ import java.time.LocalTime;
 import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,6 +53,7 @@ class SubFieldServiceImplTest {
         SubFieldServiceImpl service = new SubFieldServiceImpl(
                 subFieldRepository,
                 mock(FieldRepository.class),
+                mock(FieldTypeRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldMapper.class),
                 mock(FieldEventPublisher.class));
@@ -71,6 +74,7 @@ class SubFieldServiceImplTest {
         SubFieldServiceImpl service = new SubFieldServiceImpl(
                 subFieldRepository,
                 mock(FieldRepository.class),
+                mock(FieldTypeRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldMapper.class),
                 mock(FieldEventPublisher.class));
@@ -87,6 +91,7 @@ class SubFieldServiceImplTest {
         SubFieldServiceImpl service = new SubFieldServiceImpl(
                 subFieldRepository,
                 mock(FieldRepository.class),
+                mock(FieldTypeRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldMapper.class),
                 mock(FieldEventPublisher.class));
@@ -120,6 +125,7 @@ class SubFieldServiceImplTest {
         SubFieldServiceImpl service = new SubFieldServiceImpl(
                 subFieldRepository,
                 mock(FieldRepository.class),
+                mock(FieldTypeRepository.class),
                 mock(FieldOperatingHoursRepository.class),
                 mock(SubFieldMapper.class),
                 mock(FieldEventPublisher.class));
@@ -155,6 +161,7 @@ class SubFieldServiceImplTest {
         SubFieldServiceImpl service = new SubFieldServiceImpl(
                 mock(SubFieldRepository.class),
                 fieldRepository,
+                mock(FieldTypeRepository.class),
                 operatingHoursRepository,
                 mock(SubFieldMapper.class),
                 mock(FieldEventPublisher.class));
@@ -202,6 +209,7 @@ class SubFieldServiceImplTest {
         SubFieldServiceImpl service = new SubFieldServiceImpl(
                 subFieldRepository,
                 fieldRepository,
+                mock(FieldTypeRepository.class),
                 operatingHoursRepository,
                 mapper,
                 mock(FieldEventPublisher.class));
@@ -219,5 +227,44 @@ class SubFieldServiceImplTest {
 
         assertEquals(LocalTime.of(17, 0), subField.getTimePriceRules().get(0).getStartTime());
         assertEquals(LocalTime.of(2, 0), subField.getTimePriceRules().get(0).getEndTime());
+    }
+
+    @Test
+    void updateReplacesParentFieldTypesWithTypesDerivedFromAllSubFields() {
+        UUID subFieldId = UUID.randomUUID();
+        FieldType football = FieldType.builder().id(1L).name(SportType.FOOTBALL).build();
+        FieldType tennis = FieldType.builder().id(2L).name(SportType.TENNIS).build();
+        Field field = Field.builder()
+                .id(UUID.randomUUID())
+                .name("Sports Center")
+                .fieldTypes(new java.util.HashSet<>(Set.of(football, tennis)))
+                .build();
+        SubField subField = SubField.builder()
+                .id(subFieldId)
+                .field(field)
+                .name("Pitch A")
+                .subFieldType(SubFieldType.TENNIS)
+                .timePriceRules(new ArrayList<>())
+                .build();
+        SubFieldRepository subFieldRepository = mock(SubFieldRepository.class);
+        FieldTypeRepository fieldTypeRepository = mock(FieldTypeRepository.class);
+        when(subFieldRepository.findById(subFieldId)).thenReturn(Optional.of(subField));
+        when(subFieldRepository.findByFieldId(field.getId())).thenReturn(List.of(subField));
+        when(subFieldRepository.save(subField)).thenReturn(subField);
+        SubFieldServiceImpl service = new SubFieldServiceImpl(
+                subFieldRepository,
+                mock(FieldRepository.class),
+                fieldTypeRepository,
+                mock(FieldOperatingHoursRepository.class),
+                mock(SubFieldMapper.class),
+                mock(FieldEventPublisher.class));
+        SubFieldRequest request = SubFieldRequest.builder()
+                .subFieldType(SubFieldType.FOOTBALL_5V5)
+                .build();
+
+        service.update(subFieldId, request);
+
+        assertEquals(SubFieldType.FOOTBALL_5V5, subField.getSubFieldType());
+        assertEquals(Set.of(football), field.getFieldTypes());
     }
 }

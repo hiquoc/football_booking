@@ -138,6 +138,11 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
         boolean existsBySourceRecurringBookingIdAndStartDateTime(UUID sourceRecurringBookingId, LocalDateTime startDateTime);
 
+        boolean existsBySourceRecurringBookingIdAndBookingDateAndStatusIn(
+                UUID sourceRecurringBookingId,
+                LocalDate bookingDate,
+                Collection<BookingStatus> statuses);
+
         @EntityGraph(attributePaths = "subField")
         Optional<Booking> findFirstBySourceRecurringBookingIdOrderByStartDateTimeAsc(UUID sourceRecurringBookingId);
 
@@ -162,6 +167,18 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                         bookingDate.atStartOfDay(),
                         bookingDate.plusDays(1).atStartOfDay());
         }
+
+        @Query("""
+                    SELECT DISTINCT b.bookingDate
+                    FROM Booking b
+                    WHERE b.sourceRecurringBookingId = :sourceRecurringBookingId
+                      AND b.startDateTime >= :windowStart
+                      AND b.startDateTime < :windowEnd
+                """)
+        List<LocalDate> findGeneratedBookingDates(
+                @Param("sourceRecurringBookingId") UUID sourceRecurringBookingId,
+                @Param("windowStart") LocalDateTime windowStart,
+                @Param("windowEnd") LocalDateTime windowEnd);
 
         boolean existsByOwnerIdAndSubFieldFieldId(UUID ownerId, UUID fieldId);
 
@@ -201,6 +218,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                     WHERE b.clientId = :clientId
                       AND (CAST(:bookingDateStart AS timestamp) IS NULL OR (b.startDateTime < :bookingDateEnd AND b.endDateTime > :bookingDateStart))
                       AND (CAST(:status AS string) IS NULL OR b.status = :status)
+                    ORDER BY b.startDateTime DESC
                 """)
         Page<Booking> findClientBookings(
                 @Param("clientId") UUID clientId,
@@ -441,6 +459,17 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 @Param("paidStatus") BookingPaymentStatus paidStatus,
                 @Param("refundedStatus") BookingPaymentStatus refundedStatus,
                 @Param("failedStatus") BookingPaymentStatus failedStatus);
+
+        @EntityGraph(attributePaths = "subField")
+        @Query("""
+                    SELECT b
+                    FROM Booking b
+                    WHERE b.status = :pendingStatus
+                      AND b.paymentExpiresAt <= :expiresBefore
+                """)
+        List<Booking> findPendingBookingsExpiringAtOrBefore(
+                @Param("pendingStatus") BookingStatus pendingStatus,
+                @Param("expiresBefore") LocalDateTime expiresBefore);
 
         @Modifying(clearAutomatically = true, flushAutomatically = true)
         @Query("""

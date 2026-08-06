@@ -218,6 +218,16 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.success("Booking cancelled successfully", response));
     }
 
+    @Operation(summary = "Pay pending booking from wallet", description = "Deducts the booking fee from the authenticated user's wallet and confirms the pending booking.")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
+    @PostMapping("/{bookingId}/pay")
+    public ResponseEntity<ApiResponse<BookingResponse>> payPendingBooking(
+            @PathVariable UUID bookingId,
+            @CurrentUser UserPrincipal user) {
+        BookingResponse response = bookingService.payPendingBooking(user.id(), bookingId);
+        return ResponseEntity.ok(ApiResponse.success("Booking paid successfully", response));
+    }
+
     @Operation(
         summary = "Owner cancel booking",
         description = "Cancels a booking owned by the authenticated field owner",

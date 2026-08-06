@@ -123,6 +123,13 @@ export function cancelBooking(
   );
 }
 
+export function payBooking(bookingId: string) {
+  return authenticatedGatewayRequest<Booking>(
+    `/api/v1/bookings/${encodeURIComponent(bookingId)}/pay`,
+    { method: "POST" },
+  );
+}
+
 export function upsertMatchResult(bookingId: string, input: MatchResultInput) {
   return authenticatedGatewayRequest<Booking>(
     `/api/v1/bookings/owner/${encodeURIComponent(bookingId)}/match-result`,

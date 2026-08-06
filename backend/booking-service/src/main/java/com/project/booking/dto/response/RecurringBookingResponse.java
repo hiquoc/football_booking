@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -30,6 +31,8 @@ public class RecurringBookingResponse {
     private RecurringBookingStatus status;
     private LocalDateTime nextProcessAt;
     private LocalDateTime nextMatchAt;
+    private List<LocalDate> generatedDates;
+    private List<LocalDate> occupiedDates;
     private BookingResponse firstBooking;
     private BookingResponse latestBooking;
     private LocalDateTime createdAt;

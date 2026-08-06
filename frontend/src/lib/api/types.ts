@@ -329,6 +329,7 @@ export interface Booking {
   cancelledAt: string | null;
   paymentExpiresAt: string | null;
   cancelledBy: string | null;
+  sourceRecurringBookingId?: string | null;
   matchResult: MatchResult | null;
   createdAt: string;
   updatedAt: string;
@@ -391,6 +392,8 @@ export interface RecurringBooking {
   status: RecurringBookingStatus;
   nextProcessAt: string | null;
   nextMatchAt?: string | null;
+  generatedDates?: string[] | null;
+  occupiedDates?: string[] | null;
   firstBooking?: Booking | null;
   latestBooking?: Booking | null;
   createdAt: string;

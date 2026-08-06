@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  Booking,
   PageResponse,
   RecurringBooking,
   RecurringBookingInput,
@@ -14,6 +15,22 @@ import {
   submitRecurringBookingUpdate,
 } from "@/lib/client/recurring-bookings";
 import { bookingQueryKeys, recurringBookingQueryKeys } from "@/lib/query-keys";
+import { userQueryKeys } from "@/lib/query-keys";
+
+function decrementCurrentUserBalance(
+  queryClient: ReturnType<typeof useQueryClient>,
+  booking: Booking | null | undefined,
+) {
+  if (booking?.paymentStatus !== "PAID") return;
+  const amount = Number(booking.bookingPrice ?? booking.platformBookingFee ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  queryClient.setQueryData(userQueryKeys.mePrivate, (old: unknown) => {
+    if (!old || typeof old !== "object") return old;
+    const user = old as { balance?: number };
+    if (typeof user.balance !== "number") return old;
+    return { ...user, balance: Math.max(0, user.balance - amount) };
+  });
+}
 
 function updateRecurringBookingInCache(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -45,7 +62,8 @@ export function useCreateRecurringBooking() {
   return useMutation({
     mutationFn: (input: RecurringBookingInput) => submitRecurringBooking(input),
     retry: false,
-    onSuccess: () => {
+    onSuccess: (recurringBooking) => {
+      decrementCurrentUserBalance(queryClient, recurringBooking.firstBooking);
       void queryClient.invalidateQueries({ queryKey: recurringBookingQueryKeys.all });
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
     },

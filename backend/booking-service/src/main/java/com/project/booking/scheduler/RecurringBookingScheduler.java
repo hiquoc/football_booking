@@ -18,7 +18,7 @@ public class RecurringBookingScheduler {
     private final RecurringBookingProcessor recurringBookingProcessor;
     private final RecurringBookingRepository recurringBookingRepository;
 
-    @Scheduled(fixedDelayString = "${booking.recurring-scheduler-fixed-delay-ms:43200000}")
+    @Scheduled(fixedDelayString = "${booking.recurring-scheduler-fixed-delay-ms:86400000}")
     public void processRecurringBookings() {
         try {
             LocalDateTime now = LocalDateTime.now();

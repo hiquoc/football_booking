@@ -8,6 +8,7 @@ import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime, getBoo
 import { formatCurrency } from "@/lib/field-format";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
 import { useReportNoShow, useSubmitMatchResult } from "@/lib/hooks/use-bookings";
+import { RecurringPaymentDeadline } from "./recurring-payment-deadline";
 
 const splitPresets = [
   { label: "50 / 50", a: 50, b: 50 },
@@ -78,6 +79,12 @@ export function BookingCard({
           value={formatBookingDateTime(booking.createdAt)}
         />
       </div>
+
+      {!owner ? (
+        <div className="mt-4">
+          <RecurringPaymentDeadline booking={booking} compact />
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
         {action}

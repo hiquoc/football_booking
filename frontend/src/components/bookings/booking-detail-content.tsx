@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import {
   CalendarDays,
@@ -15,8 +14,10 @@ import {
 import { BookingStatusButton } from "@/components/bookings/booking-status-button";
 import { BackLink } from "@/components/ui/back-link";
 import { DataError, DetailSkeleton } from "@/components/ui/data-state";
+import { RecurringPaymentDeadline } from "@/components/bookings/recurring-payment-deadline";
 import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime } from "@/lib/booking-format";
 import { formatCurrency } from "@/lib/field-format";
+import { openWalletTopUpPanel } from "@/lib/client/wallet-top-up-panel";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
 import { useBooking, useCancelBooking } from "@/lib/hooks/use-bookings";
 import { useCurrentUser } from "@/lib/hooks/use-profile";
@@ -48,6 +49,7 @@ export function BookingDetailContent({
   const startText = formatBookingDateTime(bookingStartDateTime(data));
   const endText = formatBookingDateTime(bookingEndDateTime(data));
   const customerInfo = formatCustomerInfo(data.clientName, data.clientPhoneNumber);
+  const recurringPending = Boolean(data.sourceRecurringBookingId) && data.status === "PENDING";
 
   async function cancel() {
     try {
@@ -131,7 +133,13 @@ export function BookingDetailContent({
               Thao tác
             </h3>
 
-            {data.status === "PENDING" && !owner && currentUser.isPending ? (
+            {recurringPending && !owner ? (
+              <div className="mt-4">
+                <RecurringPaymentDeadline booking={data} />
+              </div>
+            ) : null}
+
+            {data.status === "PENDING" && !owner && !recurringPending && currentUser.isPending ? (
               <button
                 disabled
                 className="action-button mt-4 min-h-14 w-full cursor-not-allowed bg-slate-300 text-base text-white"
@@ -140,15 +148,16 @@ export function BookingDetailContent({
                 Đang kiểm tra ví
               </button>
             ) : null}
-            {data.status === "PENDING" && !owner && !currentUser.isPending && needsTopUp ? (
-              <Link
-                href={`/bookings/${data.id}/payment`}
+            {data.status === "PENDING" && !owner && !recurringPending && !currentUser.isPending && needsTopUp ? (
+              <button
+                type="button"
+                onClick={() => openWalletTopUpPanel({ returnPath: `/bookings/${data.id}` })}
                 className="action-button mt-4 min-h-14 w-full bg-green-600 text-base text-white hover:bg-green-700"
               >
                 Thanh toán
-              </Link>
+              </button>
             ) : null}
-            {data.status === "PENDING" && !owner && !currentUser.isPending && !needsTopUp ? (
+            {data.status === "PENDING" && !owner && !recurringPending && !currentUser.isPending && !needsTopUp ? (
               <button
                 disabled
                 className="action-button mt-4 min-h-14 w-full cursor-not-allowed bg-slate-900 text-base text-white opacity-80"

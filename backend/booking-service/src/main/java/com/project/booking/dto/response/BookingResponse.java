@@ -51,6 +51,7 @@ public class BookingResponse {
     private LocalDateTime cancelledAt;
     private LocalDateTime paymentExpiresAt;
     private BookingCancelledBy cancelledBy;
+    private UUID sourceRecurringBookingId;
     private MatchResultResponse matchResult;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

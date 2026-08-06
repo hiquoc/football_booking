@@ -17,6 +17,7 @@ import com.project.booking.dto.response.UnavailableSlotResponse;
 import com.project.booking.entity.Booking;
 import com.project.booking.entity.BookingConfig;
 import com.project.booking.entity.MatchResult;
+import com.project.booking.entity.SubFieldClosureProjection;
 import com.project.booking.entity.UserProjection;
 import com.project.booking.exception.BookingConflictException;
 import com.project.booking.exception.BookingNotCancellableException;
@@ -29,6 +30,7 @@ import com.project.booking.mapper.BookingMapper;
 import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
+import com.project.booking.repository.BookingSubFieldProjectionRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
 import com.project.booking.repository.MatchResultRepository;
 import com.project.booking.repository.RecurringBookingRepository;
@@ -72,8 +74,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -94,6 +98,9 @@ public class BookingServiceImpl implements BookingService {
     private static final String PAYMENT_TIMEOUT_REASON = "Payment timeout";
     private static final String BOOKING_PAYMENT_REFUND_REASON = "BOOKING_PAYMENT_REFUND";
     private static final String BOOKING_PAYMENT_REASON = "BOOKING_ACCOUNT_BALANCE_PAYMENT";
+    private static final String SUBFIELD_CLOSED_CODE = "SUBFIELD_CLOSED";
+    private static final String SUBFIELD_CLOSED_MESSAGE = "Sub-field is closed on the selected booking date";
+    private static final int RECURRING_PAYMENT_TIMEOUT_MINUTES = 30;
     private static final LocalTime END_OF_DAY_TIME = LocalTime.of(23, 59);
 
     private final BookingRepository bookingRepository;
@@ -115,9 +122,13 @@ public class BookingServiceImpl implements BookingService {
     private final TransactionTemplate transactionTemplate;
     private final BookingLockManager bookingLockManager;
     private final FieldManagementClient fieldManagementClient;
+    private final BookingSubFieldProjectionRepository bookingSubFieldProjectionRepository;
 
     @Value("${booking.payment-timeout-minutes:35}")
     private int paymentTimeoutMinutes = 35;
+
+    @Value("${booking.recurring-payment-timeout-minutes:30}")
+    private int recurringPaymentTimeoutMinutes = RECURRING_PAYMENT_TIMEOUT_MINUTES;
 
     @Value("${booking.balance-deduction-attempts:4}")
     private int balanceDeductionAttempts = 4;
@@ -211,11 +222,15 @@ public class BookingServiceImpl implements BookingService {
 
         validateBooking(subField, request, sourceRecurringBookingId);
 
-        ensureNoPendingPayment(userId);
+        boolean recurringOccurrence = sourceRecurringBookingId != null;
+        if (!recurringOccurrence) {
+            ensureNoPendingPayment(userId);
+        }
         long bookingPrice = resolveBookingPrice(userId);
         PaymentMethod paymentMethod = PaymentMethod.ACCOUNT_BALANCE;
         BigDecimal subFieldPrice = pricingStrategy.calculate(subField, request);
-        LocalDateTime paymentExpiresAt = LocalDateTime.now().plusMinutes(paymentTimeoutMinutes);
+        LocalDateTime paymentExpiresAt = LocalDateTime.now().plusMinutes(
+                recurringOccurrence ? recurringPaymentTimeoutMinutes : paymentTimeoutMinutes);
         Booking booking = Booking.builder()
                 .bookingCode(BookingCodeGenerator.generate())
                 .clientId(userId)
@@ -240,11 +255,14 @@ public class BookingServiceImpl implements BookingService {
                 .sourceRecurringBookingId(sourceRecurringBookingId)
                 .build();
 
-        Booking saved = transactionTemplate.execute(status -> savePendingBooking(userId, subField, booking));
+        Booking saved = transactionTemplate.execute(status -> savePendingBooking(userId, subField, booking, !recurringOccurrence));
         if (saved == null) {
             throw new IllegalStateException("Pending booking transaction did not return a booking");
         }
-        confirmWithAccountBalanceIfPossible(saved);
+        BalanceDeductionResponse deduction = confirmWithAccountBalanceIfPossible(saved);
+        if (recurringOccurrence) {
+            notifyRecurringAutomaticPaymentResult(saved, deduction);
+        }
         return bookingMapper.toResponse(saved, subField);
     }
 
@@ -333,7 +351,7 @@ public class BookingServiceImpl implements BookingService {
         return saved;
     }
 
-    private Booking savePendingBooking(UUID userId, SubFieldResponse subField, Booking booking) {
+    private Booking savePendingBooking(UUID userId, SubFieldResponse subField, Booking booking, boolean failOnReservationConflict) {
         Booking saved;
         try {
             saved = bookingRepository.saveAndFlush(booking);
@@ -346,7 +364,7 @@ public class BookingServiceImpl implements BookingService {
             }
             throw ex;
         }
-        if (!pendingBookingReservationService.reserve(userId, saved.getId(), saved.getPaymentExpiresAt())) {
+        if (!pendingBookingReservationService.reserve(userId, saved.getId(), saved.getPaymentExpiresAt()) && failOnReservationConflict) {
             throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.");
         }
         log.info("Booking created: code={}, clientId={}, subFieldId={}", saved.getBookingCode(), userId, subField.getId());
@@ -362,6 +380,32 @@ public class BookingServiceImpl implements BookingService {
                 booking.getStartDateTime(),
                 booking.getEndDateTime(),
                 RESERVING_STATUSES);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse payPendingBooking(UUID userId, UUID bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+        if (!booking.getClientId().equals(userId)) {
+            throw new UnauthorizedException("You are not authorised to pay for this booking");
+        }
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BadRequestException("Booking is not waiting for payment");
+        }
+        if (booking.getPaymentExpiresAt() != null && !booking.getPaymentExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Booking payment window has expired");
+        }
+        BalanceDeductionResponse deduction = payPendingBookingFromWallet(booking);
+        if (!deduction.deducted()) {
+            throw new BadRequestException("Insufficient account balance");
+        }
+        if (booking.getSourceRecurringBookingId() != null && deduction.balance() == 0L) {
+            bookingNotificationEventPublisher.publishRecurringPaymentWalletEmpty(booking);
+        }
+        Booking updated = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+        return bookingMapper.toResponse(updated);
     }
 
     @Override
@@ -420,15 +464,37 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public int expirePendingBookings() {
         LocalDateTime now = LocalDateTime.now();
+        List<Booking> expiringBookings = bookingRepository.findPendingBookingsExpiringAtOrBefore(BookingStatus.PENDING, now);
         int expiredCount = bookingRepository.expirePendingBookings(
                 BookingStatus.PENDING, BookingStatus.EXPIRED, now,
                 PAYMENT_TIMEOUT_REASON, now, BookingCancelledBy.SYSTEM,
                 BookingPaymentStatus.PAID, BookingPaymentStatus.REFUNDED, BookingPaymentStatus.FAILED);
         if (expiredCount > 0) {
+            pauseRecurringBookingsForExpiredPayments(expiringBookings);
             availabilityCacheService.evictAll();
             log.info("Expired {} pending bookings at or before {}", expiredCount, now);
         }
         return expiredCount;
+    }
+
+    private void pauseRecurringBookingsForExpiredPayments(List<Booking> expiringBookings) {
+        expiringBookings.stream()
+                .filter(booking -> booking.getSourceRecurringBookingId() != null)
+                .forEach(booking -> bookingRepository.findById(booking.getId())
+                        .filter(expired -> expired.getStatus() == BookingStatus.EXPIRED)
+                        .ifPresent(this::pauseRecurringBookingForExpiredPayment));
+    }
+
+    private void pauseRecurringBookingForExpiredPayment(Booking booking) {
+        int changed = recurringBookingRepository.updateStatus(
+                booking.getSourceRecurringBookingId(),
+                RecurringBookingStatus.ACTIVE,
+                RecurringBookingStatus.PAUSED);
+        pendingBookingReservationService.release(booking);
+        if (changed == 1) {
+            refreshHasRecurring(booking.getSubFieldId());
+        }
+        bookingNotificationEventPublisher.publishRecurringPausedPaymentTimeout(booking);
     }
 
     @Override
@@ -594,6 +660,8 @@ public class BookingServiceImpl implements BookingService {
         LocalDate scheduleEndDate = date.plusDays(7);
         LocalDateTime dayStart = scheduleStartDate.atStartOfDay();
         LocalDateTime dayEnd = scheduleEndDate.plusDays(1).atStartOfDay();
+        Set<LocalDate> closedDates = findClosedDates(subFieldId, scheduleStartDate, scheduleEndDate);
+        boolean selectedDateClosed = closedDates.contains(date);
         List<Booking> existingBookings = bookingRepository
                 .findOverlappingBookings(subFieldId, dayStart, dayEnd, RESERVING_STATUSES);
         List<UnavailableSlotResponse> unavailableSlots = existingBookings.stream()
@@ -611,10 +679,10 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return AvailabilityResponse.builder()
-                .openTime(hours.closed() ? null : hours.openTime())
-                .closeTime(hours.closed() ? null : hours.closeTime())
-                .open24Hours(hours.open24Hours())
-                .operatingHours(buildAvailabilityOperatingHours(subField, scheduleStartDate, scheduleEndDate))
+                .openTime(hours.closed() || selectedDateClosed ? null : hours.openTime())
+                .closeTime(hours.closed() || selectedDateClosed ? null : hours.closeTime())
+                .open24Hours(!selectedDateClosed && hours.open24Hours())
+                .operatingHours(buildAvailabilityOperatingHours(subField, scheduleStartDate, scheduleEndDate, closedDates))
                 .unavailableSlots(unavailableSlots)
                 .build();
     }
@@ -642,20 +710,37 @@ public class BookingServiceImpl implements BookingService {
     private List<AvailabilityOperatingHoursResponse> buildAvailabilityOperatingHours(
             SubFieldResponse subField,
             LocalDate startDate,
-            LocalDate endDate) {
+            LocalDate endDate,
+            Set<LocalDate> closedDates) {
         return startDate.datesUntil(endDate.plusDays(1))
                 .map(day -> {
                     ResolvedOperatingHours resolved = subFieldProjectionService.resolveOperatingHours(
                             subField.getId(), subField.getFieldId(), day.getDayOfWeek());
+                    boolean closed = resolved.closed() || closedDates.contains(day);
                     return AvailabilityOperatingHoursResponse.builder()
                             .date(day)
-                            .openTime(resolved.closed() ? null : resolved.openTime())
-                            .closeTime(resolved.closed() ? null : resolved.closeTime())
-                            .closed(resolved.closed())
-                            .open24Hours(resolved.open24Hours())
+                            .openTime(closed ? null : resolved.openTime())
+                            .closeTime(closed ? null : resolved.closeTime())
+                            .closed(closed)
+                            .open24Hours(!closed && resolved.open24Hours())
                             .build();
                 })
                 .toList();
+    }
+
+    private Set<LocalDate> findClosedDates(UUID subFieldId, LocalDate startDate, LocalDate endDate) {
+        List<SubFieldClosureProjection> closures = fieldClosureProjectionRepository.findOverlappingDateRange(
+                subFieldId, startDate, endDate);
+        if (closures == null || closures.isEmpty()) {
+            return Set.of();
+        }
+        Set<LocalDate> closedDates = new HashSet<>();
+        for (SubFieldClosureProjection closure : closures) {
+            LocalDate effectiveStart = closure.getStartDate().isBefore(startDate) ? startDate : closure.getStartDate();
+            LocalDate effectiveEnd = closure.getEndDate().isAfter(endDate) ? endDate : closure.getEndDate();
+            effectiveStart.datesUntil(effectiveEnd.plusDays(1)).forEach(closedDates::add);
+        }
+        return closedDates;
     }
 
     private void publishRefundIfEligible(Booking booking) {
@@ -694,22 +779,16 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
-    private void confirmWithAccountBalanceIfPossible(Booking booking) {
+    private BalanceDeductionResponse confirmWithAccountBalanceIfPossible(Booking booking) {
         long payableAmount = payableBookingAmount(booking);
         if (payableAmount <= 0) {
             confirmPendingBookingImmediately(booking, null);
-            return;
+            return new BalanceDeductionResponse(true, 0L, "No payment required");
         }
-        BalanceDeductionRequest request = new BalanceDeductionRequest(
-                booking.getClientId(),
-                payableAmount,
-                booking.getId(),
-                booking.getBookingCode(),
-                BOOKING_PAYMENT_REASON);
-        BalanceDeductionResponse deduction = deductBalanceWithRetry(booking, request);
+        BalanceDeductionResponse deduction = deductBalanceWithRetry(booking, balanceDeductionRequest(booking, payableAmount));
         if (!deduction.deducted()) {
             log.info("Booking remains pending due to insufficient balance: bookingId={}, balance={}", booking.getId(), deduction.balance());
-            return;
+            return deduction;
         }
         try {
             confirmPendingBookingImmediately(booking, null);
@@ -718,6 +797,39 @@ public class BookingServiceImpl implements BookingService {
             log.error("Balance was deducted but immediate booking confirmation failed; payment success inbox will retry: bookingId={}",
                     booking.getId(), ex);
         }
+        return deduction;
+    }
+
+    private BalanceDeductionResponse payPendingBookingFromWallet(Booking booking) {
+        long payableAmount = payableBookingAmount(booking);
+        if (payableAmount <= 0) {
+            confirmPendingBookingImmediately(booking, null);
+            return new BalanceDeductionResponse(true, 0L, "No payment required");
+        }
+        BalanceDeductionResponse deduction = deductBalanceWithRetry(booking, balanceDeductionRequest(booking, payableAmount));
+        if (deduction.deducted()) {
+            confirmPendingBookingImmediately(booking, null);
+        }
+        return deduction;
+    }
+
+    private BalanceDeductionRequest balanceDeductionRequest(Booking booking, long payableAmount) {
+        return new BalanceDeductionRequest(
+                booking.getClientId(),
+                payableAmount,
+                booking.getId(),
+                booking.getBookingCode(),
+                BOOKING_PAYMENT_REASON);
+    }
+
+    private void notifyRecurringAutomaticPaymentResult(Booking booking, BalanceDeductionResponse deduction) {
+        if (deduction.deducted()) {
+            if (deduction.balance() == 0L) {
+                bookingNotificationEventPublisher.publishRecurringPaymentWalletEmpty(booking);
+            }
+            return;
+        }
+        bookingNotificationEventPublisher.publishRecurringPaymentFailed(booking);
     }
 
     private BalanceDeductionResponse deductBalanceWithRetry(Booking booking, BalanceDeductionRequest request) {
@@ -831,7 +943,7 @@ public class BookingServiceImpl implements BookingService {
     private void validateClosureDate(UUID subFieldId, LocalDate startDate, LocalDate endDate) {
         boolean closed = fieldClosureProjectionRepository.existsOverlappingDateRange(subFieldId, startDate, endDate);
         if (closed) {
-            throw new BadRequestException("SubField is closed on the selected booking date");
+            throw new BadRequestException(SUBFIELD_CLOSED_MESSAGE, SUBFIELD_CLOSED_CODE);
         }
     }
 
@@ -864,7 +976,7 @@ public class BookingServiceImpl implements BookingService {
 
     private LocalDateTime operatingWindowEnd(LocalDateTime cursor, ResolvedOperatingHours hours) {
         if (hours.closed()) {
-            throw new BadRequestException("SubField is closed on the selected booking date");
+            throw new BadRequestException(SUBFIELD_CLOSED_MESSAGE, SUBFIELD_CLOSED_CODE);
         }
         if (hours.open24Hours()) {
             return cursor.toLocalDate().plusDays(1).atStartOfDay();
@@ -1024,6 +1136,11 @@ public class BookingServiceImpl implements BookingService {
         if (isConflict || recurringConflict) {
             throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
         }
+    }
+
+    private void refreshHasRecurring(UUID subFieldId) {
+        boolean hasRecurring = recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE);
+        bookingSubFieldProjectionRepository.updateHasRecurring(subFieldId, hasRecurring);
     }
 
     private boolean isBookingOverlapConstraintViolation(Throwable throwable) {

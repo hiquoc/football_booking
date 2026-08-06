@@ -11,6 +11,7 @@ import com.project.booking.entity.Booking;
 import com.project.booking.entity.RecurringBooking;
 import com.project.booking.entity.SubFieldProjection;
 import com.project.booking.exception.BookingConflictException;
+import com.project.booking.kafka.RecurringBookingOccurrenceEventPublisher;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.mapper.RecurringBookingMapper;
 import com.project.booking.repository.BookingRepository;
@@ -33,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +43,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -74,6 +78,9 @@ class RecurringBookingServiceImplTest {
     private BookingService bookingService;
 
     @Mock
+    private RecurringBookingOccurrenceEventPublisher occurrenceEventPublisher;
+
+    @Mock
     private AvailabilityCacheService availabilityCacheService;
 
     @InjectMocks
@@ -81,7 +88,7 @@ class RecurringBookingServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(recurringBookingService, "generationLeadDays", 0);
+        ReflectionTestUtils.setField(recurringBookingService, "generationWindowDays", 7);
     }
 
     @ParameterizedTest
@@ -93,9 +100,9 @@ class RecurringBookingServiceImplTest {
         CreateRecurringBookingRequest request = request(subFieldId, startDate, startDate.plusDays(7), intervalDays);
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
         when(bookingRepository.existsCompletedBookingAtField(eq(userId), any(), eq(BookingStatus.COMPLETED))).thenReturn(true);
-        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any(), any(), any()))
+        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
-        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any(), any(), any()))
+        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
         when(recurringBookingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(recurringBookingMapper.toResponse(any())).thenReturn(RecurringBookingResponse.builder().build());
@@ -129,15 +136,43 @@ class RecurringBookingServiceImplTest {
         CreateRecurringBookingRequest request = request(subFieldId, startDate, startDate.plusDays(4), 2);
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
         when(bookingRepository.existsCompletedBookingAtField(eq(userId), any(), eq(BookingStatus.COMPLETED))).thenReturn(true);
-        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any(), any(), any()))
+        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
-        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any(), any(), any()))
+        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
         org.mockito.Mockito.doThrow(new BookingConflictException("conflict"))
                 .when(bookingService).validateRecurringOccurrence(eq(userId), any(), eq(null));
 
         assertThrows(BookingConflictException.class, () -> recurringBookingService.create(userId, request));
 
+        verify(recurringBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createReportsClosureDateWhenAnyOccurrenceFallsOnClosureDay() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        LocalDate closureDate = startDate.plusDays(2);
+        CreateRecurringBookingRequest request = request(subFieldId, startDate, startDate.plusDays(4), 2);
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
+        when(bookingRepository.existsCompletedBookingAtField(eq(userId), any(), eq(BookingStatus.COMPLETED))).thenReturn(true);
+        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            CreateBookingRequest occurrence = invocation.getArgument(1);
+            if (closureDate.equals(occurrence.getBookingDate())) {
+                throw new BadRequestException("Sub-field is closed on the selected booking date", "SUBFIELD_CLOSED");
+            }
+            return null;
+        }).when(bookingService).validateRecurringOccurrence(eq(userId), any(), eq(null));
+
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> recurringBookingService.create(userId, request));
+
+        assertEquals("RECURRING_SUBFIELD_CLOSED_ON_DATE", exception.getCode());
+        assertEquals("Sân con đã đóng lịch vào ngày " + closureDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ".", exception.getMessage());
         verify(recurringBookingRepository, never()).save(any());
     }
 
@@ -152,9 +187,9 @@ class RecurringBookingServiceImplTest {
         RecurringBookingResponse mappedResponse = RecurringBookingResponse.builder().build();
         when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
         when(bookingRepository.existsCompletedBookingAtField(eq(userId), any(), eq(BookingStatus.COMPLETED))).thenReturn(true);
-        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any(), any(), any()))
+        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
-        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any(), any(), any()))
+        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
         when(recurringBookingRepository.save(any())).thenAnswer(invocation -> {
             RecurringBooking recurringBooking = invocation.getArgument(0);
@@ -172,7 +207,47 @@ class RecurringBookingServiceImplTest {
         assertEquals(startDate, firstBookingCaptor.getValue().getBookingDate());
         ArgumentCaptor<RecurringBooking> recurringCaptor = ArgumentCaptor.forClass(RecurringBooking.class);
         verify(recurringBookingRepository).save(recurringCaptor.capture());
-        assertEquals(startDate.plusDays(7).atStartOfDay(), recurringCaptor.getValue().getNextProcessAt());
+        assertNotNull(recurringCaptor.getValue().getNextProcessAt());
+    }
+
+    @Test
+    void createAllowsRecurringBookingAcrossMidnight() {
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        CreateRecurringBookingRequest request = CreateRecurringBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .startDate(startDate)
+                .endDate(startDate.plusDays(7))
+                .intervalDays(7)
+                .startTime(LocalTime.of(23, 0))
+                .endTime(LocalTime.of(1, 0))
+                .build();
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
+        when(bookingRepository.existsCompletedBookingAtField(eq(userId), any(), eq(BookingStatus.COMPLETED))).thenReturn(true);
+        when(recurringBookingRepository.findUserOverlapCandidates(any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        when(recurringBookingRepository.findSubFieldOverlapCandidates(any(), any(), any(), any(), any()))
+                .thenReturn(List.of());
+        when(recurringBookingRepository.save(any())).thenAnswer(invocation -> {
+            RecurringBooking recurringBooking = invocation.getArgument(0);
+            recurringBooking.setId(recurringId);
+            return recurringBooking;
+        });
+        when(bookingService.createRecurringOccurrence(eq(userId), eq(recurringId), any()))
+                .thenReturn(BookingResponse.builder().build());
+        when(recurringBookingMapper.toResponse(any())).thenReturn(RecurringBookingResponse.builder().build());
+
+        recurringBookingService.create(userId, request);
+
+        ArgumentCaptor<CreateBookingRequest> occurrenceCaptor = ArgumentCaptor.forClass(CreateBookingRequest.class);
+        verify(bookingService, org.mockito.Mockito.times(2))
+                .validateRecurringOccurrence(eq(userId), occurrenceCaptor.capture(), eq(null));
+        assertEquals(120, occurrenceCaptor.getAllValues().getFirst().getDurationMinutes());
+        ArgumentCaptor<CreateBookingRequest> firstBookingCaptor = ArgumentCaptor.forClass(CreateBookingRequest.class);
+        verify(bookingService).createRecurringOccurrence(eq(userId), eq(recurringId), firstBookingCaptor.capture());
+        assertEquals(120, firstBookingCaptor.getValue().getDurationMinutes());
     }
 
     @Test
@@ -251,6 +326,166 @@ class RecurringBookingServiceImplTest {
     }
 
     @Test
+    void resumeActivatesRecurringBookingAndReturnsOccupiedDatesWhenSomeOccurrencesAreAvailable() {
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate today = LocalDate.now();
+        LocalDate occupiedDate = today.plusDays(2);
+        RecurringBooking recurringBooking = RecurringBooking.builder()
+                .id(recurringId)
+                .userId(userId)
+                .fieldId(UUID.randomUUID())
+                .subFieldId(subFieldId)
+                .startDate(today)
+                .endDate(today.plusDays(4))
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(9, 0))
+                .intervalDays(2)
+                .status(RecurringBookingStatus.PAUSED)
+                .build();
+        RecurringBookingResponse mappedResponse = RecurringBookingResponse.builder().build();
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+        when(bookingRepository.findOverlappingBookings(eq(subFieldId), any(), any(), any()))
+                .thenReturn(List.of(occupiedBooking(subFieldId, occupiedDate)));
+        when(bookingRepository.existsBySourceRecurringBookingIdAndBookingDateAndStatusIn(eq(recurringId), any(), any()))
+                .thenReturn(false);
+        when(occurrenceEventPublisher.publishRequested(eq(recurringBooking), any(), eq(60))).thenReturn(true);
+        when(recurringBookingRepository.save(recurringBooking)).thenReturn(recurringBooking);
+        when(recurringBookingMapper.toResponse(recurringBooking)).thenReturn(mappedResponse);
+        when(recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE))
+                .thenReturn(true);
+
+        RecurringBookingResponse response = recurringBookingService.resume(userId, recurringId);
+
+        assertSame(mappedResponse, response);
+        assertEquals(RecurringBookingStatus.ACTIVE, recurringBooking.getStatus());
+        assertIterableEquals(List.of(today, today.plusDays(4)), response.getGeneratedDates());
+        assertIterableEquals(List.of(occupiedDate), response.getOccupiedDates());
+        verify(occurrenceEventPublisher, org.mockito.Mockito.times(2)).publishRequested(eq(recurringBooking), any(), eq(60));
+        verify(availabilityCacheService).evictAll();
+    }
+
+    @Test
+    void resumeKeepsRecurringBookingPausedWhenAllWindowOccurrencesAreOccupied() {
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate today = LocalDate.now();
+        RecurringBooking recurringBooking = RecurringBooking.builder()
+                .id(recurringId)
+                .userId(userId)
+                .fieldId(UUID.randomUUID())
+                .subFieldId(subFieldId)
+                .startDate(today)
+                .endDate(today.plusDays(4))
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(9, 0))
+                .intervalDays(2)
+                .status(RecurringBookingStatus.PAUSED)
+                .build();
+        RecurringBookingResponse mappedResponse = RecurringBookingResponse.builder().build();
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+        when(bookingRepository.findOverlappingBookings(eq(subFieldId), any(), any(), any()))
+                .thenReturn(List.of(
+                        occupiedBooking(subFieldId, today),
+                        occupiedBooking(subFieldId, today.plusDays(2)),
+                        occupiedBooking(subFieldId, today.plusDays(4))));
+        when(recurringBookingRepository.save(recurringBooking)).thenReturn(recurringBooking);
+        when(recurringBookingMapper.toResponse(recurringBooking)).thenReturn(mappedResponse);
+        when(recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE))
+                .thenReturn(false);
+
+        RecurringBookingResponse response = recurringBookingService.resume(userId, recurringId);
+
+        assertSame(mappedResponse, response);
+        assertEquals(RecurringBookingStatus.PAUSED, recurringBooking.getStatus());
+        assertIterableEquals(List.of(), response.getGeneratedDates());
+        assertIterableEquals(List.of(today, today.plusDays(2), today.plusDays(4)), response.getOccupiedDates());
+        verify(occurrenceEventPublisher, never()).publishRequested(any(), any(), any(Integer.class));
+        verify(availabilityCacheService).evictAll();
+    }
+
+    @Test
+    void resumeSkipsAlreadyGeneratedOccurrencesWithoutReturningThemAsGenerated() {
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate today = LocalDate.now();
+        RecurringBooking recurringBooking = RecurringBooking.builder()
+                .id(recurringId)
+                .userId(userId)
+                .fieldId(UUID.randomUUID())
+                .subFieldId(subFieldId)
+                .startDate(today)
+                .endDate(today.plusDays(2))
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(9, 0))
+                .intervalDays(2)
+                .status(RecurringBookingStatus.PAUSED)
+                .build();
+        RecurringBookingResponse mappedResponse = RecurringBookingResponse.builder().build();
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+        when(bookingRepository.findOverlappingBookings(eq(subFieldId), any(), any(), any())).thenReturn(List.of());
+        when(bookingRepository.existsBySourceRecurringBookingIdAndBookingDateAndStatusIn(
+                eq(recurringId),
+                eq(today),
+                any())).thenReturn(true);
+        when(bookingRepository.existsBySourceRecurringBookingIdAndBookingDateAndStatusIn(
+                eq(recurringId),
+                eq(today.plusDays(2)),
+                any())).thenReturn(false);
+        when(occurrenceEventPublisher.publishRequested(eq(recurringBooking), any(), eq(60))).thenReturn(true);
+        when(recurringBookingRepository.save(recurringBooking)).thenReturn(recurringBooking);
+        when(recurringBookingMapper.toResponse(recurringBooking)).thenReturn(mappedResponse);
+        when(recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE))
+                .thenReturn(true);
+
+        RecurringBookingResponse response = recurringBookingService.resume(userId, recurringId);
+
+        assertEquals(RecurringBookingStatus.ACTIVE, recurringBooking.getStatus());
+        assertIterableEquals(List.of(today.plusDays(2)), response.getGeneratedDates());
+        assertIterableEquals(List.of(), response.getOccupiedDates());
+        verify(occurrenceEventPublisher, org.mockito.Mockito.times(1)).publishRequested(eq(recurringBooking), any(), eq(60));
+    }
+
+    @Test
+    void resumeActivatesWhenWindowOccurrencesAlreadyExistForSameRecurringBooking() {
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate today = LocalDate.now();
+        RecurringBooking recurringBooking = RecurringBooking.builder()
+                .id(recurringId)
+                .userId(userId)
+                .fieldId(UUID.randomUUID())
+                .subFieldId(subFieldId)
+                .startDate(today)
+                .endDate(today.plusDays(2))
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(9, 0))
+                .intervalDays(2)
+                .status(RecurringBookingStatus.PAUSED)
+                .build();
+        RecurringBookingResponse mappedResponse = RecurringBookingResponse.builder().build();
+        when(recurringBookingRepository.findById(recurringId)).thenReturn(Optional.of(recurringBooking));
+        when(bookingRepository.findOverlappingBookings(eq(subFieldId), any(), any(), any())).thenReturn(List.of());
+        when(bookingRepository.existsBySourceRecurringBookingIdAndBookingDateAndStatusIn(eq(recurringId), any(), any()))
+                .thenReturn(true);
+        when(recurringBookingRepository.save(recurringBooking)).thenReturn(recurringBooking);
+        when(recurringBookingMapper.toResponse(recurringBooking)).thenReturn(mappedResponse);
+        when(recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE))
+                .thenReturn(true);
+
+        RecurringBookingResponse response = recurringBookingService.resume(userId, recurringId);
+
+        assertEquals(RecurringBookingStatus.ACTIVE, recurringBooking.getStatus());
+        assertIterableEquals(List.of(), response.getGeneratedDates());
+        assertIterableEquals(List.of(), response.getOccupiedDates());
+        verify(occurrenceEventPublisher, never()).publishRequested(any(), any(), any(Integer.class));
+    }
+
+    @Test
     void ownerCancelCancelsLatestConfirmedBookingAsOwner() {
         UUID ownerId = UUID.randomUUID();
         UUID recurringId = UUID.randomUUID();
@@ -284,6 +519,18 @@ class RecurringBookingServiceImplTest {
                 .intervalDays(intervalDays)
                 .startTime(LocalTime.of(8, 0))
                 .endTime(LocalTime.of(9, 0))
+                .build();
+    }
+
+    private Booking occupiedBooking(UUID subFieldId, LocalDate bookingDate) {
+        LocalDateTime startDateTime = LocalDateTime.of(bookingDate, LocalTime.of(8, 0));
+        return Booking.builder()
+                .id(UUID.randomUUID())
+                .subFieldId(subFieldId)
+                .sourceRecurringBookingId(UUID.randomUUID())
+                .startDateTime(startDateTime)
+                .endDateTime(startDateTime.plusHours(1))
+                .status(BookingStatus.CONFIRMED)
                 .build();
     }
 

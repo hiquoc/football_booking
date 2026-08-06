@@ -17,9 +17,11 @@ import com.project.booking.lock.BookingLockManager;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.entity.BookingConfig;
+import com.project.booking.entity.SubFieldClosureProjection;
 import com.project.booking.kafka.BookingBalanceEventPublisher;
 import com.project.booking.pricing.PricingStrategy;
 import com.project.booking.repository.BookingRepository;
+import com.project.booking.repository.BookingSubFieldProjectionRepository;
 import com.project.booking.repository.FieldClosureProjectionRepository;
 import com.project.booking.repository.MatchResultRepository;
 import com.project.booking.repository.RecurringBookingRepository;
@@ -33,6 +35,7 @@ import com.project.common.enums.BookingCancelledBy;
 import com.project.common.enums.BookingPaymentStatus;
 import com.project.common.enums.BookingStatus;
 import com.project.common.enums.BookingType;
+import com.project.common.enums.RecurringBookingStatus;
 import com.project.common.enums.PaymentMethod;
 import com.project.common.dto.balance.BalanceDeductionResponse;
 import com.project.common.exception.BadRequestException;
@@ -61,6 +64,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -75,6 +79,9 @@ class BookingServiceImplTest {
 
     @Mock
     private BookingRepository bookingRepository;
+
+    @Mock
+    private BookingSubFieldProjectionRepository bookingSubFieldProjectionRepository;
 
     @Mock
     private SubFieldProjectionService subFieldProjectionService;
@@ -245,6 +252,82 @@ class BookingServiceImplTest {
         assertEquals(PaymentMethod.ACCOUNT_BALANCE, savedBooking.getPaymentMethod());
         assertEquals(BookingStatus.PENDING, savedBooking.getStatus());
         verify(userBalanceClient).deduct(any());
+    }
+
+    @Test
+    void createRecurringOccurrenceKeepsPendingForThirtyMinutesWhenWalletIsInsufficient() {
+        ReflectionTestUtils.setField(bookingService, "recurringPaymentTimeoutMinutes", 30);
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection(), eq(recurringId))).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder().status(BookingStatus.PENDING).build());
+
+        LocalDateTime before = LocalDateTime.now();
+        BookingResponse response = bookingService.createRecurringOccurrence(userId, recurringId, request);
+        LocalDateTime after = LocalDateTime.now();
+
+        assertEquals(BookingStatus.PENDING, response.getStatus());
+        ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).saveAndFlush(bookingCaptor.capture());
+        Booking savedBooking = bookingCaptor.getValue();
+        assertEquals(recurringId, savedBooking.getSourceRecurringBookingId());
+        org.junit.jupiter.api.Assertions.assertFalse(savedBooking.getPaymentExpiresAt().isBefore(before.plusMinutes(30)));
+        org.junit.jupiter.api.Assertions.assertFalse(savedBooking.getPaymentExpiresAt().isAfter(after.plusMinutes(30)));
+        verify(bookingNotificationEventPublisher).publishRecurringPaymentFailed(savedBooking);
+    }
+
+    @Test
+    void payPendingBookingConfirmsRecurringBookingAndNotifiesWhenWalletBecomesEmpty() {
+        UUID userId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .bookingCode("BK-1")
+                .clientId(userId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 0))
+                .endTime(LocalTime.of(9, 0))
+                .status(BookingStatus.PENDING)
+                .paymentStatus(BookingPaymentStatus.UNPAID)
+                .paymentExpiresAt(LocalDateTime.now().plusMinutes(20))
+                .bookingPrice(1000L)
+                .platformBookingFee(1000L)
+                .sourceRecurringBookingId(UUID.randomUUID())
+                .build();
+        Booking confirmed = Booking.builder()
+                .id(bookingId)
+                .clientId(userId)
+                .status(BookingStatus.CONFIRMED)
+                .paymentStatus(BookingPaymentStatus.PAID)
+                .build();
+        when(bookingRepository.findById(bookingId))
+                .thenReturn(Optional.of(booking))
+                .thenReturn(Optional.of(booking))
+                .thenReturn(Optional.of(confirmed));
+        when(userBalanceClient.deduct(any())).thenReturn(new BalanceDeductionResponse(true, 0L, "Balance deducted"));
+        when(bookingRepository.confirmPendingBookingFromPayment(bookingId, BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingPaymentStatus.PAID))
+                .thenReturn(1);
+        when(bookingMapper.toResponse(confirmed)).thenReturn(BookingResponse.builder().status(BookingStatus.CONFIRMED).build());
+
+        BookingResponse response = bookingService.payPendingBooking(userId, bookingId);
+
+        assertEquals(BookingStatus.CONFIRMED, response.getStatus());
+        verify(bookingNotificationEventPublisher).publishRecurringPaymentWalletEmpty(booking);
     }
 
     @Test
@@ -742,6 +825,64 @@ class BookingServiceImplTest {
     }
 
     @Test
+    void getAvailabilityMarksClosureDatesClosed() {
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate date = LocalDate.now().plusDays(1);
+        SubFieldResponse subField = activeSubField(subFieldId);
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), any()))
+                .thenReturn(openHours());
+        when(fieldClosureProjectionRepository.findOverlappingDateRange(
+                eq(subFieldId), eq(date.minusDays(1)), eq(date.plusDays(7))))
+                .thenReturn(List.of(SubFieldClosureProjection.builder()
+                        .id(UUID.randomUUID())
+                        .subFieldId(subFieldId)
+                        .startDate(date)
+                        .endDate(date.plusDays(1))
+                        .build()));
+        when(bookingRepository.findOverlappingBookings(
+                eq(subFieldId), any(LocalDateTime.class), any(LocalDateTime.class), anyCollection()))
+                .thenReturn(List.of());
+
+        AvailabilityResponse response = bookingService.getAvailability(subFieldId, date);
+
+        assertEquals(null, response.getOpenTime());
+        assertEquals(null, response.getCloseTime());
+        assertEquals(false, response.getOpen24Hours());
+        assertTrue(response.getOperatingHours().stream()
+                .filter(hours -> date.equals(hours.getDate()) || date.plusDays(1).equals(hours.getDate()))
+                .allMatch(hours -> Boolean.TRUE.equals(hours.getClosed())
+                        && hours.getOpenTime() == null
+                        && hours.getCloseTime() == null
+                        && !Boolean.TRUE.equals(hours.getOpen24Hours())));
+    }
+
+    @Test
+    void createBookingOnClosureDateReturnsSpecificErrorCode() {
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate bookingDate = LocalDate.now().plusDays(1);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(bookingDate)
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(activeSubField(subFieldId));
+        when(fieldClosureProjectionRepository.existsOverlappingDateRange(subFieldId, bookingDate, bookingDate))
+                .thenReturn(true);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> bookingService.createBooking(UUID.randomUUID(), request));
+
+        assertEquals("SUBFIELD_CLOSED", exception.getCode());
+        verify(subFieldProjectionService, never()).resolveOperatingHours(any(), any(), any());
+        verify(bookingRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void expirePendingBookingsOnlyExpiresPendingBookingsOlderThanTimeout() {
         ReflectionTestUtils.setField(bookingService, "paymentTimeoutMinutes", 20);
         ArgumentCaptor<LocalDateTime> expiresBeforeCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
@@ -762,6 +903,55 @@ class BookingServiceImplTest {
 
         assertEquals(3, expiredCount);
         assertEquals(cancelledAtCaptor.getValue(), expiresBeforeCaptor.getValue());
+    }
+
+    @Test
+    void expirePendingBookingsPausesRecurringBookingAfterPaymentTimeout() {
+        UUID bookingId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        Booking expiringBooking = Booking.builder()
+                .id(bookingId)
+                .subFieldId(subFieldId)
+                .sourceRecurringBookingId(recurringId)
+                .status(BookingStatus.PENDING)
+                .paymentStatus(BookingPaymentStatus.UNPAID)
+                .build();
+        Booking expiredBooking = Booking.builder()
+                .id(bookingId)
+                .subFieldId(subFieldId)
+                .sourceRecurringBookingId(recurringId)
+                .status(BookingStatus.EXPIRED)
+                .paymentStatus(BookingPaymentStatus.UNPAID)
+                .build();
+
+        when(bookingRepository.findPendingBookingsExpiringAtOrBefore(eq(BookingStatus.PENDING), any(LocalDateTime.class)))
+                .thenReturn(List.of(expiringBooking));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(expiredBooking));
+        when(bookingRepository.expirePendingBookings(
+                eq(BookingStatus.PENDING),
+                eq(BookingStatus.EXPIRED),
+                any(LocalDateTime.class),
+                eq("Payment timeout"),
+                any(LocalDateTime.class),
+                eq(BookingCancelledBy.SYSTEM),
+                eq(BookingPaymentStatus.PAID),
+                eq(BookingPaymentStatus.REFUNDED),
+                eq(BookingPaymentStatus.FAILED))).thenReturn(1);
+        when(recurringBookingRepository.updateStatus(
+                recurringId,
+                RecurringBookingStatus.ACTIVE,
+                RecurringBookingStatus.PAUSED)).thenReturn(1);
+        when(recurringBookingRepository.existsBySubFieldIdAndStatus(subFieldId, RecurringBookingStatus.ACTIVE))
+                .thenReturn(false);
+
+        int expiredCount = bookingService.expirePendingBookings();
+
+        assertEquals(1, expiredCount);
+        verify(recurringBookingRepository).updateStatus(recurringId, RecurringBookingStatus.ACTIVE, RecurringBookingStatus.PAUSED);
+        verify(pendingBookingReservationService).release(expiredBooking);
+        verify(bookingSubFieldProjectionRepository).updateHasRecurring(subFieldId, false);
+        verify(bookingNotificationEventPublisher).publishRecurringPausedPaymentTimeout(expiredBooking);
     }
 
     @Test

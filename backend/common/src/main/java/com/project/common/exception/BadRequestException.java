@@ -10,4 +10,8 @@ public class BadRequestException extends BusinessException {
     public BadRequestException(String message, String code) {
         super(message, HttpStatus.BAD_REQUEST, code);
     }
+
+    public BadRequestException(String message, String code, String developerMessage) {
+        super(message, HttpStatus.BAD_REQUEST, code, developerMessage);
+    }
 }

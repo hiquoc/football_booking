@@ -93,6 +93,13 @@ export function submitCancellation(id: string, reason?: string, owner = false) {
   );
 }
 
+export function submitBookingPayment(id: string) {
+  return requestJson<Booking>(
+    `/api/bookings/${encodeURIComponent(id)}/pay`,
+    { method: "POST" },
+  );
+}
+
 export function submitMatchResult(bookingId: string, input: MatchResultInput) {
   return requestJson<Booking>(
     `/api/owner/bookings/${encodeURIComponent(bookingId)}/match-result`,

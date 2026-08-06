@@ -31,6 +31,15 @@ public class OutboxService {
 
     @Transactional
     public OutboxEvent save(OutboxSaveRequest request) {
+        return outboxEventRepository.save(toEvent(request));
+    }
+
+    @Transactional
+    public OutboxEvent saveAndFlush(OutboxSaveRequest request) {
+        return outboxEventRepository.saveAndFlush(toEvent(request));
+    }
+
+    private OutboxEvent toEvent(OutboxSaveRequest request) {
         UUID eventId = UUID.randomUUID();
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put(KafkaHeaderUtil.EVENT_ID, eventId.toString());
@@ -44,7 +53,7 @@ public class OutboxService {
             headers.put(KafkaHeaderUtil.REQUEST_ID, requestId);
         }
 
-        OutboxEvent event = OutboxEvent.builder()
+        return OutboxEvent.builder()
                 .id(eventId)
                 .aggregateType(request.aggregateType())
                 .aggregateId(request.aggregateId())
@@ -57,7 +66,6 @@ public class OutboxService {
                 .retryCount(0)
                 .nextRetryAt(Instant.now())
                 .build();
-        return outboxEventRepository.save(event);
     }
 
     public Object payload(OutboxEvent event) {

@@ -12,6 +12,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   MATCH_POST_NOT_FOUND: "Không tìm thấy bài đăng.",
   BOOKING_CONFLICT: "Khung giờ này đã được đặt.",
   RESERVATION_CONFLICT: "Khung giờ này đã được giữ.",
+  SUBFIELD_CLOSED: "Sân con đã đóng lịch vào ngày đã chọn.",
   CONFLICT: "Dữ liệu đang bị xung đột.",
   EMAIL_ALREADY_EXISTS: "Email đã được sử dụng.",
   PHONE_ALREADY_EXISTS: "Số điện thoại đã được sử dụng.",
@@ -73,4 +74,8 @@ export function statusCodeFromHttpStatus(status: number): string {
 
 export function localizedErrorMessage(statusCode?: string | null) {
   return ERROR_MESSAGES[statusCode ?? "UNKNOWN_ERROR"] ?? ERROR_MESSAGES.UNKNOWN_ERROR;
+}
+
+export function shouldUsePayloadMessage(statusCode?: string | null) {
+  return statusCode === "RECURRING_SUBFIELD_CLOSED_ON_DATE";
 }

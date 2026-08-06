@@ -1,5 +1,6 @@
 package com.project.field.service.impl;
 
+import com.project.common.enums.SportType;
 import com.project.common.enums.SubFieldType;
 import com.project.common.cache.CacheNames;
 import com.project.common.exception.BadRequestException;
@@ -12,6 +13,7 @@ import com.project.field.dto.response.SubFieldResponse;
 import com.project.field.entity.BookingRule;
 import com.project.field.entity.Field;
 import com.project.field.entity.FieldOperatingHours;
+import com.project.field.entity.FieldType;
 import com.project.field.entity.SubField;
 import com.project.field.entity.TimePriceRule;
 import com.project.field.exceptions.FieldNotFoundException;
@@ -20,6 +22,7 @@ import com.project.field.kafka.FieldEventPublisher;
 import com.project.field.mapper.SubFieldMapper;
 import com.project.field.repository.FieldOperatingHoursRepository;
 import com.project.field.repository.FieldRepository;
+import com.project.field.repository.FieldTypeRepository;
 import com.project.field.repository.SubFieldRepository;
 import com.project.field.service.SubFieldService;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +37,9 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -47,6 +52,7 @@ public class SubFieldServiceImpl implements SubFieldService {
 
     private final SubFieldRepository subFieldRepository;
     private final FieldRepository fieldRepository;
+    private final FieldTypeRepository fieldTypeRepository;
     private final FieldOperatingHoursRepository fieldOperatingHoursRepository;
     private final SubFieldMapper subFieldMapper;
     private final FieldEventPublisher fieldEventPublisher;
@@ -84,6 +90,7 @@ public class SubFieldServiceImpl implements SubFieldService {
         }
 
         SubField saved = subFieldRepository.save(subField);
+        syncFieldTypesFromSubFields(field, appendSubField(field.getId(), saved));
         fieldEventPublisher.publishSubFieldCreated(saved);
         return subFieldMapper.toDto(saved);
     }
@@ -103,7 +110,10 @@ public class SubFieldServiceImpl implements SubFieldService {
         if (request.getName() != null) subField.setName(request.getName());
         if (request.getDescription() != null) subField.setDescription(request.getDescription());
         if (request.getActive() != null) subField.setActive(request.getActive());
-        if (request.getSubFieldType() != null) subField.setSubFieldType(request.getSubFieldType());
+        if (request.getSubFieldType() != null) {
+            subField.setSubFieldType(request.getSubFieldType());
+            syncFieldTypesFromSubFields(subField.getField(), subFieldsForUpdatedField(subField));
+        }
         if (request.getIndoorOutdoor() != null) subField.setIndoorOutdoor(request.getIndoorOutdoor());
         if (request.getSurfaceType() != null) subField.setSurfaceType(request.getSurfaceType());
         if (request.getChangingRoom() != null) subField.setChangingRoom(request.getChangingRoom());
@@ -157,8 +167,11 @@ public class SubFieldServiceImpl implements SubFieldService {
     public void delete(UUID id) {
         SubField subField = subFieldRepository.findById(id)
                 .orElseThrow(() -> new SubFieldNotFoundException(id));
+        Field field = subField.getField();
+        List<SubField> remainingSubFields = remainingSubFieldsAfterDelete(subField);
         fieldEventPublisher.publishSubFieldDeleted(subField);
         subFieldRepository.delete(subField);
+        syncFieldTypesFromSubFields(field, remainingSubFields);
     }
 
     @Override
@@ -287,6 +300,69 @@ public class SubFieldServiceImpl implements SubFieldService {
         }
         validateBookingRule(request, existingBookingRule);
         validateTimePriceRules(request, field);
+    }
+
+    private void syncFieldTypesFromSubFields(Field field, List<SubField> subFields) {
+        if (field == null) {
+            return;
+        }
+        if (field.getFieldTypes() == null) {
+            field.setFieldTypes(new HashSet<>());
+        }
+        Set<SportType> requiredFieldTypes = subFields.stream()
+                .map(SubField::getSubFieldType)
+                .filter(java.util.Objects::nonNull)
+                .map(SubFieldType::getFieldType)
+                .collect(Collectors.toSet());
+        field.getFieldTypes().removeIf(fieldType -> !requiredFieldTypes.contains(fieldType.getName()));
+        Set<SportType> existingFieldTypes = field.getFieldTypes().stream()
+                .map(FieldType::getName)
+                .collect(Collectors.toSet());
+        requiredFieldTypes.stream()
+                .filter(fieldType -> !existingFieldTypes.contains(fieldType))
+                .map(this::getFieldType)
+                .forEach(field.getFieldTypes()::add);
+    }
+
+    private List<SubField> appendSubField(UUID fieldId, SubField subField) {
+        List<SubField> existingSubFields = fieldId != null ? subFieldRepository.findByFieldId(fieldId) : List.of();
+        List<SubField> subFields = new ArrayList<>(existingSubFields != null ? existingSubFields : List.of());
+        if (subFields.stream().noneMatch(existing -> existing.getId() != null && existing.getId().equals(subField.getId()))) {
+            subFields.add(subField);
+        }
+        return subFields;
+    }
+
+    private List<SubField> subFieldsForUpdatedField(SubField updatedSubField) {
+        Field field = updatedSubField.getField();
+        List<SubField> existingSubFields = field != null && field.getId() != null
+                ? subFieldRepository.findByFieldId(field.getId())
+                : List.of();
+        List<SubField> subFields = new ArrayList<>(existingSubFields != null ? existingSubFields : List.of());
+        for (int i = 0; i < subFields.size(); i++) {
+            if (updatedSubField.getId() != null && updatedSubField.getId().equals(subFields.get(i).getId())) {
+                subFields.set(i, updatedSubField);
+                return subFields;
+            }
+        }
+        subFields.add(updatedSubField);
+        return subFields;
+    }
+
+    private List<SubField> remainingSubFieldsAfterDelete(SubField deletedSubField) {
+        Field field = deletedSubField.getField();
+        List<SubField> existingSubFields = field != null && field.getId() != null
+                ? subFieldRepository.findByFieldId(field.getId())
+                : List.of();
+        return (existingSubFields != null ? existingSubFields : List.<SubField>of()).stream()
+                .filter(subField -> deletedSubField.getId() == null || !deletedSubField.getId().equals(subField.getId()))
+                .toList();
+    }
+
+    private FieldType getFieldType(SportType sportType) {
+        return fieldTypeRepository.findByName(sportType)
+                .orElseThrow(() -> new BadRequestException(
+                        "Field type " + sportType + " must be configured before using a matching sub-field type"));
     }
 
     private void validateBookingRule(SubFieldRequest request, BookingRule existingRule) {

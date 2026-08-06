@@ -21,6 +21,7 @@ import {
   fetchOwnerBookings,
   fetchOwnerReservations,
   submitBooking,
+  submitBookingPayment,
   submitCancellation,
   submitMatchResult,
   submitReservation,
@@ -38,6 +39,47 @@ type BookingListFilters = {
   subFieldType?: string;
   status?: string;
 };
+
+function bookingPaymentAmount(booking: Booking) {
+  return Number(booking.bookingPrice ?? booking.platformBookingFee ?? 0);
+}
+
+function decrementCurrentUserBalance(
+  queryClient: ReturnType<typeof useQueryClient>,
+  amount: number,
+) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  queryClient.setQueryData(userQueryKeys.mePrivate, (old: unknown) => {
+    if (!old || typeof old !== "object") return old;
+    const user = old as { balance?: number };
+    if (typeof user.balance !== "number") return old;
+    return { ...user, balance: Math.max(0, user.balance - amount) };
+  });
+}
+
+function decrementBalanceForPaidBooking(
+  queryClient: ReturnType<typeof useQueryClient>,
+  booking: Booking,
+) {
+  if (booking.paymentStatus !== "PAID") return;
+  decrementCurrentUserBalance(queryClient, bookingPaymentAmount(booking));
+}
+
+function findCachedBooking(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+) {
+  const detail = queryClient.getQueryData<Booking>(bookingQueryKeys.detail(id));
+  if (detail) return detail;
+
+  for (const [, page] of queryClient.getQueriesData<PageResponse<Booking>>({
+    queryKey: bookingQueryKeys.all,
+  })) {
+    const booking = page?.content?.find((item) => item.id === id);
+    if (booking) return booking;
+  }
+  return null;
+}
 
 function incrementCompletedBookingCount(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.setQueryData(userQueryKeys.mePrivate, (old: unknown) => {
@@ -155,6 +197,7 @@ export function useCreateBooking() {
     retry: false,
     onSuccess: (booking, input) => {
       queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
+      decrementBalanceForPaidBooking(queryClient, booking);
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
       void queryClient.invalidateQueries({
         queryKey: bookingQueryKeys.availability(
@@ -229,6 +272,31 @@ export function useCancelBooking(owner = false) {
             : old,
       );
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+    },
+  });
+}
+
+export function usePayBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => submitBookingPayment(id),
+    retry: false,
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: userQueryKeys.mePrivate });
+      const previousUser = queryClient.getQueryData(userQueryKeys.mePrivate);
+      const booking = findCachedBooking(queryClient, id);
+      const amount = booking ? bookingPaymentAmount(booking) : 0;
+      decrementCurrentUserBalance(queryClient, amount);
+      return { previousUser, deducted: amount > 0 };
+    },
+    onError: (_error, _id, context) => {
+      queryClient.setQueryData(userQueryKeys.mePrivate, context?.previousUser);
+    },
+    onSuccess: (booking, _id, context) => {
+      if (!context?.deducted) decrementBalanceForPaidBooking(queryClient, booking);
+      queryClient.setQueryData(bookingQueryKeys.detail(booking.id), booking);
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+      void queryClient.invalidateQueries({ queryKey: recurringBookingQueryKeys.all });
     },
   });
 }

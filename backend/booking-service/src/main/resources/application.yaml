@@ -50,7 +50,7 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       enable-auto-commit: false
       properties:
-        spring.json.trusted.packages: com.project.common.events.field,com.project.common.events.notification
+        spring.json.trusted.packages: com.project.common.events.field,com.project.common.events.notification,com.project.booking.events
         spring.json.use.type.headers: true
   listener:
       ack-mode: record
@@ -71,8 +71,7 @@ booking:
   payment-timeout-minutes: 5
   expiration-scheduler-fixed-delay-ms: 60000
   completion-scheduler-fixed-delay-ms: 300000
-  recurring-scheduler-fixed-delay-ms: 43200000
-  recurring-generation-lead-days: 2
+  recurring-scheduler-fixed-delay-ms: 86400000
 
 community:
   post-close-scheduler-fixed-delay-ms: 60000

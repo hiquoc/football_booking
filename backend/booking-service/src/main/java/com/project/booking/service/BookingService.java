@@ -35,6 +35,8 @@ public interface BookingService {
 
     void validateRecurringOccurrence(UUID userId, CreateBookingRequest request, UUID recurringBookingId);
 
+    BookingResponse payPendingBooking(UUID userId, UUID bookingId);
+
     /**
      * Cancels an existing booking owned by the requesting client.
      *
