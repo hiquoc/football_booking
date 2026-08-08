@@ -1,5 +1,6 @@
 export interface ApiResponse<T> {
   success: boolean;
+  statusCode: string | null;
   message: string | null;
   data: T;
   timestamp: string;
@@ -69,6 +70,11 @@ export interface Field {
   updatedAt: string;
   images: FieldImage[];
   fieldTypes: FieldType[];
+}
+
+export interface FieldSearchOption {
+  fieldId: string;
+  name: string;
 }
 
 export interface ImageUploadSlot {
@@ -270,6 +276,7 @@ export type BookingStatus =
   | "CONFIRMED"
   | "CANCELLED"
   | "COMPLETED"
+  | "REPORTED"
   | "EXPIRED";
 
 export type BookingPaymentStatus = "UNPAID" | "PAID" | "NOT_REQUIRED" | "REFUNDED" | "FAILED";
@@ -664,6 +671,7 @@ export interface CommunityViolation {
 export interface UserViolationHistory {
   community: PageResponse<CommunityViolation>;
   field: PageResponse<FieldViolation>;
+  audit: PageResponse<ModerationAuditLog>;
 }
 
 export interface CommunityModerationHistory {
@@ -698,7 +706,7 @@ export interface CommunityPostFilters {
   fieldName?: string;
   status?: CommunityPostStatus | "all";
   keyword?: string;
-  sortBy?: "desc" | "asc";
+  sortBy?: "desc" | "asc" | "upcoming" | "newest";
 }
 
 export interface CreateCommunityPostInput {
@@ -729,14 +737,61 @@ export interface FieldViolation {
   updatedAt: string;
 }
 
+export interface BookingNoShowReport {
+  id: string;
+  bookingId: string;
+  fieldId: string;
+  reportedUserId: string;
+  reportedUsername?: string | null;
+  reportedPhoneNumber?: string | null;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModerationAuditLog {
+  id: string;
+  actorId: string | null;
+  targetUserId: string | null;
+  targetUsername?: string | null;
+  targetPhoneNumber?: string | null;
+  fieldId: string | null;
+  action: string;
+  details: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModerationResetResponse {
+  userId: string;
+  platformBanRecordsCleared: number;
+  fieldViolationRecordsReset: number;
+}
+
 export type PaymentDisputeStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface PaymentDisputeReport {
   id: string;
   bookingId: string;
   fieldId: string;
+  fieldName?: string | null;
+  subFieldId?: string | null;
+  subFieldName?: string | null;
   reportedUserId: string;
+  reportedUsername?: string | null;
+  reportedPhoneNumber?: string | null;
+  reportedUserStatus?: string | null;
   ownerId: string;
+  bookingCode?: string | null;
+  bookingDate?: string | null;
+  startDateTime?: string | null;
+  endDateTime?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  bookingPrice?: number | null;
+  platformBookingFee?: number | null;
+  bookingStatus?: BookingStatus | null;
+  bookingPaymentStatus?: BookingPaymentStatus | null;
   description: string;
   status: PaymentDisputeStatus;
   adminNote: string | null;
@@ -749,7 +804,7 @@ export interface PaymentDisputeReport {
 export interface CreatePaymentDisputeInput {
   bookingId: string;
   description: string;
-  imageUrls: string[];
+  imageUrls?: string[];
 }
 
 export interface UpdateCommunityPostInput {

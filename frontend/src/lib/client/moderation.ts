@@ -1,6 +1,8 @@
 import type {
   CreatePaymentDisputeInput,
   FieldViolation,
+  BookingNoShowReport,
+  ModerationAuditLog,
   PageResponse,
   PaymentDisputeReport,
   PaymentDisputeStatus,
@@ -15,6 +17,12 @@ export const submitNoShowReport = (bookingId: string) =>
 
 export const fetchFieldViolations = (fieldId: string, page = 0, size = 20) =>
   requestJson<PageResponse<FieldViolation>>(`/api/owner/client-violations?fieldId=${encodeURIComponent(fieldId)}&page=${page}&size=${size}`);
+
+export const fetchNoShowReports = (fieldId: string, page = 0, size = 20) =>
+  requestJson<PageResponse<BookingNoShowReport>>(`/api/owner/no-show-reports?fieldId=${encodeURIComponent(fieldId)}&page=${page}&size=${size}`);
+
+export const fetchModerationAuditLogs = (fieldId: string, page = 0, size = 20) =>
+  requestJson<PageResponse<ModerationAuditLog>>(`/api/owner/audit-logs?fieldId=${encodeURIComponent(fieldId)}&page=${page}&size=${size}`);
 
 export const fetchBannedClients = (fieldId: string, page = 0, size = 20) =>
   requestJson<PageResponse<FieldViolation>>(`/api/owner/banned-clients?fieldId=${encodeURIComponent(fieldId)}&page=${page}&size=${size}`);
@@ -40,8 +48,12 @@ export const submitPaymentDispute = (input: CreatePaymentDisputeInput) =>
 export const fetchOwnerPaymentDisputes = (page = 0, size = 20) =>
   requestJson<PageResponse<PaymentDisputeReport>>(`/api/owner/payment-disputes?page=${page}&size=${size}`);
 
-export const fetchAdminPaymentDisputes = (page = 0, size = 20, status?: PaymentDisputeStatus) =>
-  requestJson<PageResponse<PaymentDisputeReport>>(`/api/admin/payment-disputes?page=${page}&size=${size}${status ? `&status=${status}` : ""}`);
+export const fetchAdminPaymentDisputes = (page = 0, size = 20, status?: PaymentDisputeStatus, fieldIds: string[] = []) => {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (status) query.set("status", status);
+  if (fieldIds.length) query.set("fieldIds", fieldIds.join(","));
+  return requestJson<PageResponse<PaymentDisputeReport>>(`/api/admin/payment-disputes?${query}`);
+};
 
 export const submitPaymentDisputeReview = (reportId: string, approved: boolean, adminNote: string) =>
   requestJson<PaymentDisputeReport>(`/api/admin/payment-disputes/${encodeURIComponent(reportId)}/review`, {

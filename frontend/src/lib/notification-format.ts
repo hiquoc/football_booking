@@ -59,8 +59,8 @@ export function formatNotification(notification: Notification) {
       };
     case "WALLET_TOP_UP_SUCCEEDED":
       return {
-        title: "Nap vi thanh cong",
-        detail: joinParts([Number.isFinite(amount) && formatCurrency(amount), code && `Ma ${code}`]),
+        title: "Nạp ví thành công",
+        detail: joinParts([Number.isFinite(amount) && formatCurrency(amount), code && `Mã ${code}`]),
       };
     case "COMMUNITY_POST_APPLIED":
       return { title: "Có người vừa ứng tuyển", detail: community };

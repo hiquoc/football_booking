@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Eye, Mail, Phone, Search, ShieldBan, ShieldCheck, UserRound } from "lucide-react";
-import type { CommunityViolation, FieldViolation, User } from "@/lib/api/types";
+import type { CommunityViolation, FieldViolation, ModerationAuditLog, User } from "@/lib/api/types";
 import {
   useCurrentUser,
   useUpdateUserRole,
@@ -106,10 +106,7 @@ export function AdminUserList({
           const roleOptions = user.userType === "ADMIN" ? Object.entries(roleLabels) : assignableRoleLabels;
 
           return (
-            <article
-              key={user.id}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-            >
+            <article key={user.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="flex min-w-0 gap-4">
                   <span className="grid size-11 shrink-0 place-items-center rounded-full bg-green-50 text-green-700">
@@ -163,8 +160,7 @@ export function AdminUserList({
                   </select>
                   <button
                     type="button"
-                    className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60 ${banned ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
-                      }`}
+                    className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60 ${banned ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"}`}
                     disabled={isCurrentUser || statusMutation.isPending}
                     title={isCurrentUser ? "Không thể cấm hoặc bỏ cấm chính mình" : undefined}
                     onClick={() =>
@@ -185,9 +181,9 @@ export function AdminUserList({
                     <Eye className="size-4" />
                     Vi phạm
                   </button>
-                  <span className="inline-flex h-10 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold text-slate-500">
+                  {/* <span className="inline-flex h-10 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold text-slate-500">
                     {user.status}
-                  </span>
+                  </span> */}
                 </div>
               </div>
               {expandedUserId === user.id ? <ViolationPanel userId={user.id} /> : null}
@@ -249,6 +245,7 @@ function ViolationPanel({ userId }: { userId: string }) {
 
   const communityViolations = query.data.community.content;
   const fieldViolations = query.data.field.content;
+  const auditLogs = query.data.audit.content;
   const activeCommunityCount = communityViolations.filter((violation) =>
     violation.status === "ACTIVE" || violation.status === "PERMANENT"
   ).length;
@@ -268,7 +265,7 @@ function ViolationPanel({ userId }: { userId: string }) {
         <span className="text-slate-500">Tổng cộng {totalViolations} bản ghi vi phạm</span>
       </div>
       {communityViolations.length > 0 || fieldViolations.length > 0 ? (
-        <ViolationDetails communityViolations={communityViolations} fieldViolations={fieldViolations} />
+        <ViolationDetails communityViolations={communityViolations} fieldViolations={fieldViolations} auditLogs={auditLogs} />
       ) : (
         <p className="mt-3 text-sm text-slate-500">Chưa có vi phạm nào.</p>
       )}
@@ -279,9 +276,11 @@ function ViolationPanel({ userId }: { userId: string }) {
 function ViolationDetails({
   communityViolations,
   fieldViolations,
+  auditLogs,
 }: {
   communityViolations: CommunityViolation[];
   fieldViolations: FieldViolation[];
+  auditLogs: ModerationAuditLog[];
 }) {
   return (
     <div className="mt-3 space-y-4 border-t border-slate-200 pt-3 text-sm text-slate-600">
@@ -320,6 +319,20 @@ function ViolationDetails({
                 <span>Trạng thái: {violation.status}</span>
                 <span>Ngày tạo: {formatDateTime(violation.createdAt)}</span>
                 {violation.expireAt ? <span>Hết hạn: {formatDateTime(violation.expireAt)}</span> : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {auditLogs.length > 0 ? (
+        <section>
+          <h3 className="text-xs font-black uppercase text-slate-500">Nhật ký kiểm duyệt</h3>
+          <div className="mt-2 space-y-2 text-xs font-semibold text-slate-500">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="flex flex-wrap gap-3">
+                <span>Hành động: {log.action}</span>
+                {log.details ? <span>Chi tiết: {log.details}</span> : null}
+                <span>Ngày tạo: {formatDateTime(log.createdAt)}</span>
               </div>
             ))}
           </div>

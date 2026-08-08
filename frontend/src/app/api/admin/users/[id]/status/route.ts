@@ -14,7 +14,8 @@ export async function PATCH(
   try {
     assertSameOrigin(request);
     const input = schema.parse(await request.json());
-    return NextResponse.json(await updateUserStatus((await params).id, input.status));
+    const id = (await params).id;
+    return NextResponse.json(await updateUserStatus(id, input.status));
   } catch (error) {
     return routeError(error);
   }

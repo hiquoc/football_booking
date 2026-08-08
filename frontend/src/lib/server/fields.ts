@@ -11,6 +11,7 @@ import type {
   FieldStatus,
   FieldClosure,
   FieldImage,
+  FieldSearchOption,
   FieldInput,
   FieldEmployee,
   FavoriteCheckResponse,
@@ -125,6 +126,14 @@ export async function getFields(page = 0, size = 9, status?: FieldStatus) {
     );
   }
   return sessionGatewayRequest<PageResponse<Field>>(`/api/v1/fields?${query}`);
+}
+
+export async function searchAdminFields(keyword = "") {
+  const query = new URLSearchParams();
+  if (keyword.trim()) query.set("keyword", keyword.trim());
+  return authenticatedGatewayRequest<FieldSearchOption[]>(
+    `/api/v1/fields/admin/search${query.size ? `?${query}` : ""}`,
+  );
 }
 
 export async function getOwnerFields(page = 0, size = 10) {

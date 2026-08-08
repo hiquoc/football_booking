@@ -1,26 +1,25 @@
-import { ClientViolationsPanel } from "@/components/owner/client-violations-panel";
+import { ModerationHistoryPanel } from "@/components/owner/moderation-history-panel";
 import { BackLink } from "@/components/ui/back-link";
 import { PageHeading } from "@/components/ui/page-heading";
 import { getAssignedFields, getOwnerFields } from "@/lib/server/fields";
 import { requireUser } from "@/lib/server/guards";
 
-const getManagedFieldsForViolationPage = (role: string) =>
+const getManagedFieldsForModerationPage = (role: string) =>
   role === "EMPLOYEE" ? getAssignedFields(0, 100) : getOwnerFields(0, 100);
 
-export default async function OwnerClientViolationsPage({
+export default async function OwnerModerationHistoryPage({
   searchParams,
 }: {
   searchParams: Promise<{ fieldId?: string; page?: string }>;
 }) {
   const user = await requireUser();
   const query = await searchParams;
-  const fields = await getManagedFieldsForViolationPage(user.userType);
+  const fields = await getManagedFieldsForModerationPage(user.userType);
   const allowedFields = fields.content;
   const requestedFieldId = query.fieldId;
   const selectedFieldId = allowedFields.some((field) => field.id === requestedFieldId)
     ? requestedFieldId
     : allowedFields[0]?.id;
-  const requestedDenied = Boolean(requestedFieldId && requestedFieldId !== selectedFieldId);
   const page = Math.max(0, Number(query.page) || 0);
 
   return (
@@ -29,16 +28,15 @@ export default async function OwnerClientViolationsPage({
         Quan ly san
       </BackLink>
       <PageHeading
-        eyebrow="Vi pham"
-        title="Luot vang mat cua khach"
-        description="Theo doi cac luot vang mat va cam khach dat san khi can thiet."
+        eyebrow="Kiem duyet"
+        title="Bao cao vang mat va nhat ky cam"
+        description="Theo doi cac bao cao vang mat da ghi nhan va lich su thao tac cam/go cam theo tung san."
       />
-      <ClientViolationsPanel
+      <ModerationHistoryPanel
         key={`${selectedFieldId ?? ""}-${page}`}
         fields={allowedFields}
         selectedFieldId={selectedFieldId ?? ""}
         page={page}
-        requestedDenied={requestedDenied}
       />
     </>
   );

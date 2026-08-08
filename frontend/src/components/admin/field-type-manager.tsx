@@ -30,8 +30,7 @@ export function FieldTypeManager() {
   const [showForm, setShowForm] = useState(false);
 
   if (types.isPending) return <ListSkeleton />;
-  if (types.isError)
-    return <DataError title="Không thể tải danh sách loại sân" />;
+  if (types.isError) return <DataError title="Không thể tải danh sách loại sân" />;
 
   async function submit(input: FieldTypeInput) {
     try {
@@ -109,8 +108,7 @@ export function FieldTypeManager() {
                 </button>
                 <button
                   onClick={() => {
-                    if (window.confirm("Xóa loại sân này?"))
-                      remove.mutate(type.id);
+                    if (window.confirm("Xóa loại sân này?")) remove.mutate(type.id);
                   }}
                   disabled={remove.isPending}
                   className="grid size-9 place-items-center rounded-xl bg-rose-500 text-white hover:bg-rose-600 disabled:cursor-wait disabled:opacity-60 shadow-none"
@@ -141,11 +139,10 @@ function FieldTypeForm({
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "FOOTBALL");
-  const [duration, setDuration] = useState(
-    initial?.defaultBookingDurationMinutes ?? 60,
-  );
+  const [duration, setDuration] = useState(initial?.defaultBookingDurationMinutes ?? 60);
   const [active, setActive] = useState(initial?.active ?? true);
   const [description, setDescription] = useState("");
+
   return (
     <form
       onSubmit={(event) => {
@@ -218,9 +215,7 @@ function FieldTypeForm({
           Đang hoạt động
         </label>
       </div>
-      {error ? (
-        <p className="mt-4 text-sm text-rose-700">{error.message}</p>
-      ) : null}
+      {error ? <p className="mt-4 text-sm text-rose-700">{error.message}</p> : null}
       <button
         disabled={pending}
         className="mt-5 inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-black text-white hover:bg-green-700 disabled:cursor-wait disabled:opacity-60 shadow-none"

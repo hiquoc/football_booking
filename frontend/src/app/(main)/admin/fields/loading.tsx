@@ -12,10 +12,7 @@ export default function AdminFieldsLoading() {
       <div className="mt-8">
         <div className="mb-6 flex gap-2">
           {[0, 1, 2].map((item) => (
-            <div
-              key={item}
-              className="h-10 w-32 animate-pulse rounded-full bg-slate-200"
-            />
+            <div key={item} className="h-10 w-32 animate-pulse rounded-full bg-slate-200" />
           ))}
         </div>
         <ListSkeleton />

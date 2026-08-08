@@ -6,7 +6,7 @@ import { assertSameOrigin, routeError } from "@/lib/server/route-response";
 const schema = z.object({
   bookingId: z.string().uuid(),
   description: z.string().trim().min(1),
-  imageUrls: z.array(z.string().url()).min(1),
+  imageUrls: z.array(z.string().url()).default([]),
 });
 
 export async function GET(request: Request) {

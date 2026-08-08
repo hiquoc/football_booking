@@ -74,7 +74,7 @@ export function CommunityDetailContent({
     post.matchResultSubmitted &&
     evaluationTarget,
   );
-  const canReport = Boolean(viewer && !isOwner);
+  const canReport = Boolean(viewer && !isOwner && !report.isSuccess);
   const hasActionControls = canReport || (isOwner && post.status === "OPEN");
   const ownerName = post.ownerDisplayName ?? "Người đăng";
 
@@ -295,6 +295,7 @@ export function CommunityDetailContent({
                   <textarea value={reportDescription} onChange={(event) => setReportDescription(event.target.value)} rows={3} placeholder="Mô tả thêm" className={`mt-3 w-full ${inputClassName}`} />
                   <button
                     onClick={async () => {
+                      if (!window.confirm("Xác nhận gửi báo cáo bài đăng này?")) return;
                       await report.mutateAsync({ reason: reportReason, description: reportDescription });
                       setReportOpen(false);
                     }}

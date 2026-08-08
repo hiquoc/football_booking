@@ -34,13 +34,24 @@ export default async function OwnerPaymentDisputesPage() {
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-600">{report.description}</p>
               <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm text-slate-500 md:grid-cols-3">
-                <Reference label="Lịch đặt" href={`/bookings/${report.bookingId}`} value={report.bookingId} />
+
+                <div>
+                  <span className="font-bold text-slate-500">Lịch đặt: </span>
+                  <span className="break-all">
+                    {report.bookingId}
+                  </span>
+                   </div>
                 <Reference label="Sân" href={`/fields/${report.fieldId}`} value={report.fieldId} />
-                <Reference label="Người bị báo cáo" href={`/users/${report.reportedUserId}/profile`} value={report.reportedUserId} />
+                <UserReference
+                  label="Người bị báo cáo"
+                  href={`/users/${report.reportedUserId}/profile`}
+                  name={report.reportedUsername ?? report.reportedUserId}
+                  phone={report.reportedPhoneNumber}
+                />
               </div>
-              <p className="mt-4 text-xs font-bold text-slate-500">
+              {/* <p className="mt-4 text-xs font-bold text-slate-500">
                 Bằng chứng: {report.imageUrls.length} ảnh
-              </p>
+              </p> */}
               {report.adminNote ? (
                 <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-600">
                   Ghi chú quản trị: {report.adminNote}
@@ -61,6 +72,18 @@ function Reference({ label, href, value }: { label: string; href: string; value:
       <Link href={href} className="break-all font-black text-green-700 hover:text-green-800">
         {value}
       </Link>
+    </span>
+  );
+}
+
+function UserReference({ label, href, name, phone }: { label: string; href: string; name: string; phone?: string | null }) {
+  return (
+    <span className="min-w-0">
+      <span className="font-bold text-slate-500">{label}: </span>
+      <Link href={href} className="break-all font-black text-green-700 hover:text-green-800">
+        {name}
+      </Link>
+      {phone ? <span className="mt-1 block font-semibold text-slate-500">{phone}</span> : null}
     </span>
   );
 }

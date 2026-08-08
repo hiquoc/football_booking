@@ -3,7 +3,7 @@ import { z } from "zod";
 import { banClient } from "@/lib/server/moderation";
 import { assertSameOrigin, routeError } from "@/lib/server/route-response";
 
-const schema = z.object({ fieldId: z.string().uuid() });
+const schema = z.object({ fieldId: z.string() });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   try {

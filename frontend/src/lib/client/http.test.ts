@@ -46,7 +46,7 @@ describe("requestJson authentication retry", () => {
 
     await expect(
       requestJson("/api/auth/otp/verify", { method: "POST" }),
-    ).rejects.toThrow("Bạn cần đăng nhập.");
+    ).rejects.toThrow("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -58,7 +58,9 @@ describe("requestJson authentication retry", () => {
     vi.stubGlobal("fetch", fetchMock);
     const requestJson = await loadRequestJson();
 
-    await expect(requestJson("/api/profile")).rejects.toThrow("Bạn cần đăng nhập.");
+    await expect(requestJson("/api/profile")).rejects.toThrow(
+      "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

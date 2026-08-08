@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, Eye, MapPin, Phone, Save, UserRound } from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock3, Eye, MapPin, Save, UserRound, X } from "lucide-react";
 import type { Booking, MatchResultOutcome, WinningTeam } from "@/lib/api/types";
 import { bookingEndDateTime, bookingStartDateTime, formatBookingDateTime, getBookingStatus } from "@/lib/booking-format";
 import { formatCurrency } from "@/lib/field-format";
 import { useBookingDisplayStatus } from "@/lib/hooks/use-booking-display-status";
-import { useReportNoShow, useSubmitMatchResult } from "@/lib/hooks/use-bookings";
+import { useCreatePaymentDispute, useReportNoShow, useSubmitMatchResult } from "@/lib/hooks/use-bookings";
 import { RecurringPaymentDeadline } from "./recurring-payment-deadline";
 
 const splitPresets = [
@@ -50,7 +50,7 @@ export function BookingCard({
               <UserRound className="size-3.5 text-slate-400" />
               Khách hàng: {customerName(booking)} {customerPhone(booking) ? (
                 <>
-                  <Phone className="size-4 text-slate-400" /> ` ${customerPhone(booking)}`
+                  ({`${customerPhone(booking)}`})
                 </>) : ""}
             </p>
           ) : null}
@@ -143,7 +143,9 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
   );
   const mutation = useSubmitMatchResult();
   const bookerName = customerName(booking);
+  const [reportOpen, setReportOpen] = useState(false);
   const noShowMutation = useReportNoShow();
+  const paymentDisputeMutation = useCreatePaymentDispute();
 
   const teamAAmount = useMemo(
     () => (Number(booking.subFieldPrice ?? 0) * teamAPercentage) / 100,
@@ -248,25 +250,197 @@ function MatchResultEditor({ booking }: { booking: Booking }) {
 
         {booking.status === "COMPLETED" && !booking.matchResult ? (
           <button
-            disabled={noShowMutation.isPending}
-            onClick={() => {
-              if (window.confirm("Xác nhận báo cáo khách hàng vắng mặt cho lịch đặt này?")) {
-                noShowMutation.mutate(booking.id);
-              }
-            }}
+            disabled={noShowMutation.isPending || paymentDisputeMutation.isPending}
+            onClick={() => setReportOpen(true)}
             className="action-button min-h-0 rounded-lg bg-amber-500 px-3 py-2 text-xs text-white hover:bg-amber-600"
           >
-            Báo vắng mặt
+            Báo cáo
           </button>
         ) : null}
       </div>
       {mutation.error ? <p className="text-sm font-semibold text-rose-600">{mutation.error.message}</p> : null}
 
-      {noShowMutation.error ? (
+      {(noShowMutation.error || paymentDisputeMutation.error) ? (
         <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-          {noShowMutation.error.message}
+          {(noShowMutation.error ?? paymentDisputeMutation.error)?.message}
         </p>
       ) : null}
+      {reportOpen ? (
+        <BookingReportDialog
+          booking={booking}
+          noShowPending={noShowMutation.isPending}
+          paymentDisputePending={paymentDisputeMutation.isPending}
+          onClose={() => setReportOpen(false)}
+          onReportNoShow={() =>
+            noShowMutation.mutate(booking.id, {
+              onSuccess: () => setReportOpen(false),
+            })
+          }
+          onReportPaymentDispute={(description) =>
+            paymentDisputeMutation.mutate(
+              { bookingId: booking.id, description },
+              { onSuccess: () => setReportOpen(false) },
+            )
+          }
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type ReportReason = "NO_SHOW" | "UNPAID_FIELD";
+
+function BookingReportDialog({
+  booking,
+  noShowPending,
+  paymentDisputePending,
+  onClose,
+  onReportNoShow,
+  onReportPaymentDispute,
+}: {
+  booking: Booking;
+  noShowPending: boolean;
+  paymentDisputePending: boolean;
+  onClose: () => void;
+  onReportNoShow: () => void;
+  onReportPaymentDispute: (description: string) => void;
+}) {
+  const [reason, setReason] = useState<ReportReason>("NO_SHOW");
+  const [description, setDescription] = useState(
+    `Khách hàng ${customerName(booking) || "này"} không trả tiền sân cho lịch ${booking.bookingCode}.`,
+  );
+  const [validationError, setValidationError] = useState("");
+  const pending = noShowPending || paymentDisputePending;
+
+  function submitReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setValidationError("");
+
+    if (reason === "NO_SHOW") {
+      onReportNoShow();
+      return;
+    }
+
+    if (!description.trim()) {
+      setValidationError("Nhập mô tả cho báo cáo.");
+      return;
+    }
+    onReportPaymentDispute(description.trim());
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/55 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`report-booking-${booking.id}`}
+    >
+      <form
+        onSubmit={submitReport}
+        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-950/20"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-black uppercase text-amber-600">
+              <AlertTriangle className="size-4" />
+              Báo cáo lịch đặt
+            </p>
+            <h3 id={`report-booking-${booking.id}`} className="mt-2 text-lg font-black text-slate-950">
+              Báo cáo lịch {booking.bookingCode}
+            </h3>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Khách hàng: {customerName(booking) || "Khách hàng"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
+            aria-label="Đóng"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          <label className={`flex cursor-pointer gap-3 rounded-xl border p-4 ${reason === "NO_SHOW" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+            <input
+              type="radio"
+              name="reportReason"
+              value="NO_SHOW"
+              checked={reason === "NO_SHOW"}
+              onChange={() => setReason("NO_SHOW")}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-black text-slate-950">Vắng mặt</span>
+              <span className="mt-1 block text-sm font-semibold text-slate-500">
+                Ghi nhận khách không đến sân và cập nhật lịch sử vi phạm.
+              </span>
+            </span>
+          </label>
+
+          <label className={`flex cursor-pointer gap-3 rounded-xl border p-4 ${reason === "UNPAID_FIELD" ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+            <input
+              type="radio"
+              name="reportReason"
+              value="UNPAID_FIELD"
+              checked={reason === "UNPAID_FIELD"}
+              onChange={() => setReason("UNPAID_FIELD")}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-black text-slate-950">Không trả tiền sân</span>
+              <span className="mt-1 block text-sm font-semibold text-slate-500">
+                Gửi tranh chấp thanh toán cho quản trị viên xem xét.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        {reason === "UNPAID_FIELD" ? (
+          <div className="mt-4 grid gap-3">
+            <label className="grid gap-1 text-sm font-bold text-slate-600">
+              Mô tả
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+                className="resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
+              />
+            </label>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+            Xác nhận chỉ khi khách hàng thực sự không đến sân cho lịch này.
+          </p>
+        )}
+
+        {validationError ? (
+          <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+            {validationError}
+          </p>
+        ) : null}
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-black text-white hover:bg-amber-600 disabled:opacity-60"
+          >
+            {pending ? "Đang gửi..." : "Xác nhận báo cáo"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

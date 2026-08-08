@@ -9,6 +9,7 @@ import {
 import type {
   Booking,
   CreateBookingInput,
+  CreatePaymentDisputeInput,
   MatchResultInput,
   PageResponse,
   RecurringBooking,
@@ -27,7 +28,7 @@ import {
   submitReservation,
   submitReservationCancellation,
 } from "@/lib/client/bookings";
-import { submitNoShowReport } from "@/lib/client/moderation";
+import { submitNoShowReport, submitPaymentDispute } from "@/lib/client/moderation";
 import { bookingQueryKeys } from "@/lib/query-keys";
 import { recurringBookingQueryKeys, userQueryKeys } from "@/lib/query-keys";
 
@@ -110,6 +111,18 @@ export function useMyBookings(
     queryKey: bookingQueryKeys.mine(page, size, filters),
     queryFn: () => fetchMyBookings(page, size, filters),
   });
+}
+
+function markBookingReported(queryClient: ReturnType<typeof useQueryClient>, bookingId: string) {
+  const update = (booking: Booking) =>
+    booking.id === bookingId ? { ...booking, status: "REPORTED" as const } : booking;
+
+  queryClient.setQueryData<Booking>(bookingQueryKeys.detail(bookingId), (old) =>
+    old ? update(old) : old,
+  );
+  queryClient.setQueriesData<PageResponse<Booking>>({ queryKey: bookingQueryKeys.all }, (old) =>
+    old ? { ...old, content: old.content?.map(update) } : old,
+  );
 }
 
 export function useOwnerBookings(
@@ -320,7 +333,20 @@ export function useReportNoShow() {
   return useMutation({
     mutationFn: (bookingId: string) => submitNoShowReport(bookingId),
     retry: false,
-    onSuccess: () => {
+    onSuccess: (_response, bookingId) => {
+      markBookingReported(queryClient, bookingId);
+      void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
+    },
+  });
+}
+
+export function useCreatePaymentDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreatePaymentDisputeInput) => submitPaymentDispute(input),
+    retry: false,
+    onSuccess: (_response, input) => {
+      markBookingReported(queryClient, input.bookingId);
       void queryClient.invalidateQueries({ queryKey: bookingQueryKeys.all });
     },
   });

@@ -9,10 +9,12 @@ export function errorJson(
 ) {
   return NextResponse.json(
     {
+      success: false,
       status,
       statusCode,
       code: statusCode,
       message,
+      data: null,
       timestamp: new Date().toISOString(),
     },
     { status },
@@ -34,5 +36,5 @@ export function routeError(error: unknown) {
     const statusCode = error.statusCode ?? "UNKNOWN_ERROR";
     return errorJson(error.status, statusCode, error.message);
   }
-  return errorJson(500, "INTERNAL_SERVER_ERROR", "Unexpected server error.");
+  return errorJson(500, "INTERNAL_ERROR", "Internal server error.");
 }

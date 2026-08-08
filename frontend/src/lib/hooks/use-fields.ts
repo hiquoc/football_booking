@@ -10,6 +10,7 @@ import {
   fetchFieldDetails,
   fetchFieldReviews,
   fetchFavoriteFields,
+  fetchAdminFieldSearch,
   removeFavoriteField,
   fetchSubFields,
   fetchSubFieldFilterOptions,
@@ -136,6 +137,15 @@ export function useSubFieldFilterOptions(search = "", enabled = true) {
     queryFn: () => fetchSubFieldFilterOptions(search),
     enabled,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useAdminFieldSearch(keyword = "", enabled = true) {
+  return useQuery({
+    queryKey: fieldQueryKeys.adminSearch(keyword),
+    queryFn: () => fetchAdminFieldSearch(keyword),
+    enabled,
+    staleTime: 60 * 1000,
   });
 }
 

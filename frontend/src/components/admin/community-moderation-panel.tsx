@@ -13,7 +13,6 @@ import type {
   CommunityReportReason,
   CommunityReportStatus,
 } from "@/lib/api/types";
-
 import { useAdminModeration, useCommunityReports } from "@/lib/hooks/use-community";
 
 const actionLabels: Array<[CommunityModerationAction, string]> = [
@@ -158,10 +157,7 @@ function ReportCard({
             </p>
             <ModerationReportStatusButton status={report.status} size="sm" />
           </div>
-          <Link
-            href={postHref}
-            className="mt-2 block text-xl font-black text-slate-950 transition hover:text-green-700"
-          >
+          <Link href={postHref} className="mt-2 block text-xl font-black text-slate-950 transition hover:text-green-700">
             {report.post?.title ?? "Bài đăng"}
           </Link>
           <p className="mt-2 text-sm text-slate-600">
@@ -170,29 +166,20 @@ function ReportCard({
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-slate-500">
             <span>
               Người báo cáo:{" "}
-              <Link
-                href={`/users/${report.reporterId}/profile`}
-                className="text-green-700 hover:text-green-800"
-              >
+              <Link href={`/users/${report.reporterId}/profile`} className="text-green-700 hover:text-green-800">
                 {reporterName}
               </Link>
             </span>
             {targetUserId ? (
               <span>
                 Người bị báo cáo:{" "}
-                <Link
-                  href={`/users/${targetUserId}/profile`}
-                  className="text-green-700 hover:text-green-800"
-                >
+                <Link href={`/users/${targetUserId}/profile`} className="text-green-700 hover:text-green-800">
                   {reportedName}
                 </Link>
               </span>
             ) : null}
           </div>
-          <Link
-            href={postHref}
-            className="mt-4 inline-flex items-center gap-2 text-sm font-black text-green-700 hover:text-green-800"
-          >
+          <Link href={postHref} className="mt-4 inline-flex items-center gap-2 text-sm font-black text-green-700 hover:text-green-800">
             Xem bài đăng <ArrowUpRight className="size-4" />
           </Link>
         </div>
@@ -203,9 +190,7 @@ function ReportCard({
             className={inputClassName}
           >
             {actionLabels.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
+              <option key={value} value={value}>{label}</option>
             ))}
           </select>
           <input
@@ -255,10 +240,7 @@ function ModerationSkeleton() {
   return (
     <div className="space-y-4">
       {[0, 1, 2].map((item) => (
-        <div
-          key={item}
-          className="h-44 animate-pulse rounded-2xl border border-slate-200 bg-white"
-        />
+        <div key={item} className="h-44 animate-pulse rounded-2xl border border-slate-200 bg-white" />
       ))}
     </div>
   );

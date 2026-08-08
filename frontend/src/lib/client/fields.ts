@@ -3,6 +3,7 @@ import type {
   FieldCardData,
   FieldCardFilters,
   FieldDetails,
+  FieldSearchOption,
   FieldStatus,
   FavoriteCheckResponse,
   OperatingHours,
@@ -61,6 +62,14 @@ export function fetchSubFieldFilterOptions(search = "") {
   if (search.trim()) query.set("search", search.trim());
   return requestJson<SubFieldFilterOption[]>(
     `/api/subfields/filter-options${query.size ? `?${query}` : ""}`,
+  );
+}
+
+export function fetchAdminFieldSearch(keyword = "") {
+  const query = new URLSearchParams();
+  if (keyword.trim()) query.set("keyword", keyword.trim());
+  return requestJson<FieldSearchOption[]>(
+    `/api/admin/fields/search${query.size ? `?${query}` : ""}`,
   );
 }
 

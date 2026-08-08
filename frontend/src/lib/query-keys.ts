@@ -11,6 +11,8 @@ export const fieldQueryKeys = {
   operatingHours: (id: string) =>
     [...fieldQueryKeys.detail(id), "operating-hours"] as const,
   subFields: (id: string) => ["sub-fields", id] as const,
+  adminSearch: (keyword = "") =>
+    ["field-search", keyword] as const,
   subFieldFilterOptions: (search = "") =>
     ["sub-fields", "filter-options", { search }] as const,
   reviews: (id: string) => ["reviews", id] as const,
@@ -89,4 +91,16 @@ export const communityQueryKeys = {
   detail: (id: string) => [...communityQueryKeys.all, id] as const,
   reports: (page: number, size = 20, status?: string) =>
     [...communityQueryKeys.all, "reports", { page, size, status }] as const,
+};
+
+export const moderationQueryKeys = {
+  all: ["moderation"] as const,
+  fieldViolations: (fieldId: string, page: number, size = 20) =>
+    [...moderationQueryKeys.all, "field-violations", { fieldId, page, size }] as const,
+  noShowReports: (fieldId: string, page: number, size = 20) =>
+    [...moderationQueryKeys.all, "no-show-reports", { fieldId, page, size }] as const,
+  auditLogs: (fieldId: string, page: number, size = 20) =>
+    [...moderationQueryKeys.all, "audit-logs", { fieldId, page, size }] as const,
+  adminPaymentDisputes: (page: number, size = 20, filters: object = {}) =>
+    [...moderationQueryKeys.all, "admin-payment-disputes", { page, size, filters }] as const,
 };

@@ -3,14 +3,10 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import type { FieldStatus } from "@/lib/api/types";
-import { useFields } from "@/lib/hooks/use-fields";
-import {
-  DataEmpty,
-  DataError,
-  ListSkeleton,
-} from "@/components/ui/data-state";
-import { AdminPagination } from "./admin-pagination";
 import { formatFieldAddress } from "@/lib/field-format";
+import { useFields } from "@/lib/hooks/use-fields";
+import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
+import { AdminPagination } from "./admin-pagination";
 import { FieldStatusControl } from "./field-status-control";
 
 const filters: Array<{ status: FieldStatus; label: string }> = [

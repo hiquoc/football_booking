@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createFieldReview, getFieldReviews } from "@/lib/server/fields";
-import { assertSameOrigin, routeError } from "@/lib/server/route-response";
+import { assertSameOrigin, errorJson, routeError } from "@/lib/server/route-response";
 
 export async function GET(
   request: Request,
@@ -25,11 +25,9 @@ export async function POST(
   try {
     assertSameOrigin(request);
     const body = (await request.json()) as { rating: number; comment?: string };
-    if (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5)
-      return NextResponse.json(
-        { message: "Điểm đánh giá phải từ 1 đến 5" },
-        { status: 400 },
-      );
+    if (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) {
+      return errorJson(400, "VALIDATION_ERROR", "Rating must be between 1 and 5.");
+    }
     return NextResponse.json(
       await createFieldReview((await params).id, body.rating, body.comment),
     );

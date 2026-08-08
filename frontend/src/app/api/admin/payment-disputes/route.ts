@@ -10,8 +10,16 @@ export async function GET(request: Request) {
       Number(query.get("page")) || 0,
       Number(query.get("size")) || 20,
       (query.get("status") || undefined) as PaymentDisputeStatus | undefined,
+      parseFieldIds(query.get("fieldIds") ?? query.get("fieldId")),
     ));
   } catch (error) {
     return routeError(error);
   }
+}
+
+function parseFieldIds(value: string | null) {
+  return (value ?? "")
+    .split(",")
+    .map((fieldId) => fieldId.trim())
+    .filter(Boolean);
 }

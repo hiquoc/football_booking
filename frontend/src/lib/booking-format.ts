@@ -20,6 +20,7 @@ export const bookingStatus: Record<
   },
   CANCELLED: { label: "Đã hủy", className: "bg-rose-500 text-white" },
   COMPLETED: { label: "Hoàn thành", className: "bg-green-600 text-white" },
+  REPORTED: { label: "Đã báo cáo", className: "bg-amber-500 text-white" },
   EXPIRED: { label: "Đã hết hạn", className: "bg-slate-500 text-white" },
 };
 

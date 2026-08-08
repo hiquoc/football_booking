@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserCommunityViolations } from "@/lib/server/community";
-import { getUserFieldViolations } from "@/lib/server/moderation";
+import { getUserFieldViolations, getUserModerationAuditLogs } from "@/lib/server/moderation";
 import { routeError } from "@/lib/server/route-response";
 
 export async function GET(
@@ -12,11 +12,12 @@ export async function GET(
     const page = Math.max(0, Number(query.get("page")) || 0);
     const size = Math.min(10, Math.max(1, Number(query.get("size")) || 5));
     const userId = (await params).id;
-    const [community, field] = await Promise.all([
+    const [community, field, audit] = await Promise.all([
       getUserCommunityViolations(userId, page, size),
       getUserFieldViolations(userId, page, size),
+      getUserModerationAuditLogs(userId, page, size),
     ]);
-    return NextResponse.json({ community, field });
+    return NextResponse.json({ community, field, audit });
   } catch (error) {
     return routeError(error);
   }

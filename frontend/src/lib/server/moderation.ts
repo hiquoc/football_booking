@@ -1,8 +1,11 @@
 import "server-only";
 
 import type {
+  BookingNoShowReport,
   CreatePaymentDisputeInput,
   FieldViolation,
+  ModerationAuditLog,
+  ModerationResetResponse,
   PageResponse,
   PaymentDisputeReport,
   PaymentDisputeStatus,
@@ -35,6 +38,31 @@ export function getBannedClients(fieldId: string, page = 0, size = 20) {
   );
 }
 
+export function getNoShowReports(fieldId: string, page = 0, size = 20) {
+  return authenticatedGatewayRequest<PageResponse<BookingNoShowReport>>(
+    `/api/v1/moderation/owner/fields/${encodeURIComponent(fieldId)}/no-show-reports?page=${page}&size=${size}`,
+  );
+}
+
+export function getModerationAuditLogs(fieldId: string, page = 0, size = 20) {
+  return authenticatedGatewayRequest<PageResponse<ModerationAuditLog>>(
+    `/api/v1/moderation/owner/fields/${encodeURIComponent(fieldId)}/audit-logs?page=${page}&size=${size}`,
+  );
+}
+
+export function getUserModerationAuditLogs(userId: string, page = 0, size = 5) {
+  return authenticatedGatewayRequest<PageResponse<ModerationAuditLog>>(
+    `/api/v1/moderation/admin/users/${encodeURIComponent(userId)}/audit-logs?page=${page}&size=${size}`,
+  );
+}
+
+export function resetPlatformBan(userId: string) {
+  return authenticatedGatewayRequest<ModerationResetResponse>(
+    `/api/v1/moderation/admin/users/${encodeURIComponent(userId)}/platform-ban/reset`,
+    { method: "PATCH" },
+  );
+}
+
 export function banClient(fieldId: string, userId: string) {
   return authenticatedGatewayRequest<FieldViolation>(
     `/api/v1/moderation/owner/fields/${encodeURIComponent(fieldId)}/banned-clients/${encodeURIComponent(userId)}/ban`,
@@ -62,9 +90,10 @@ export function getOwnerPaymentDisputes(page = 0, size = 20) {
   );
 }
 
-export function getAdminPaymentDisputes(page = 0, size = 20, status?: PaymentDisputeStatus) {
+export function getAdminPaymentDisputes(page = 0, size = 20, status?: PaymentDisputeStatus, fieldIds: string[] = []) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) query.set("status", status);
+  if (fieldIds.length) query.set("fieldIds", fieldIds.join(","));
   return authenticatedGatewayRequest<PageResponse<PaymentDisputeReport>>(
     `/api/v1/moderation/admin/payment-disputes?${query}`,
   );

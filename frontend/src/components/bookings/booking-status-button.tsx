@@ -7,6 +7,7 @@ const statusButtonClassName: Record<BookingDisplayStatus, string> = {
   IN_PROGRESS: "bg-green-600 text-white",
   CANCELLED: "bg-rose-500 text-white",
   COMPLETED: "bg-green-600 text-white",
+  REPORTED: "bg-amber-500 text-white",
   EXPIRED: "bg-slate-500 text-white",
 };
 

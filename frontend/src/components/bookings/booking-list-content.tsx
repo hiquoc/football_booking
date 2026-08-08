@@ -25,10 +25,12 @@ export function BookingListContent({
   page,
   owner = false,
   filters = {},
+  bookingDateCleared = false,
 }: {
   page: number;
   owner?: boolean;
   filters?: BookingFiltersValue;
+  bookingDateCleared?: boolean;
 }) {
   const query = useBookingList(page, owner, 10, filters);
   const cancelMutation = useCancelBooking(true);
@@ -99,7 +101,7 @@ export function BookingListContent({
           {page > 0 ? (
             <Link
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-green-300 hover:bg-green-50 hover:text-green-700"
-              href={pageLink(page, filters)}
+              href={pageLink(page, filters, bookingDateCleared)}
             >
               Trước
             </Link>
@@ -107,7 +109,7 @@ export function BookingListContent({
           {page + 1 < query.data.totalPages ? (
             <Link
               className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white"
-              href={pageLink(page + 2, filters)}
+              href={pageLink(page + 2, filters, bookingDateCleared)}
             >
               Sau
             </Link>
@@ -144,6 +146,9 @@ function BookingFilters({
       const value = String(form.get(key) ?? "").trim();
       if (value) params.set(key, value);
     });
+    if (owner && !String(form.get("bookingDate") ?? "").trim()) {
+      params.set("bookingDateCleared", "1");
+    }
     startTransition(() =>
       router.push(`${owner ? "/owner/bookings" : "/bookings"}${params.size ? `?${params}` : ""}`),
     );
@@ -228,7 +233,7 @@ function BookingFilters({
         className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
       >
         <option value={owner ? "ALL" : ""}>Tất cả trạng thái</option>
-        {(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "EXPIRED"] satisfies BookingStatus[]).map((status) => (
+        {(["PENDING", "CONFIRMED", "COMPLETED", "REPORTED", "CANCELLED", "EXPIRED"] satisfies BookingStatus[]).map((status) => (
           <option key={status} value={status}>
             {getBookingStatus(status).label}
           </option>
@@ -238,11 +243,12 @@ function BookingFilters({
   );
 }
 
-function pageLink(page: number, filters: BookingFiltersValue) {
+function pageLink(page: number, filters: BookingFiltersValue, bookingDateCleared = false) {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value) params.set(key, value);
   });
+  if (bookingDateCleared) params.set("bookingDateCleared", "1");
   params.set("page", String(page));
   return `?${params}`;
 }

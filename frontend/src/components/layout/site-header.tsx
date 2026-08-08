@@ -55,8 +55,8 @@ export async function SiteHeader() {
             {user.userType === "CLIENT" || user.userType === "EMPLOYEE"|| user.userType === "OWNER" ? (
               <Link
                 href="/profile#favorite-fields"
-                aria-label="Saved fields"
-                title="Saved fields"
+                aria-label="Sân đã lưu"
+                title="Sân đã lưu"
                 className="grid size-10 place-items-center rounded-full  border border-slate-200 bg-white !shadow-none transition hover:border-green-300 hover:bg-green-50"
               >
                 <Bookmark className="size-5 text-green-600" />
@@ -107,13 +107,13 @@ export async function SiteHeader() {
 
 function bookingBanTooltip(user: Awaited<ReturnType<typeof getCurrentUser>>) {
   if (!user?.isBookingBanned) return null;
-  if (user.isPermanentBan) return "You are permanently banned from booking.";
+  if (user.isPermanentBan) return "Bạn đang bị cấm đặt sân vĩnh viễn.";
   if (user.banExpiresAt) {
-    return `You are banned from booking until ${new Intl.DateTimeFormat("en-GB", {
+    return `Bạn bị cấm đặt sân đến ${new Intl.DateTimeFormat("vi-VN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     }).format(new Date(user.banExpiresAt))}.`;
   }
-  return "You are banned from booking.";
+  return "Bạn đang bị cấm đặt sân.";
 }

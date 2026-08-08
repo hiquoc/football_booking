@@ -69,10 +69,11 @@ export async function gatewayRequest<T>(
 
   const envelope = payload as ApiResponse<T> | null;
   if (!envelope?.success) {
+    const statusCode = envelope?.statusCode ?? "INVALID_RESPONSE";
     throw new ApiError(
       envelope?.message ?? "Invalid API response",
       502,
-      "INVALID_RESPONSE",
+      statusCode,
     );
   }
 

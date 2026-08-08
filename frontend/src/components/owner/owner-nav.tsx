@@ -1,4 +1,4 @@
-import { CalendarRange, ClipboardList, Gavel, LayoutDashboard, MapPinned, ShieldAlert } from "lucide-react";
+import { CalendarRange, ClipboardList, FileClock, Gavel, LayoutDashboard, MapPinned, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/server/session";
 
@@ -12,11 +12,12 @@ export async function OwnerNav() {
     { href: "/owner/recurring-bookings", label: "Đặt định kỳ", icon: ClipboardList, show: true },
     { href: "/owner/client-violations", label: "Vi phạm", icon: ShieldAlert, show: true },
     { href: "/owner/payment-disputes", label: "Tranh chấp", icon: Gavel, show: showOwnerOnly },
+    { href: "/owner/moderation-history", label: "Nhật ký", icon: FileClock, show: true },
   ];
 
   return (
     <nav className="border-b border-slate-200 bg-white" aria-label="Quản lý sân">
-      <div className="mx-auto flex justify-center w-full max-w-[90rem] gap-2 overflow-x-auto px-5 py-3 sm:px-8">
+      <div className=" mx-auto flex w-full max-w-[90rem] justify-center gap-2 overflow-x-auto px-5 py-3 sm:px-8">
         {links.filter((link) => link.show).map((link) => {
           const Icon = link.icon;
           return (
