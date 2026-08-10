@@ -7,8 +7,10 @@ import com.project.booking.community.kafka.CommunityNotificationEventPublisher;
 import com.project.booking.community.mapper.CommunityMapper;
 import com.project.booking.community.repository.*;
 import com.project.booking.community.service.CommunityModerationService;
+import com.project.booking.moderation.service.BookingModerationService;
 import com.project.common.dto.PageResponse;
 import com.project.common.exception.BadRequestException;
+import com.project.common.exception.NotFoundException;
 import com.project.common.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +39,7 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
     private final CommunityModerationHistoryRepository historyRepository;
     private final CommunityMapper mapper;
     private final CommunityNotificationEventPublisher notifications;
+    private final BookingModerationService bookingModerationService;
 
     @Value("${community.moderation.permanent-ban-threshold:3}")
     private int permanentBanThreshold;
@@ -44,11 +47,12 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
     @Override
     @Transactional(readOnly = true)
     public void ensureCanPost(UUID userId) {
+        bookingModerationService.ensurePlatformAllowed(userId);
         boolean temporaryBanned = violationRepository.existsByUserIdAndActionAndStatus(
                 userId, CommunityModerationAction.TEMPORARY_POSTING_BAN, CommunityViolationStatus.ACTIVE);
         boolean permanentlyBanned = violationRepository.existsByUserIdAndStatus(userId, CommunityViolationStatus.PERMANENT);
         if (temporaryBanned || permanentlyBanned) {
-            throw new UnauthorizedException("You are currently restricted from community posting");
+            throw new UnauthorizedException("You are currently restricted from community posting", "COMMUNITY_POSTING_RESTRICTED");
         }
     }
 
@@ -61,12 +65,16 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
     @Override
     @Transactional
     public CommunityReportResponse reportPost(UUID reporterId, UUID postId, ReportCommunityPostRequest request) {
+        bookingModerationService.ensurePlatformAllowed(reporterId);
         CommunityPost post = findPost(postId);
         if (post.getOwnerId().equals(reporterId)) {
             throw new BadRequestException("You cannot report your own community post");
         }
+        if (List.of(CommunityPostStatus.CLOSED, CommunityPostStatus.CANCELLED, CommunityPostStatus.HIDDEN).contains(post.getStatus())) {
+            throw new BadRequestException("This community post can no longer be reported", "OPERATION_NOT_ALLOWED");
+        }
         if (reportRepository.existsByPostIdAndReporterId(postId, reporterId)) {
-            throw new BadRequestException("You already reported this community post");
+            throw new BadRequestException("You already reported this community post", "POST_ALREADY_REPORTED");
         }
         CommunityPostReport report = CommunityPostReport.builder()
                 .post(post)
@@ -187,7 +195,7 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
 
     private CommunityPost findPost(UUID postId) {
         return postRepository.findById(postId)
-                .orElseThrow(() -> new BadRequestException("Community post not found"));
+                .orElseThrow(() -> new NotFoundException("Community post not found", "POST_NOT_FOUND"));
     }
 
     private void requirePost(CommunityPost post) {
@@ -227,7 +235,7 @@ public class CommunityModerationServiceImpl implements CommunityModerationServic
                                  CommunityViolationStatus status, String notificationCode) {
         if (postId != null && violationRepository.existsByUserIdAndSourcePostIdAndAction(
                 targetUserId, postId, request.getAction())) {
-            throw new BadRequestException("Violation for this user and post already exists");
+            throw new BadRequestException("Violation for this user and post already exists", "DUPLICATE_REQUEST");
         }
         CommunityUserViolation violation = CommunityUserViolation.builder()
                 .userId(targetUserId)

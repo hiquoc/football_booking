@@ -2,10 +2,11 @@ package com.project.common.inbox.scheduler;
 
 import com.project.common.inbox.entity.InboxEvent;
 import com.project.common.inbox.service.InboxProcessingService;
+import com.project.common.scheduler.SchedulerJitter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,16 +14,26 @@ import java.util.List;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class InboxScheduler {
 
     private final InboxProcessingService processingService;
     private final MeterRegistry meterRegistry;
+    private final long schedulerJitterMs;
+
+    public InboxScheduler(
+            InboxProcessingService processingService,
+            MeterRegistry meterRegistry,
+            @Value("${inbox.scheduler-jitter-ms:0}") long schedulerJitterMs) {
+        this.processingService = processingService;
+        this.meterRegistry = meterRegistry;
+        this.schedulerJitterMs = schedulerJitterMs;
+    }
 
     @Scheduled(fixedDelayString = "${inbox.poll-interval:1000}")
     public void processReceivedEvents() {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
+            SchedulerJitter.sleepUpTo(schedulerJitterMs, "inbox");
             List<InboxEvent> events = processingService.claimBatch();
             for (InboxEvent event : events) {
                 process(event);

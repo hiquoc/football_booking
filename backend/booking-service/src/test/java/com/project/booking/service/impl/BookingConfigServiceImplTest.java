@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -29,12 +30,14 @@ class BookingConfigServiceImplTest {
     void loadCachesActiveConfigurationInMemory() {
         BookingConfig config = config(5000L, 1000L, 24, true);
         when(repository.findByActiveTrue()).thenReturn(Optional.of(config));
+        ReflectionTestUtils.setField(service, "maxBookingDaysInFuture", 45);
 
         service.load();
 
         assertEquals(5000L, service.getConfig().getFirstBookingFee());
         assertEquals(1000L, service.getConfig().getNotFirstBookingFee());
         assertEquals(24, service.getConfig().getRefundBeforeHours());
+        assertEquals(45, service.getCurrent().maxBookingDaysInFuture());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.project.booking.kafka;
 
 import com.project.booking.entity.UserProjection;
+import com.project.booking.moderation.repository.PlatformBanRepository;
 import com.project.booking.repository.UserProjectionRepository;
 import com.project.common.events.notification.NotificationEventTopics;
 import com.project.common.events.notification.PlayerMatchStatisticsAdjustedEvent;
@@ -13,11 +14,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Component
 @RequiredArgsConstructor
 public class UserProjectionInboxEventHandler implements InboxEventHandler {
+    private static final String PLATFORM_BANNED_STATUS = "PLATFORM_BANNED";
+
     private final InboxService inboxService;
     private final UserProjectionRepository repository;
+    private final PlatformBanRepository platformBanRepository;
 
     @Override
     public boolean supports(String topic) {
@@ -66,6 +72,18 @@ public class UserProjectionInboxEventHandler implements InboxEventHandler {
         projection.setFairPlayRate(payload.fairPlayRate() == null ? projection.getFairPlayRate() : payload.fairPlayRate());
         projection.setCompletedBookingCount(valueOrZero(payload.completedBookingCount()));
         repository.save(projection);
+        syncPlatformBan(payload);
+    }
+
+    private void syncPlatformBan(UserProfileUpdatedEvent payload) {
+        if (PLATFORM_BANNED_STATUS.equals(payload.status())) {
+            platformBanRepository.upsertActiveBan(
+                    payload.userId(),
+                    "User status updated to PLATFORM_BANNED from user projection event",
+                    LocalDateTime.now());
+            return;
+        }
+        platformBanRepository.deleteByUserId(payload.userId());
     }
 
     private void adjustMatchStatistics(PlayerMatchStatisticsAdjustedEvent payload) {

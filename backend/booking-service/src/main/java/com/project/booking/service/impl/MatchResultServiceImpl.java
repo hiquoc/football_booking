@@ -5,11 +5,13 @@ import com.project.booking.dto.request.UpsertMatchResultRequest;
 import com.project.booking.dto.response.BookingResponse;
 import com.project.booking.entity.Booking;
 import com.project.booking.entity.MatchResult;
+import com.project.booking.entity.UserProjection;
 import com.project.booking.enums.WinningTeam;
 import com.project.booking.exception.BookingNotFoundException;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.MatchResultRepository;
+import com.project.booking.repository.UserProjectionRepository;
 import com.project.booking.service.MatchStatisticsAdjustmentService;
 import com.project.booking.service.MatchResultService;
 import com.project.common.enums.BookingStatus;
@@ -22,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -33,6 +37,7 @@ public class MatchResultServiceImpl implements MatchResultService {
     private final MatchStatisticsAdjustmentService statisticsAdjustmentService;
     private final BookingMapper bookingMapper;
     private final FieldManagementClient fieldManagementClient;
+    private final UserProjectionRepository userProjectionRepository;
 
     @Override
     @Transactional
@@ -60,8 +65,30 @@ public class MatchResultServiceImpl implements MatchResultService {
         statisticsAdjustmentService.adjustForResultChange(booking, previousResult, saved.getWinningTeam());
 
         BookingResponse response = bookingMapper.toResponse(booking);
+        enrichProfiles(response);
         response.setMatchResult(bookingMapper.toMatchResultResponse(saved));
         return response;
+    }
+
+    private void enrichProfiles(BookingResponse response) {
+        Set<UUID> userIds = new HashSet<>();
+        userIds.add(response.getClientId());
+        if (response.getOpponentId() != null) {
+            userIds.add(response.getOpponentId());
+        }
+        userProjectionRepository.findAllById(userIds).forEach(user -> applyProfile(response, user));
+    }
+
+    private void applyProfile(BookingResponse response, UserProjection user) {
+        if (user.getUserId().equals(response.getClientId())) {
+            response.setClientName(user.getFullName());
+            response.setClientPhoneNumber(user.getPhoneNumber());
+            response.setClientAvatarUrl(user.getAvatarUrl());
+        }
+        if (user.getUserId().equals(response.getOpponentId())) {
+            response.setOpponentName(user.getFullName());
+            response.setOpponentPhoneNumber(user.getPhoneNumber());
+        }
     }
 
     private void validateManagerCanSubmit(UUID managerId, String managerRole, Booking booking) {

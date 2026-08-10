@@ -72,6 +72,7 @@ internal:
 outbox:
   batch-size: 50
   poll-interval: 5000
+  scheduler-jitter-ms: 0
   max-retries: 5
   scheduler-concurrency: 8
   retry-delays:
@@ -87,6 +88,7 @@ outbox:
 inbox:
   batch-size: 50
   poll-interval: 5000
+  scheduler-jitter-ms: 0
   max-retries: 5
   scheduler-concurrency: 1
   retry-delays:

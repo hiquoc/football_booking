@@ -18,6 +18,8 @@ public interface BookingMapper {
     @Mapping(target = "clientName", ignore = true)
     @Mapping(target = "clientPhoneNumber", ignore = true)
     @Mapping(target = "clientAvatarUrl", ignore = true)
+    @Mapping(target = "opponentName", ignore = true)
+    @Mapping(target = "opponentPhoneNumber", ignore = true)
     @Mapping(target = "subFieldId",    source = "booking.subFieldId")
     @Mapping(target = "ownerId",       source = "booking.ownerId")
     @Mapping(target = "bookingDate",   source = "booking.bookingDate")
@@ -52,7 +54,9 @@ public interface BookingMapper {
     @Mapping(target = "clientName", ignore = true)
     @Mapping(target = "clientPhoneNumber", ignore = true)
     @Mapping(target = "clientAvatarUrl", ignore = true)
-    @Mapping(target = "fieldId", ignore = true)
+    @Mapping(target = "opponentName", ignore = true)
+    @Mapping(target = "opponentPhoneNumber", ignore = true)
+    @Mapping(target = "fieldId", source = "subField.fieldId")
     @Mapping(target = "matchResult", ignore = true)
     BookingResponse toResponse(Booking booking);
 

@@ -77,6 +77,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -96,11 +97,14 @@ public class BookingServiceImpl implements BookingService {
     private static final String BOOKING_CONFLICT_MESSAGE = "The selected time slot is no longer available.";
     private static final String EXCLUSION_VIOLATION_SQL_STATE = "23P01";
     private static final String PAYMENT_TIMEOUT_REASON = "Payment timeout";
+    private static final String INSUFFICIENT_BALANCE_REASON = "Insufficient account balance";
     private static final String BOOKING_PAYMENT_REFUND_REASON = "BOOKING_PAYMENT_REFUND";
     private static final String BOOKING_PAYMENT_REASON = "BOOKING_ACCOUNT_BALANCE_PAYMENT";
     private static final String SUBFIELD_CLOSED_CODE = "SUBFIELD_CLOSED";
     private static final String SUBFIELD_CLOSED_MESSAGE = "Sub-field is closed on the selected booking date";
+    private static final int NORMAL_PAYMENT_TIMEOUT_MINUTES = 1;
     private static final int RECURRING_PAYMENT_TIMEOUT_MINUTES = 30;
+    private static final int MAX_BOOKING_DAYS_IN_FUTURE = 30;
     private static final LocalTime END_OF_DAY_TIME = LocalTime.of(23, 59);
 
     private final BookingRepository bookingRepository;
@@ -124,8 +128,8 @@ public class BookingServiceImpl implements BookingService {
     private final FieldManagementClient fieldManagementClient;
     private final BookingSubFieldProjectionRepository bookingSubFieldProjectionRepository;
 
-    @Value("${booking.payment-timeout-minutes:35}")
-    private int paymentTimeoutMinutes = 35;
+    @Value("${booking.payment-timeout-minutes:1}")
+    private int paymentTimeoutMinutes = NORMAL_PAYMENT_TIMEOUT_MINUTES;
 
     @Value("${booking.recurring-payment-timeout-minutes:30}")
     private int recurringPaymentTimeoutMinutes = RECURRING_PAYMENT_TIMEOUT_MINUTES;
@@ -135,6 +139,9 @@ public class BookingServiceImpl implements BookingService {
 
     @Value("${booking.balance-deduction-retry-delay-ms:1250}")
     private long balanceDeductionRetryDelayMs = 1_250L;
+
+    @Value("${booking.max-booking-days-in-future:30}")
+    private int maxBookingDaysInFuture = MAX_BOOKING_DAYS_IN_FUTURE;
 
     @Override
     public BookingResponse createBooking(UUID userId, CreateBookingRequest request) {
@@ -199,7 +206,7 @@ public class BookingServiceImpl implements BookingService {
         }
         bookingModerationService.ensureCanBook(userId, subField.getFieldId());
         normalizeRequestDateTimes(request);
-        validateBooking(subField, request, recurringBookingId);
+        validateBooking(subField, request, recurringBookingId, false);
     }
 
     private BookingResponse createBooking(UUID userId, CreateBookingRequest request, UUID sourceRecurringBookingId) {
@@ -358,14 +365,14 @@ public class BookingServiceImpl implements BookingService {
         } catch (DataIntegrityViolationException ex) {
             if (isBookingOverlapConstraintViolation(ex)) {
                 if (hasSameClientBooking(booking)) {
-                    throw new BookingConflictException("You have already booked this field successfully.");
+                    throw new BadRequestException("You have already booked this field successfully.", "BOOKING_ALREADY_EXISTS");
                 }
                 throw new BookingConflictException(BOOKING_CONFLICT_MESSAGE);
             }
             throw ex;
         }
         if (!pendingBookingReservationService.reserve(userId, saved.getId(), saved.getPaymentExpiresAt()) && failOnReservationConflict) {
-            throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.");
+            throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.", "BOOKING_ALREADY_EXISTS");
         }
         log.info("Booking created: code={}, clientId={}, subFieldId={}", saved.getBookingCode(), userId, subField.getId());
         availabilityCacheService.evict(saved.getSubFieldId(), saved.getBookingDate());
@@ -391,14 +398,15 @@ public class BookingServiceImpl implements BookingService {
             throw new UnauthorizedException("You are not authorised to pay for this booking");
         }
         if (booking.getStatus() != BookingStatus.PENDING) {
-            throw new BadRequestException("Booking is not waiting for payment");
+            throw new BadRequestException("Booking is not waiting for payment", "BOOKING_CANNOT_MODIFY");
         }
         if (booking.getPaymentExpiresAt() != null && !booking.getPaymentExpiresAt().isAfter(LocalDateTime.now())) {
-            throw new BadRequestException("Booking payment window has expired");
+            throw new BadRequestException("Booking payment window has expired", "BOOKING_EXPIRED");
         }
+        bookingModerationService.ensureCanBook(userId, resolveFieldId(booking));
         BalanceDeductionResponse deduction = payPendingBookingFromWallet(booking);
         if (!deduction.deducted()) {
-            throw new BadRequestException("Insufficient account balance");
+            throw new BadRequestException("Insufficient account balance", "INSUFFICIENT_BALANCE");
         }
         if (booking.getSourceRecurringBookingId() != null && deduction.balance() == 0L) {
             bookingNotificationEventPublisher.publishRecurringPaymentWalletEmpty(booking);
@@ -532,8 +540,8 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<BookingResponse> getManagerBookings(UUID managerId, String managerRole, LocalDate bookingDate, UUID fieldId, SportType fieldType, SubFieldType subFieldType, BookingStatus status, Pageable pageable) {
-        LocalDateTime bookingDateStart = bookingDate == null ? null : bookingDate.atStartOfDay();
-        LocalDateTime bookingDateEnd = bookingDate == null ? null : bookingDate.plusDays(1).atStartOfDay();
+        LocalDateTime bookingDateStart = bookingDate == null ? LocalDateTime.of(1970,1,1,0,0) : bookingDate.atStartOfDay();
+        LocalDateTime bookingDateEnd = bookingDate == null ? LocalDateTime.of(9999,12,31,0,0) : bookingDate.plusDays(1).atStartOfDay();
         Collection<SubFieldType> subFieldTypes = resolveSubFieldTypes(fieldType, subFieldType);
         boolean filterSubFieldTypes = fieldType != null || subFieldType != null;
         List<UUID> managedFieldIds = "EMPLOYEE".equals(managerRole) ? fieldManagementClient.assignedFieldIds(managerId) : List.of();
@@ -586,10 +594,15 @@ public class BookingServiceImpl implements BookingService {
         if (responses.isEmpty()) {
             return;
         }
+        Set<UUID> userIds = responses.stream()
+                .map(BookingResponse::getClientId)
+                .collect(Collectors.toCollection(HashSet::new));
+        responses.stream()
+                .map(BookingResponse::getOpponentId)
+                .filter(Objects::nonNull)
+                .forEach(userIds::add);
         Map<UUID, UserProjection> usersById = userProjectionRepository.findAllById(
-                        responses.stream()
-                                .map(BookingResponse::getClientId)
-                                .collect(Collectors.toSet()))
+                        userIds)
                 .stream()
                 .collect(Collectors.toMap(UserProjection::getUserId, projection -> projection));
         responses.forEach(response -> {
@@ -598,6 +611,11 @@ public class BookingServiceImpl implements BookingService {
                 response.setClientName(client.getFullName());
                 response.setClientPhoneNumber(client.getPhoneNumber());
                 response.setClientAvatarUrl(client.getAvatarUrl());
+            }
+            UserProjection opponent = usersById.get(response.getOpponentId());
+            if (opponent != null) {
+                response.setOpponentName(opponent.getFullName());
+                response.setOpponentPhoneNumber(opponent.getPhoneNumber());
             }
         });
     }
@@ -775,7 +793,7 @@ public class BookingServiceImpl implements BookingService {
     private void ensureNoPendingPayment(UUID userId) {
         if (pendingBookingReservationService.find(userId).isPresent()
                 || bookingRepository.existsByClientIdAndStatus(userId, BookingStatus.PENDING)) {
-            throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.");
+            throw new BadRequestException("You already have a booking waiting for payment. Please complete or wait for it to expire before creating another booking.", "BOOKING_ALREADY_EXISTS");
         }
     }
 
@@ -787,6 +805,12 @@ public class BookingServiceImpl implements BookingService {
         }
         BalanceDeductionResponse deduction = deductBalanceWithRetry(booking, balanceDeductionRequest(booking, payableAmount));
         if (!deduction.deducted()) {
+            if (booking.getSourceRecurringBookingId() == null) {
+                expireNormalBookingAfterInsufficientBalance(booking);
+                log.info("Normal booking rejected due to insufficient balance: bookingId={}, balance={}",
+                        booking.getId(), deduction.balance());
+                throw new BadRequestException(INSUFFICIENT_BALANCE_REASON, "INSUFFICIENT_BALANCE");
+            }
             log.info("Booking remains pending due to insufficient balance: bookingId={}, balance={}", booking.getId(), deduction.balance());
             return deduction;
         }
@@ -798,6 +822,27 @@ public class BookingServiceImpl implements BookingService {
                     booking.getId(), ex);
         }
         return deduction;
+    }
+
+    private void expireNormalBookingAfterInsufficientBalance(Booking booking) {
+        transactionTemplate.execute(status -> {
+            LocalDateTime now = LocalDateTime.now();
+            int changed = bookingRepository.cancelClientBooking(
+                    booking.getId(), booking.getClientId(), List.of(BookingStatus.PENDING), BookingStatus.EXPIRED,
+                    INSUFFICIENT_BALANCE_REASON, now, BookingCancelledBy.SYSTEM,
+                    BookingPaymentStatus.PAID, BookingPaymentStatus.REFUNDED, BookingPaymentStatus.FAILED);
+            if (changed != 1) {
+                return null;
+            }
+            booking.setStatus(BookingStatus.EXPIRED);
+            booking.setCancellationReason(INSUFFICIENT_BALANCE_REASON);
+            booking.setCancelledAt(now);
+            booking.setCancelledBy(BookingCancelledBy.SYSTEM);
+            booking.setPaymentStatus(BookingPaymentStatus.FAILED);
+            pendingBookingReservationService.release(booking);
+            availabilityCacheService.evict(booking.getSubFieldId(), booking.getBookingDate());
+            return null;
+        });
     }
 
     private BalanceDeductionResponse payPendingBookingFromWallet(Booking booking) {
@@ -888,7 +933,20 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private void validateBooking(SubFieldResponse subField, CreateBookingRequest request, UUID sourceRecurringBookingId) {
+        validateBooking(subField, request, sourceRecurringBookingId, true);
+    }
+
+    private void validateBooking(
+            SubFieldResponse subField,
+            CreateBookingRequest request,
+            UUID sourceRecurringBookingId,
+            boolean enforceFutureDateLimit) {
         validateSubFieldActive(subField);
+        if (enforceFutureDateLimit) {
+            validateBookingDateWindow(request.getBookingDate());
+        } else {
+            validateBookingDateNotPast(request.getBookingDate());
+        }
         validateBookingStartNotPast(request.getStartDateTime());
         validateDuration(request, subField);
         validateStartTimeAlignment(request.getStartTime());
@@ -903,6 +961,7 @@ public class BookingServiceImpl implements BookingService {
 
     private void validateBookingForUpdate(SubFieldResponse subField, CreateBookingRequest request, UUID bookingId) {
         validateSubFieldActive(subField);
+        validateBookingDateWindow(request.getBookingDate());
         validateBookingStartNotPast(request.getStartDateTime());
         validateDuration(request, subField);
         validateStartTimeAlignment(request.getStartTime());
@@ -936,7 +995,7 @@ public class BookingServiceImpl implements BookingService {
 
     private void validateSubFieldActive(SubFieldResponse subField) {
         if (Boolean.FALSE.equals(subField.getActive()) || !"ACTIVE".equalsIgnoreCase(subField.getStatus())) {
-            throw new BadRequestException("SubField '" + subField.getName() + "' is not currently available for booking");
+            throw new BadRequestException("SubField '" + subField.getName() + "' is not currently available for booking", "FIELD_NOT_AVAILABLE");
         }
     }
 
@@ -950,6 +1009,16 @@ public class BookingServiceImpl implements BookingService {
     private void validateBookingDateNotPast(LocalDate bookingDate) {
         if (bookingDate.isBefore(LocalDate.now())) {
             throw new BadRequestException("Booking date cannot be in the past");
+        }
+    }
+
+    private void validateBookingDateWindow(LocalDate bookingDate) {
+        validateBookingDateNotPast(bookingDate);
+        LocalDate latestBookingDate = LocalDate.now().plusDays(maxBookingDaysInFuture);
+        if (bookingDate.isAfter(latestBookingDate)) {
+            throw new BadRequestException(
+                    "Booking date cannot be more than " + maxBookingDaysInFuture + " days in the future",
+                    "BOOKING_DATE_OUT_OF_RANGE");
         }
     }
 

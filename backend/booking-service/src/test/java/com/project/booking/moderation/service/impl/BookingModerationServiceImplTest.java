@@ -1,7 +1,11 @@
 package com.project.booking.moderation.service.impl;
 
 import com.project.booking.client.FieldManagementClient;
+import com.project.booking.entity.Booking;
+import com.project.booking.entity.SubFieldProjection;
 import com.project.booking.moderation.dto.FieldViolationResponse;
+import com.project.booking.moderation.dto.CreatePaymentDisputeReportRequest;
+import com.project.booking.moderation.dto.ReportNoShowRequest;
 import com.project.booking.moderation.entity.FieldViolation;
 import com.project.booking.moderation.kafka.ModerationEventPublisher;
 import com.project.booking.moderation.repository.BookingNoShowReportRepository;
@@ -12,6 +16,8 @@ import com.project.booking.moderation.repository.PlatformBanRepository;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.UserProjectionRepository;
 import com.project.common.dto.PageResponse;
+import com.project.common.enums.BookingStatus;
+import com.project.common.exception.BadRequestException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,8 +31,10 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +70,46 @@ class BookingModerationServiceImplTest {
 
     @InjectMocks
     private BookingModerationServiceImpl service;
+
+    @Test
+    void reportNoShowRejectsSelfReport() {
+        UUID userId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        UUID fieldId = UUID.randomUUID();
+        Booking booking = booking(bookingId, userId, userId, fieldId, BookingStatus.COMPLETED);
+        ReportNoShowRequest request = new ReportNoShowRequest();
+        request.setBookingId(bookingId);
+
+        when(bookingRepository.findById(bookingId)).thenReturn(java.util.Optional.of(booking));
+
+        BadRequestException error = assertThrows(
+                BadRequestException.class,
+                () -> service.reportNoShow(userId, "OWNER", request));
+
+        assertEquals("You cannot report yourself", error.getMessage());
+        verify(noShowReportRepository, never()).save(any());
+        verify(violationRepository, never()).save(any());
+    }
+
+    @Test
+    void createPaymentDisputeRejectsSelfReport() {
+        UUID userId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        UUID fieldId = UUID.randomUUID();
+        Booking booking = booking(bookingId, userId, userId, fieldId, BookingStatus.COMPLETED);
+        CreatePaymentDisputeReportRequest request = new CreatePaymentDisputeReportRequest();
+        request.setBookingId(bookingId);
+        request.setDescription("Self dispute");
+
+        when(bookingRepository.findById(bookingId)).thenReturn(java.util.Optional.of(booking));
+
+        BadRequestException error = assertThrows(
+                BadRequestException.class,
+                () -> service.createPaymentDispute(userId, request));
+
+        assertEquals("You cannot report yourself", error.getMessage());
+        verify(disputeRepository, never()).save(any());
+    }
 
     @Test
     void getViolationsEnrichesPagedResultsWithBatchUserProjectionData() {
@@ -122,6 +170,24 @@ class BookingModerationServiceImplTest {
             public String getPhoneNumber() {
                 return phoneNumber;
             }
+
+            @Override
+            public String getStatus() {
+                return "ACTIVE";
+            }
         };
+    }
+
+    private Booking booking(UUID bookingId, UUID clientId, UUID ownerId, UUID fieldId, BookingStatus status) {
+        return Booking.builder()
+                .id(bookingId)
+                .clientId(clientId)
+                .ownerId(ownerId)
+                .status(status)
+                .subField(SubFieldProjection.builder()
+                        .fieldId(fieldId)
+                        .ownerId(ownerId)
+                        .build())
+                .build();
     }
 }

@@ -31,6 +31,8 @@ public class UserTrustInboxEventHandler implements InboxEventHandler {
     private final InboxService inboxService;
     private final UserRepository userRepository;
     private final UserTrustEventPublisher publisher;
+    private final UserProfileEventPublisher userProfileEventPublisher;
+    private final UserNotificationEventPublisher userNotificationEventPublisher;
 
     @Override
     public boolean supports(String topic) {
@@ -64,7 +66,19 @@ public class UserTrustInboxEventHandler implements InboxEventHandler {
     private void platformBan(PlatformBanRequestedEvent event) {
         User user = userRepository.findForUpdateById(event.userId())
                 .orElseThrow(() -> new BadRequestException("User not found"));
+        String previousStatus = user.getStatus();
         user.setStatus(PLATFORM_BANNED_STATUS);
+        userProfileEventPublisher.publishUpdated(user);
+        if (!PLATFORM_BANNED_STATUS.equals(previousStatus)) {
+            userNotificationEventPublisher.publishModerationNotification(
+                    user.getId(),
+                    "PLATFORM_BAN",
+                    "Tài khoản của bạn đã bị cấm",
+                    java.util.Map.of(
+                            "reason", event.reason(),
+                            "requestedBy", event.requestedBy(),
+                            "source", event.source()));
+        }
     }
 
     private void adjustPlayerMatchStatistics(PlayerMatchStatisticsAdjustedEvent event) {

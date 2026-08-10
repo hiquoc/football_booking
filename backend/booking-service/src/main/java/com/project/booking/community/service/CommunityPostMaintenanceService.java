@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public interface CommunityPostMaintenanceService {
     void cancelOpenPostForBooking(UUID bookingId);
-    int closeStartedOpenPosts();
+    int closeEndedActivePosts();
 }

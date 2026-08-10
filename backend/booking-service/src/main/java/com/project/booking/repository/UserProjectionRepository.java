@@ -13,7 +13,7 @@ import java.util.UUID;
 @Repository
 public interface UserProjectionRepository extends JpaRepository<UserProjection, UUID> {
     @Query("""
-            SELECT u.userId AS userId, u.fullName AS username, u.phoneNumber AS phoneNumber
+            SELECT u.userId AS userId, u.fullName AS username, u.phoneNumber AS phoneNumber, u.status AS status
             FROM UserProjection u
             WHERE u.userId IN :userIds
             """)
@@ -23,5 +23,6 @@ public interface UserProjectionRepository extends JpaRepository<UserProjection, 
         UUID getUserId();
         String getUsername();
         String getPhoneNumber();
+        String getStatus();
     }
 }

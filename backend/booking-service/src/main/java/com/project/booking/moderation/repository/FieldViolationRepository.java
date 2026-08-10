@@ -5,6 +5,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.LockModeType;
@@ -23,4 +25,15 @@ public interface FieldViolationRepository extends JpaRepository<FieldViolation, 
     Page<FieldViolation> findByFieldIdAndBannedTrueOrderByBanDateDesc(UUID fieldId, Pageable pageable);
     Page<FieldViolation> findByFieldIdOrderByUpdatedAtDesc(UUID fieldId, Pageable pageable);
     List<FieldViolation> findAllByBannedTrue();
+
+    @Modifying
+    @Query("""
+            UPDATE FieldViolation v
+            SET v.violationCount = 0,
+                v.banned = false,
+                v.banDate = null,
+                v.lastViolationDate = null
+            WHERE v.userId = :userId
+            """)
+    int resetByUserId(UUID userId);
 }

@@ -5,10 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface UserReputationEvaluationRepository extends JpaRepository<UserReputationEvaluation, UUID> {
+    Optional<UserReputationEvaluation> findBySourceEvaluationId(UUID sourceEvaluationId);
+
     @Query("""
             select new com.project.user.repository.UserReputationSummary(
                 count(e),
@@ -20,4 +24,12 @@ public interface UserReputationEvaluationRepository extends JpaRepository<UserRe
             where e.evaluatedUserId = :userId
             """)
     UserReputationSummary summarize(UUID userId);
+
+    @Query("""
+            select e.skillLevel
+            from UserReputationEvaluation e
+            where e.evaluatedUserId = :userId
+              and e.skillLevel is not null
+            """)
+    List<String> findReviewedSkillLevels(UUID userId);
 }

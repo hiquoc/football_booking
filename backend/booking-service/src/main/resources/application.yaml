@@ -68,16 +68,26 @@ eureka:
     prefer-ip-address: true
 
 booking:
-  payment-timeout-minutes: 5
-  expiration-scheduler-fixed-delay-ms: 60000
+  max-booking-days-in-future: 30
+  payment-timeout-minutes: 1
+  recurring-payment-timeout-minutes: 30
+  expiration-scheduler-fixed-delay-ms: 15000
+  expiration-scheduler-jitter-ms: 3000
   completion-scheduler-fixed-delay-ms: 300000
+  completion-scheduler-jitter-ms: 30000
   recurring-scheduler-fixed-delay-ms: 86400000
+  recurring-scheduler-jitter-ms: 300000
 
 community:
-  post-close-scheduler-fixed-delay-ms: 60000
+  post-close-scheduler-fixed-delay-ms: 1800000
+  post-close-scheduler-jitter-ms: 120000
   moderation:
     permanent-ban-threshold: 3
     expiration-scheduler-fixed-delay-ms: 300000
+    expiration-scheduler-jitter-ms: 30000
+
+moderation:
+  violation-recovery-jitter-ms: 300000
 
 internal:
   gateway:
@@ -88,6 +98,7 @@ internal:
 outbox:
   batch-size: 50
   poll-interval: 1000
+  scheduler-jitter-ms: 0
   max-retries: 5
   scheduler-concurrency: 8
   retry-delays:
@@ -103,6 +114,7 @@ outbox:
 inbox:
   batch-size: 50
   poll-interval: 1000
+  scheduler-jitter-ms: 0
   max-retries: 5
   scheduler-concurrency: 1
   retry-delays:

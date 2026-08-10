@@ -175,7 +175,9 @@ class SubFieldServiceImplTest {
                         .build()))
                 .build();
 
-        assertThrows(BadRequestException.class, () -> service.create(fieldId, request));
+        BadRequestException exception = assertThrows(BadRequestException.class, () -> service.create(fieldId, request));
+
+        assertEquals("TIME_PRICE_RULES_OPERATING_HOURS_COVERAGE_REQUIRED", exception.getCode());
     }
 
     @Test

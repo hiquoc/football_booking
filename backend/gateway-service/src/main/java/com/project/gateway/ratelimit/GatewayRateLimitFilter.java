@@ -1,7 +1,8 @@
 package com.project.gateway.ratelimit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.project.common.dto.ErrorResponse;
+import com.project.common.dto.ApiResponse;
+import com.project.common.enums.ApiStatusCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -20,8 +21,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -143,15 +142,7 @@ public class GatewayRateLimitFilter implements GlobalFilter, Ordered {
         exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
 
-        ErrorResponse response = ErrorResponse.builder()
-                .code("RATE_LIMITED")
-                .statusCode("RATE_LIMITED")
-                .status(HttpStatus.TOO_MANY_REQUESTS.value())
-                .error(HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase())
-                .message("Too many requests. Please try again later.")
-                .path(exchange.getRequest().getPath().value())
-                .timestamp(LocalDateTime.now(ZoneOffset.UTC))
-                .build();
+        ApiResponse<Void> response = ApiResponse.error(ApiStatusCode.RATE_LIMITED, "Too many requests. Please try again later.");
 
         try {
             byte[] bytes = objectMapper.writeValueAsBytes(response);

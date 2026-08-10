@@ -15,6 +15,7 @@ import com.project.field.dto.FieldCardDto;
 import com.project.field.dto.FieldImageDto;
 import com.project.field.dto.FieldImageOrderRequest;
 import com.project.field.dto.FieldRequest;
+import com.project.field.dto.FieldSearchOptionResponse;
 import com.project.field.dto.OperatingHoursRequest;
 import com.project.field.dto.UserDto;
 import com.project.field.entity.Field;
@@ -36,6 +37,7 @@ import com.project.field.service.FieldService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -164,6 +166,16 @@ public class FieldServiceImpl implements FieldService {
         return PageResponse.from(fieldCardQueryRepository.search(keyword, fieldType, subFieldType, district, provinceCode,
                 latitude, longitude, radiusKm, sortBy, direction, page, size,
                 currentUser != null && isClientLike(currentUser.role()) ? currentUser.id() : null));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FieldSearchOptionResponse> searchFieldOptions(String keyword) {
+        String normalizedKeyword = keyword == null ? "" : keyword.trim();
+        return fieldRepository.searchApprovedFieldOptions(normalizedKeyword, PageRequest.of(0, 10))
+                .stream()
+                .map(field -> new FieldSearchOptionResponse(field.getFieldId(), field.getName()))
+                .toList();
     }
 
     @Override

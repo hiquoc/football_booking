@@ -9,6 +9,7 @@ public record BookingConfigResponse(
         Long notFirstBookingFee,
         Integer refundBeforeHours,
         Boolean refundEnabled,
+        Integer maxBookingDaysInFuture,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

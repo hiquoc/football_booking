@@ -90,6 +90,11 @@ public class KafkaTopicConfig {
     }
 
     @Bean
+    public NewTopic platformBanClearedTopic() {
+        return topic(NotificationEventTopics.PLATFORM_BAN_CLEARED);
+    }
+
+    @Bean
     public NewTopic matchEvaluationSubmittedTopic() {
         return topic(NotificationEventTopics.MATCH_EVALUATION_SUBMITTED);
     }

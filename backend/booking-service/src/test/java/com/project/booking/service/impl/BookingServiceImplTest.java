@@ -156,7 +156,7 @@ class BookingServiceImplTest {
                 .refundEnabled(true)
                 .build());
         org.mockito.Mockito.lenient().when(userBalanceClient.deduct(org.mockito.ArgumentMatchers.any()))
-                .thenReturn(new BalanceDeductionResponse(false, 0L, "Insufficient account balance"));
+                .thenReturn(new BalanceDeductionResponse(true, 10000L, "Balance deducted"));
         org.mockito.Mockito.lenient().when(pendingBookingReservationService.find(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Optional.empty());
         org.mockito.Mockito.lenient().when(pendingBookingReservationService.reserve(
@@ -276,6 +276,7 @@ class BookingServiceImplTest {
         when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
         when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder().status(BookingStatus.PENDING).build());
+        when(userBalanceClient.deduct(any())).thenReturn(new BalanceDeductionResponse(false, 0L, "Insufficient account balance"));
 
         LocalDateTime before = LocalDateTime.now();
         BookingResponse response = bookingService.createRecurringOccurrence(userId, recurringId, request);
@@ -289,6 +290,50 @@ class BookingServiceImplTest {
         org.junit.jupiter.api.Assertions.assertFalse(savedBooking.getPaymentExpiresAt().isBefore(before.plusMinutes(30)));
         org.junit.jupiter.api.Assertions.assertFalse(savedBooking.getPaymentExpiresAt().isAfter(after.plusMinutes(30)));
         verify(bookingNotificationEventPublisher).publishRecurringPaymentFailed(savedBooking);
+    }
+
+    @Test
+    void createBookingRejectsAndExpiresNormalBookingWhenWalletIsInsufficient() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(request.getBookingDate().getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(request.getBookingDate()),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> {
+            Booking booking = invocation.getArgument(0);
+            booking.setId(UUID.randomUUID());
+            return booking;
+        });
+        when(userBalanceClient.deduct(any())).thenReturn(new BalanceDeductionResponse(false, 0L, "Insufficient account balance"));
+        when(bookingRepository.cancelClientBooking(
+                any(), eq(userId), eq(List.of(BookingStatus.PENDING)), eq(BookingStatus.EXPIRED),
+                eq("Insufficient account balance"), any(LocalDateTime.class), eq(BookingCancelledBy.SYSTEM),
+                eq(BookingPaymentStatus.PAID), eq(BookingPaymentStatus.REFUNDED), eq(BookingPaymentStatus.FAILED)))
+                .thenReturn(1);
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> bookingService.createBooking(userId, request));
+
+        assertEquals("INSUFFICIENT_BALANCE", exception.getCode());
+        verify(bookingRepository).cancelClientBooking(
+                any(), eq(userId), eq(List.of(BookingStatus.PENDING)), eq(BookingStatus.EXPIRED),
+                eq("Insufficient account balance"), any(LocalDateTime.class), eq(BookingCancelledBy.SYSTEM),
+                eq(BookingPaymentStatus.PAID), eq(BookingPaymentStatus.REFUNDED), eq(BookingPaymentStatus.FAILED));
+        verify(pendingBookingReservationService).release(any(Booking.class));
+        verify(availabilityCacheService, times(2)).evict(eq(subFieldId), eq(request.getBookingDate()));
+        verify(bookingNotificationEventPublisher, never()).publishRecurringPaymentFailed(any());
     }
 
     @Test
@@ -633,6 +678,83 @@ class BookingServiceImplTest {
         assertThrows(BadRequestException.class, () -> bookingService.createBooking(UUID.randomUUID(), request));
         verify(subFieldProjectionService, never()).resolveOperatingHours(any(), any(), any());
         verify(bookingRepository, never()).existsConflictingBookings(any(), any(), any(), any(), anyCollection());
+        verify(bookingRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createBookingAllowsConfiguredMaximumFutureBookingDate() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate bookingDate = LocalDate.now().plusDays(30);
+        SubFieldResponse subField = activeSubField(subFieldId);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(bookingDate)
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(bookingDate.getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(bookingDate),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection())).thenReturn(false);
+        when(pricingStrategy.calculate(eq(subField), eq(request))).thenReturn(new BigDecimal("100000"));
+        when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingMapper.toResponse(any(Booking.class), eq(subField))).thenReturn(BookingResponse.builder().build());
+
+        bookingService.createBooking(userId, request);
+
+        verify(bookingRepository).saveAndFlush(any(Booking.class));
+    }
+
+    @Test
+    void createBookingRejectsDateBeyondConfiguredFutureBookingLimit() {
+        ReflectionTestUtils.setField(bookingService, "maxBookingDaysInFuture", 7);
+        UUID subFieldId = UUID.randomUUID();
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(LocalDate.now().plusDays(8))
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(activeSubField(subFieldId));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> bookingService.createBooking(UUID.randomUUID(), request));
+
+        assertEquals("Booking date cannot be more than 7 days in the future", exception.getMessage());
+        assertEquals("BOOKING_DATE_OUT_OF_RANGE", exception.getCode());
+        verify(subFieldProjectionService, never()).resolveOperatingHours(any(), any(), any());
+        verify(bookingRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void validateRecurringOccurrenceDoesNotUseNormalFutureBookingLimit() {
+        ReflectionTestUtils.setField(bookingService, "maxBookingDaysInFuture", 7);
+        UUID userId = UUID.randomUUID();
+        UUID recurringId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate bookingDate = LocalDate.now().plusDays(60);
+        CreateBookingRequest request = CreateBookingRequest.builder()
+                .subFieldId(subFieldId)
+                .bookingDate(bookingDate)
+                .startTime(LocalTime.of(8, 30))
+                .durationMinutes(60)
+                .build();
+        SubFieldResponse subField = activeSubField(subFieldId);
+
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField);
+        when(subFieldProjectionService.resolveOperatingHours(eq(subFieldId), any(), eq(bookingDate.getDayOfWeek())))
+                .thenReturn(openHours());
+        when(bookingRepository.existsConflictingBookings(eq(subFieldId), eq(bookingDate),
+                eq(LocalTime.of(8, 30)), eq(LocalTime.of(9, 30)), anyCollection(), eq(recurringId))).thenReturn(false);
+
+        bookingService.validateRecurringOccurrence(userId, request, recurringId);
+
+        verify(subFieldProjectionService).resolveOperatingHours(eq(subFieldId), any(), eq(bookingDate.getDayOfWeek()));
         verify(bookingRepository, never()).saveAndFlush(any());
     }
 

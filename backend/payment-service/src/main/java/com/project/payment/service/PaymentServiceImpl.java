@@ -32,7 +32,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public CheckoutResponse createCheckout(UUID userId, CreateCheckoutRequest request) {
         BookingPaymentProjection booking = request.bookingId() == null ? null : bookingRepository.findById(request.bookingId())
-                                                                                .orElseThrow(() -> new NotFoundException("Booking is not available for wallet top-up"));
+                                                                                .orElseThrow(() -> new NotFoundException("Booking is not available for wallet top-up", "BOOKING_NOT_FOUND"));
         if (booking != null && !booking.getUserId().equals(userId))
             throw new ForbiddenException("You are not authorised to top up for this booking");
         java.math.BigDecimal payableAmount = request.amount();
@@ -64,7 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional(readOnly = true)
     public PaymentResponse getByBookingId(UUID userId, UUID bookingId) {
         Payment payment = paymentRepository.findTopByBookingIdOrderByCreatedAtDesc(bookingId)
-                .orElseThrow(() -> new NotFoundException("Payment not found for booking " + bookingId));
+                .orElseThrow(() -> new NotFoundException("Payment not found for booking " + bookingId, "PAYMENT_NOT_FOUND"));
         if (!payment.getUserId().equals(userId))
             throw new ForbiddenException("You are not authorised to view this payment");
         return toResponse(payment);
@@ -87,7 +87,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
         if (!result.actionable()) return;
         PaymentSession session = paymentSessionRepository.findById(result.sessionId())
-                .orElseThrow(() -> new NotFoundException("Payment not found for provider session"));
+                .orElseThrow(() -> new NotFoundException("Payment not found for provider session", "PAYMENT_NOT_FOUND"));
         Payment payment = paymentRepository.findById(session.getPaymentId()).orElseThrow();
         if (session.getAttempt() != payment.getCheckoutAttempt()) return;
         if (payment.getStatus() == PaymentStatus.SUCCESS) return;

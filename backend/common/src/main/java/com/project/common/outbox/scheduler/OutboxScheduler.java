@@ -1,10 +1,12 @@
 package com.project.common.outbox.scheduler;
 
+import com.project.common.scheduler.SchedulerJitter;
 import com.project.common.outbox.entity.OutboxEvent;
 import com.project.common.outbox.service.OutboxProcessingService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,13 +22,16 @@ public class OutboxScheduler {
     private final OutboxProcessingService processingService;
     private final MeterRegistry meterRegistry;
     private final ExecutorService outboxPublisherExecutor;
+    private final long schedulerJitterMs;
 
     public OutboxScheduler(
             OutboxProcessingService processingService,
             MeterRegistry meterRegistry,
+            @Value("${outbox.scheduler-jitter-ms:0}") long schedulerJitterMs,
             @Qualifier("outboxPublisherExecutor") ExecutorService outboxPublisherExecutor) {
         this.processingService = processingService;
         this.meterRegistry = meterRegistry;
+        this.schedulerJitterMs = schedulerJitterMs;
         this.outboxPublisherExecutor = outboxPublisherExecutor;
     }
 
@@ -34,6 +39,7 @@ public class OutboxScheduler {
     public void publishPendingEvents() {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
+            SchedulerJitter.sleepUpTo(schedulerJitterMs, "outbox");
             List<OutboxEvent> events = processingService.claimBatch();
             if (events.isEmpty()) {
                 return;

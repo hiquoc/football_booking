@@ -1,8 +1,10 @@
 package com.project.booking.scheduler;
 
 import com.project.booking.service.BookingService;
+import com.project.common.scheduler.SchedulerJitter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,9 +15,13 @@ public class BookingCompletionScheduler {
 
     private final BookingService bookingService;
 
+    @Value("${booking.completion-scheduler-jitter-ms:0}")
+    private long schedulerJitterMs;
+
     @Scheduled(fixedDelayString = "${booking.completion-scheduler-fixed-delay-ms:300000}")
     public void completeFinishedBookings() {
         try {
+            SchedulerJitter.sleepUpTo(schedulerJitterMs, "booking-completion");
             bookingService.completeFinishedBookings();
         } catch (RuntimeException ex) {
             log.error("Failed to complete finished bookings", ex);

@@ -5,6 +5,7 @@ import com.project.booking.community.service.CommunityModerationService;
 import com.project.booking.community.service.CommunityPostService;
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
+import com.project.common.enums.ApiStatusCode;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -42,7 +44,7 @@ public class CommunityPostController {
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody CreateCommunityPostRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Community post created", service.create(user.id(), request)));
+                .body(ApiResponse.success(ApiStatusCode.POST_CREATED, "Community post created", service.create(user.id(), request)));
     }
 
     @Operation(summary = "Get community post detail")
@@ -59,7 +61,7 @@ public class CommunityPostController {
             @PathVariable UUID postId,
             @Valid @RequestBody ReportCommunityPostRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Community post reported", moderationService.reportPost(user.id(), postId, request)));
+                .body(ApiResponse.success(ApiStatusCode.POST_REPORTED, "Community post reported", moderationService.reportPost(user.id(), postId, request)));
     }
 
     @Operation(summary = "Field owner hides an inappropriate post for their field booking")
@@ -79,21 +81,21 @@ public class CommunityPostController {
             @CurrentUser UserPrincipal user,
             @PathVariable UUID postId,
             @Valid @RequestBody UpdateCommunityPostRequest request) {
-        return ApiResponse.success(service.update(user.id(), postId, request));
+        return ApiResponse.success(ApiStatusCode.POST_UPDATED, service.update(user.id(), postId, request));
     }
 
     @Operation(summary = "Close own open post")
     @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/close")
     public ApiResponse<CommunityPostResponse> close(@CurrentUser UserPrincipal user, @PathVariable UUID postId) {
-        return ApiResponse.success(service.close(user.id(), postId));
+        return ApiResponse.success(ApiStatusCode.POST_CLOSED, service.close(user.id(), postId));
     }
 
     @Operation(summary = "Mark player recruitment as full")
     @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/full")
     public ApiResponse<CommunityPostResponse> markFull(@CurrentUser UserPrincipal user, @PathVariable UUID postId) {
-        return ApiResponse.success(service.markFull(user.id(), postId));
+        return ApiResponse.success(ApiStatusCode.POST_MARKED_FULL, service.markFull(user.id(), postId));
     }
 
     @Operation(summary = "Apply to a community post")
@@ -104,14 +106,14 @@ public class CommunityPostController {
             @PathVariable UUID postId,
             @Valid @RequestBody CommunityApplicationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Application submitted", service.apply(user.id(), postId, request)));
+                .body(ApiResponse.success(ApiStatusCode.POST_APPLICATION_SUBMITTED, "Application submitted", service.apply(user.id(), postId, request)));
     }
 
     @Operation(summary = "Withdraw own pending application")
     @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
     @PatchMapping("/{postId}/applications/withdraw")
     public ApiResponse<CommunityApplicationResponse> withdraw(@CurrentUser UserPrincipal user, @PathVariable UUID postId) {
-        return ApiResponse.success(service.withdraw(user.id(), postId));
+        return ApiResponse.success(ApiStatusCode.POST_APPLICATION_WITHDRAWN, service.withdraw(user.id(), postId));
     }
 
     @Operation(summary = "Accept an application")
@@ -121,7 +123,7 @@ public class CommunityPostController {
             @CurrentUser UserPrincipal user,
             @PathVariable UUID postId,
             @PathVariable UUID applicationId) {
-        return ApiResponse.success(service.accept(user.id(), postId, applicationId));
+        return ApiResponse.success(ApiStatusCode.POST_APPLICATION_ACCEPTED, service.accept(user.id(), postId, applicationId));
     }
 
     @Operation(summary = "Reject an application")
@@ -131,7 +133,16 @@ public class CommunityPostController {
             @CurrentUser UserPrincipal user,
             @PathVariable UUID postId,
             @PathVariable UUID applicationId) {
-        return ApiResponse.success(service.reject(user.id(), postId, applicationId));
+        return ApiResponse.success(ApiStatusCode.POST_APPLICATION_REJECTED, service.reject(user.id(), postId, applicationId));
+    }
+
+    @Operation(summary = "Get own opponent match evaluations")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @GetMapping("/{postId}/evaluations")
+    public ApiResponse<List<MatchEvaluationResponse>> evaluations(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID postId) {
+        return ApiResponse.success(service.getEvaluations(user.id(), postId));
     }
 
     @Operation(summary = "Submit opponent match evaluation")
@@ -142,6 +153,6 @@ public class CommunityPostController {
             @PathVariable UUID postId,
             @Valid @RequestBody MatchEvaluationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Evaluation submitted", service.evaluate(user.id(), postId, request)));
+                .body(ApiResponse.success(ApiStatusCode.POST_EVALUATION_SUBMITTED, "Evaluation submitted", service.evaluate(user.id(), postId, request)));
     }
 }

@@ -12,12 +12,13 @@ public class MatchEvaluationRequest {
     private UUID evaluatedUserId;
     @NotNull
     private Boolean arrivedOnTime;
-    @NotNull
     private Boolean cancelledUnexpectedly;
     @NotNull
     private Boolean fairPlay;
     @NotNull
     private Boolean wouldPlayAgain;
+    @NotNull
+    private String skillLevel;
     @Size(max = 1000)
     private String comment;
 }

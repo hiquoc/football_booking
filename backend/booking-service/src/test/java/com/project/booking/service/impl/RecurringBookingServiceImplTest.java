@@ -14,6 +14,7 @@ import com.project.booking.exception.BookingConflictException;
 import com.project.booking.kafka.RecurringBookingOccurrenceEventPublisher;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.mapper.RecurringBookingMapper;
+import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.BookingSubFieldProjectionRepository;
 import com.project.booking.repository.RecurringBookingRepository;
@@ -22,6 +23,7 @@ import com.project.booking.service.SubFieldProjectionService;
 import com.project.common.enums.BookingStatus;
 import com.project.common.enums.RecurringBookingStatus;
 import com.project.common.exception.BadRequestException;
+import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.UnauthorizedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,6 +80,9 @@ class RecurringBookingServiceImplTest {
     private BookingService bookingService;
 
     @Mock
+    private BookingModerationService bookingModerationService;
+
+    @Mock
     private RecurringBookingOccurrenceEventPublisher occurrenceEventPublisher;
 
     @Mock
@@ -129,6 +134,40 @@ class RecurringBookingServiceImplTest {
     }
 
     @Test
+    void createRejectsRecurringEndDateMoreThanOneYearAfterStartDate() {
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        CreateRecurringBookingRequest request = request(subFieldId, startDate, startDate.plusYears(1).plusDays(1), 7);
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
+
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> recurringBookingService.create(UUID.randomUUID(), request));
+
+        assertEquals("RECURRING_BOOKING_END_DATE_OUT_OF_RANGE", exception.getCode());
+        verify(recurringBookingRepository, never()).save(any());
+        verify(bookingService, never()).validateRecurringOccurrence(any(), any(), any());
+    }
+
+    @Test
+    void createRejectsIneligibleUserWithRecurringCompletedBookingRequiredCode() {
+        UUID userId = UUID.randomUUID();
+        UUID subFieldId = UUID.randomUUID();
+        LocalDate startDate = LocalDate.now().plusDays(1);
+        CreateRecurringBookingRequest request = request(subFieldId, startDate, startDate.plusDays(7), 7);
+        when(subFieldProjectionService.getRequiredSubField(subFieldId)).thenReturn(subField(subFieldId));
+        when(bookingRepository.existsCompletedBookingAtField(eq(userId), any(), eq(BookingStatus.COMPLETED))).thenReturn(false);
+
+        ForbiddenException exception = assertThrows(
+                ForbiddenException.class,
+                () -> recurringBookingService.create(userId, request));
+
+        assertEquals("RECURRING_BOOKING_COMPLETED_BOOKING_REQUIRED", exception.getCode());
+        verify(recurringBookingRepository, never()).save(any());
+        verify(bookingService, never()).validateRecurringOccurrence(any(), any(), any());
+    }
+
+    @Test
     void createRollsBackRuleWhenAnyOccurrenceConflicts() {
         UUID userId = UUID.randomUUID();
         UUID subFieldId = UUID.randomUUID();
@@ -172,7 +211,7 @@ class RecurringBookingServiceImplTest {
         BadRequestException exception = assertThrows(BadRequestException.class, () -> recurringBookingService.create(userId, request));
 
         assertEquals("RECURRING_SUBFIELD_CLOSED_ON_DATE", exception.getCode());
-        assertEquals("Sân con đã đóng lịch vào ngày " + closureDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ".", exception.getMessage());
+        assertEquals("Sân sẽ đóng vào ngày " + closureDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ".", exception.getMessage());
         verify(recurringBookingRepository, never()).save(any());
     }
 

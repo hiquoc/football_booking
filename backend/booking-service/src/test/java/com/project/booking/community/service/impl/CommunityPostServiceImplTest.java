@@ -1,8 +1,11 @@
 package com.project.booking.community.service.impl;
 
 import com.project.booking.community.dto.CommunityApplicationResponse;
+import com.project.booking.community.dto.MatchEvaluationRequest;
+import com.project.booking.community.dto.MatchEvaluationResponse;
 import com.project.booking.community.entity.CommunityApplication;
 import com.project.booking.community.entity.CommunityPost;
+import com.project.booking.community.entity.MatchEvaluation;
 import com.project.booking.community.enums.CommunityApplicationStatus;
 import com.project.booking.community.enums.CommunityPostStatus;
 import com.project.booking.community.enums.CommunityPostType;
@@ -14,6 +17,7 @@ import com.project.booking.community.repository.CommunityApplicationRepository;
 import com.project.booking.community.repository.CommunityPostRepository;
 import com.project.booking.community.repository.MatchEvaluationRepository;
 import com.project.booking.community.service.CommunityModerationService;
+import com.project.booking.entity.Booking;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.MatchResultRepository;
 import com.project.booking.repository.UserProjectionRepository;
@@ -33,6 +37,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -101,12 +106,19 @@ class CommunityPostServiceImplTest {
         when(postRepository.findPostOnlyById(postId)).thenReturn(Optional.of(post));
         when(applicationRepository.findByIdAndPostId(acceptedApplicationId, postId))
                 .thenReturn(Optional.of(acceptedApplication));
+        Booking booking = Booking.builder()
+                .id(post.getBookingId())
+                .clientId(ownerId)
+                .ownerId(UUID.randomUUID())
+                .build();
+        when(bookingRepository.findById(post.getBookingId())).thenReturn(Optional.of(booking));
         when(applicationRepository.findByPostIdAndStatus(postId, CommunityApplicationStatus.PENDING))
                 .thenReturn(List.of(acceptedApplication, rejectedApplication));
 
         CommunityApplicationResponse response = service.accept(ownerId, postId, acceptedApplicationId);
 
         assertThat(response.getStatus()).isEqualTo(CommunityApplicationStatus.ACCEPTED);
+        assertThat(booking.getOpponentId()).isEqualTo(acceptedApplicantId);
         verify(applicationRepository).rejectOtherPendingApplications(
                 postId,
                 acceptedApplicationId,
@@ -150,6 +162,57 @@ class CommunityPostServiceImplTest {
         service.markFull(ownerId, postId);
 
         verify(applicationHandlingEvents).publish(postId, "COMMUNITY_PLAYER_RECRUITMENT_FULL", "Da tuyen du nguoi cho tran dau");
+    }
+
+    @Test
+    void acceptedApplicantCanEvaluateOwnerAfterMatchedPostWasClosedByScheduler() {
+        UUID ownerId = UUID.randomUUID();
+        UUID applicantId = UUID.randomUUID();
+        UUID postId = UUID.randomUUID();
+        UUID applicationId = UUID.randomUUID();
+
+        CommunityPost post = CommunityPost.builder()
+                .id(postId)
+                .bookingId(UUID.randomUUID())
+                .ownerId(ownerId)
+                .postType(CommunityPostType.LOOKING_OPPONENT)
+                .status(CommunityPostStatus.CLOSED)
+                .matchedApplicationId(applicationId)
+                .bookingDate(LocalDate.now().minusDays(1))
+                .startTime(LocalTime.of(18, 0))
+                .endTime(LocalTime.of(19, 0))
+                .build();
+        CommunityApplication acceptedApplication = CommunityApplication.builder()
+                .id(applicationId)
+                .post(post)
+                .applicantId(applicantId)
+                .status(CommunityApplicationStatus.ACCEPTED)
+                .build();
+        post.setApplications(List.of(acceptedApplication));
+
+        MatchEvaluationRequest request = new MatchEvaluationRequest();
+        request.setEvaluatedUserId(ownerId);
+        request.setArrivedOnTime(true);
+        request.setCancelledUnexpectedly(false);
+        request.setFairPlay(true);
+        request.setWouldPlayAgain(true);
+        request.setSkillLevel("good");
+        request.setComment("Good match");
+
+        when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+        when(evaluationRepository.findByPostIdAndEvaluatorIdAndEvaluatedUserId(postId, applicantId, ownerId))
+                .thenReturn(Optional.empty());
+        when(evaluationRepository.save(any(MatchEvaluation.class))).thenAnswer(invocation -> {
+            MatchEvaluation evaluation = invocation.getArgument(0);
+            evaluation.setId(UUID.randomUUID());
+            return evaluation;
+        });
+
+        MatchEvaluationResponse response = service.evaluate(applicantId, postId, request);
+
+        assertThat(response.getEvaluatedUserId()).isEqualTo(ownerId);
+        assertThat(response.getSkillLevel()).isEqualTo("GOOD");
+        verify(evaluationEvents).publish(any(MatchEvaluation.class));
     }
 
     private static CommunityPost openPlayerPost(UUID ownerId, UUID postId) {

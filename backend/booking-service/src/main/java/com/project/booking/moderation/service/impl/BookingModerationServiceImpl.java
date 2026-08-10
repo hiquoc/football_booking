@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,14 +52,15 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     @Transactional
     public FieldViolationResponse reportNoShow(UUID actorId, String actorRole, ReportNoShowRequest request) {
         Booking booking = bookingRepository.findById(request.getBookingId())
-                .orElseThrow(() -> new NotFoundException("Booking not found"));
+                .orElseThrow(() -> new NotFoundException("Booking not found", "BOOKING_NOT_FOUND"));
         UUID fieldId = booking.getSubField().getFieldId();
         requireManager(actorId, actorRole, booking, fieldId);
+        preventSelfReport(actorId, booking.getClientId());
+        if (booking.getStatus() == BookingStatus.REPORTED || noShowReportRepository.existsByBookingId(booking.getId())) {
+            throw new BadRequestException("This booking has already been reported", "NO_SHOW_ALREADY_REPORTED");
+        }
         if (booking.getStatus() != BookingStatus.COMPLETED) {
             throw new BadRequestException("Only completed bookings can be reported as no-show");
-        }
-        if (noShowReportRepository.existsByBookingId(booking.getId())) {
-            throw new BadRequestException("This booking has already been reported");
         }
 
         noShowReportRepository.save(BookingNoShowReport.builder()
@@ -67,6 +69,8 @@ public class BookingModerationServiceImpl implements BookingModerationService {
                 .reportedUserId(booking.getClientId())
                 .ownerId(booking.getOwnerId())
                 .build());
+        booking.setStatus(BookingStatus.REPORTED);
+        bookingRepository.save(booking);
 
         FieldViolation violation = violationRepository.findForUpdateByUserIdAndFieldId(booking.getClientId(), fieldId)
                 .orElseGet(() -> FieldViolation.builder()
@@ -81,10 +85,10 @@ public class BookingModerationServiceImpl implements BookingModerationService {
         if (nextCount >= FIELD_BAN_THRESHOLD && !Boolean.TRUE.equals(violation.getBanned())) {
             violation.setBanned(true);
             violation.setBanDate(LocalDateTime.now());
-            notifyUser(booking.getClientId(), "FIELD_BAN", "Ban bi cam dat san tai dia diem nay",
+            notifyUser(booking.getClientId(), "FIELD_BAN", "Bạn đã bị cấm đặt sân tại đây",
                     payload("fieldId", fieldId, "bookingId", booking.getId(), "violationCount", nextCount));
         } else {
-            notifyUser(booking.getClientId(), "FIELD_VIOLATION_WARNING", "Canh bao vang mat khi dat san",
+            notifyUser(booking.getClientId(), "FIELD_VIOLATION_WARNING", "Cảnh báo vắng mặt sau khi đặt sân",
                     payload("fieldId", fieldId, "bookingId", booking.getId(), "violationCount", nextCount));
         }
         FieldViolation saved = violationRepository.save(violation);
@@ -119,6 +123,32 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PageResponse<BookingNoShowReportResponse> getNoShowReports(UUID actorId, String actorRole, UUID fieldId, Pageable pageable) {
+        assertManagerCanAccessField(actorId, actorRole, fieldId);
+        PageResponse<BookingNoShowReportResponse> response = PageResponse.from(noShowReportRepository.findByFieldIdOrderByCreatedAtDesc(fieldId, pageable)
+                .map(this::toNoShowReportResponse));
+        return enrichNoShowReportUsers(response);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ModerationAuditLogResponse> getAuditLogs(UUID actorId, String actorRole, UUID fieldId, Pageable pageable) {
+        assertManagerCanAccessField(actorId, actorRole, fieldId);
+        PageResponse<ModerationAuditLogResponse> response = PageResponse.from(auditLogRepository.findByFieldIdOrderByCreatedAtDesc(fieldId, pageable)
+                .map(this::toAuditLogResponse));
+        return enrichAuditLogUsers(response);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ModerationAuditLogResponse> getUserAuditLogs(UUID userId, Pageable pageable) {
+        PageResponse<ModerationAuditLogResponse> response = PageResponse.from(auditLogRepository.findByTargetUserIdOrderByCreatedAtDesc(userId, pageable)
+                .map(this::toAuditLogResponse));
+        return enrichAuditLogUsers(response);
+    }
+
+    @Override
     @Transactional
     public FieldViolationResponse ban(UUID actorId, String actorRole, UUID fieldId, UUID userId) {
         assertManagerCanAccessField(actorId, actorRole, fieldId);
@@ -132,7 +162,7 @@ public class BookingModerationServiceImpl implements BookingModerationService {
         if (!Boolean.TRUE.equals(violation.getBanned())) {
             violation.setBanned(true);
             violation.setBanDate(LocalDateTime.now());
-            notifyUser(userId, "FIELD_BAN", "Ban bi cam dat san tai dia diem nay",
+            notifyUser(userId, "FIELD_BAN", "Bạn bị cấm đặt sân tại địa điểm này",
                     payload("fieldId", fieldId, "violationCount", violation.getViolationCount()));
         }
         FieldViolation saved = violationRepository.save(violation);
@@ -146,12 +176,27 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     public FieldViolationResponse unban(UUID actorId, String actorRole, UUID fieldId, UUID userId) {
         assertManagerCanAccessField(actorId, actorRole, fieldId);
         FieldViolation violation = violationRepository.findForUpdateByUserIdAndFieldId(userId, fieldId)
-                .orElseThrow(() -> new NotFoundException("Field violation not found"));
+                .orElseThrow(() -> new NotFoundException("Field violation not found", "RESOURCE_NOT_FOUND"));
         violation.setBanned(false);
         violation.setBanDate(null);
         audit(actorId, userId, fieldId, "FIELD_UNBAN", "manual field manager unban");
-        notifyUser(userId, "FIELD_UNBAN", "Lenh cam dat san da duoc go bo", payload("fieldId", fieldId));
+        clearLocalPlatformBanIfBelowThreshold(userId);
+        notifyUser(userId, "FIELD_UNBAN", "Lệnh cấm đặt sân đã được gỡ bỏ", payload("fieldId", fieldId));
         return toViolationResponse(violation);
+    }
+
+    @Override
+    @Transactional
+    public ModerationResetResponse resetPlatformBan(UUID actorId, UUID userId) {
+        int platformBanRecordsCleared = platformBanRepository.deleteByUserId(userId);
+        int fieldViolationRecordsReset = violationRepository.resetByUserId(userId);
+        audit(actorId, userId, null, "PLATFORM_UNBAN_RESET", "platform ban and field violations reset by admin");
+        notifyUser(userId, "PLATFORM_UNBAN", "Tài khoản của bạn đã được gỡ cấm", payload("resetBy", actorId));
+        return ModerationResetResponse.builder()
+                .userId(userId)
+                .platformBanRecordsCleared(platformBanRecordsCleared)
+                .fieldViolationRecordsReset(fieldViolationRecordsReset)
+                .build();
     }
 
     @Override
@@ -167,7 +212,8 @@ public class BookingModerationServiceImpl implements BookingModerationService {
             if (nextCount < FIELD_BAN_THRESHOLD && Boolean.TRUE.equals(violation.getBanned())) {
                 violation.setBanned(false);
                 violation.setBanDate(null);
-                notifyUser(violation.getUserId(), "FIELD_UNBAN", "Lenh cam dat san da duoc tu dong go bo",
+                clearLocalPlatformBanIfBelowThreshold(violation.getUserId());
+                notifyUser(violation.getUserId(), "FIELD_UNBAN", "Lệnh cấm đặt sân đã được tự động gỡ bỏ",
                         payload("fieldId", violation.getFieldId(), "violationCount", nextCount));
             }
         }
@@ -175,22 +221,17 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public void ensureCanBook(UUID userId, UUID fieldId) {
         ensurePlatformAllowed(userId);
         if (violationRepository.existsByUserIdAndFieldIdAndBannedTrue(userId, fieldId)) {
-            throw new ForbiddenException("You are banned from booking this field");
+            throw new ForbiddenException("You are banned from booking this field", "USER_FIELD_BANNED");
         }
     }
 
     @Override
-    @Transactional(readOnly = true)
     public void ensurePlatformAllowed(UUID userId) {
         if (platformBanRepository.existsByUserId(userId)) {
-            throw new ForbiddenException("Your account is banned from booking and community features");
-        }
-        if (violationRepository.countByUserIdAndBannedTrue(userId) >= PLATFORM_BAN_FIELD_THRESHOLD) {
-            throw new ForbiddenException("Your account is banned from booking and community features");
+            throw new ForbiddenException("Your account is banned from booking and community features", "USER_PLATFORM_BANNED");
         }
     }
 
@@ -198,10 +239,16 @@ public class BookingModerationServiceImpl implements BookingModerationService {
     @Transactional
     public PaymentDisputeReportResponse createPaymentDispute(UUID ownerId, CreatePaymentDisputeReportRequest request) {
         Booking booking = bookingRepository.findById(request.getBookingId())
-                .orElseThrow(() -> new NotFoundException("Booking not found"));
+                .orElseThrow(() -> new NotFoundException("Booking not found", "BOOKING_NOT_FOUND"));
         requireOwner(ownerId, booking);
-        if (disputeRepository.existsByBookingIdAndOwnerId(booking.getId(), ownerId)) {
-            throw new BadRequestException("A payment dispute already exists for this booking");
+        preventSelfReport(ownerId, booking.getClientId());
+        if (booking.getStatus() == BookingStatus.REPORTED
+                || noShowReportRepository.existsByBookingId(booking.getId())
+                || disputeRepository.existsByBookingId(booking.getId())) {
+            throw new BadRequestException("A payment dispute already exists for this booking", "PAYMENT_DISPUTE_ALREADY_REPORTED");
+        }
+        if (booking.getStatus() != BookingStatus.COMPLETED) {
+            throw new BadRequestException("Only completed bookings can be reported for payment disputes");
         }
         PaymentDisputeReport report = PaymentDisputeReport.builder()
                 .bookingId(booking.getId())
@@ -209,60 +256,75 @@ public class BookingModerationServiceImpl implements BookingModerationService {
                 .reportedUserId(booking.getClientId())
                 .ownerId(ownerId)
                 .description(request.getDescription())
-                .imageUrls(request.getImageUrls())
+                .imageUrls(request.getImageUrls() == null ? List.of() : request.getImageUrls())
                 .status(PaymentDisputeStatus.PENDING)
                 .build();
         PaymentDisputeReport saved = disputeRepository.save(report);
+        booking.setStatus(BookingStatus.REPORTED);
+        bookingRepository.save(booking);
         audit(ownerId, booking.getClientId(), saved.getFieldId(), "PAYMENT_DISPUTE_SUBMITTED", "reportId=" + saved.getId());
-        notifyUser(ownerId, "PAYMENT_DISPUTE_SUBMITTED", "Bao cao tranh chap thanh toan da duoc gui",
+        notifyUser(ownerId, "PAYMENT_DISPUTE_SUBMITTED", "Báo cáo tranh chấp thanh toán đã được gửi",
                 payload("reportId", saved.getId(), "bookingId", booking.getId()));
-        return toDisputeResponse(saved);
+        return enrichDisputeUser(toDisputeResponse(saved));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<PaymentDisputeReportResponse> getOwnerDisputes(UUID ownerId, Pageable pageable) {
-        return PageResponse.from(disputeRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId, pageable).map(this::toDisputeResponse));
+        return enrichDisputeUsers(PageResponse.from(disputeRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId, pageable).map(this::toDisputeResponse)));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<PaymentDisputeReportResponse> getAdminDisputes(PaymentDisputeStatus status, Pageable pageable) {
-        return PageResponse.from((status == null
-                ? disputeRepository.findAllByOrderByCreatedAtDesc(pageable)
-                : disputeRepository.findByStatusOrderByCreatedAtDesc(status, pageable)).map(this::toDisputeResponse));
+    public PageResponse<PaymentDisputeReportResponse> getAdminDisputes(PaymentDisputeStatus status, Collection<UUID> fieldIds, Pageable pageable) {
+        boolean hasFieldFilter = fieldIds != null && !fieldIds.isEmpty();
+        return enrichDisputes(PageResponse.from(
+                (status != null && hasFieldFilter
+                        ? disputeRepository.findByStatusAndFieldIdInOrderByCreatedAtDesc(status, fieldIds, pageable)
+                        : status != null
+                            ? disputeRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
+                            : hasFieldFilter
+                                ? disputeRepository.findByFieldIdInOrderByCreatedAtDesc(fieldIds, pageable)
+                                : disputeRepository.findAllByOrderByCreatedAtDesc(pageable))
+                        .map(this::toDisputeResponse)));
     }
 
     @Override
     @Transactional
     public PaymentDisputeReportResponse reviewPaymentDispute(UUID adminId, UUID reportId, ReviewPaymentDisputeRequest request) {
         PaymentDisputeReport report = disputeRepository.findById(reportId)
-                .orElseThrow(() -> new NotFoundException("Payment dispute report not found"));
+                .orElseThrow(() -> new NotFoundException("Payment dispute report not found", "PAYMENT_DISPUTE_NOT_FOUND"));
         if (report.getStatus() != PaymentDisputeStatus.PENDING) {
-            throw new BadRequestException("This report has already been reviewed");
+            throw new BadRequestException("This report has already been reviewed", "PAYMENT_DISPUTE_ALREADY_REVIEWED");
         }
         report.setStatus(Boolean.TRUE.equals(request.getApproved()) ? PaymentDisputeStatus.APPROVED : PaymentDisputeStatus.REJECTED);
         report.setAdminNote(request.getAdminNote());
         report.setReviewedAt(LocalDateTime.now());
         report.setReviewedBy(adminId);
         String code = report.getStatus() == PaymentDisputeStatus.APPROVED ? "PAYMENT_DISPUTE_APPROVED" : "PAYMENT_DISPUTE_REJECTED";
-        notifyUser(report.getOwnerId(), code, "Ket qua xem xet tranh chap thanh toan", payload("reportId", report.getId(), "status", report.getStatus()));
-        notifyUser(report.getReportedUserId(), code, "Ket qua xem xet tranh chap thanh toan", payload("reportId", report.getId(), "status", report.getStatus()));
+        notifyUser(report.getOwnerId(), code, "Kết quả xem xét tranh chấp thanh toán", payload("reportId", report.getId(), "status", report.getStatus()));
+        notifyUser(report.getReportedUserId(), code, "Kết quả xem xét tranh chấp thanh toán", payload("reportId", report.getId(), "status", report.getStatus()));
         if (report.getStatus() == PaymentDisputeStatus.APPROVED) {
             createLocalPlatformBan(report.getReportedUserId(), "Approved payment dispute report " + report.getId());
             publisher.publishPlatformBanRequested(new PlatformBanRequestedEvent(
                     report.getReportedUserId(), "Approved payment dispute report " + report.getId(), adminId,
                     "PAYMENT_DISPUTE", Instant.now()));
-            notifyUser(report.getReportedUserId(), "PLATFORM_BAN", "Tai khoan cua ban da bi cam vinh vien",
+            notifyUser(report.getReportedUserId(), "PLATFORM_BAN", "Tài khoản của bạn đã bị cấm vĩnh viễn",
                     payload("reportId", report.getId(), "reason", "PAYMENT_DISPUTE_APPROVED"));
         }
         audit(adminId, report.getReportedUserId(), report.getFieldId(), "PAYMENT_DISPUTE_" + report.getStatus(), request.getAdminNote());
-        return toDisputeResponse(report);
+        return enrichDisputeUser(toDisputeResponse(report));
     }
 
     private void requireOwner(UUID ownerId, Booking booking) {
         if (!ownerId.equals(booking.getOwnerId())) {
             throw new ForbiddenException("Only the owner of this field can perform this action");
+        }
+    }
+
+    private void preventSelfReport(UUID actorId, UUID reportedUserId) {
+        if (actorId.equals(reportedUserId)) {
+            throw new BadRequestException("You cannot report yourself");
         }
     }
 
@@ -291,8 +353,14 @@ public class BookingModerationServiceImpl implements BookingModerationService {
             createLocalPlatformBan(userId, "Banned from two or more fields");
             publisher.publishPlatformBanRequested(new PlatformBanRequestedEvent(
                     userId, "Banned from two or more fields", actorId, "FIELD_VIOLATION", Instant.now()));
-            notifyUser(userId, "PLATFORM_BAN", "Tai khoan cua ban da bi cam vinh vien",
+            notifyUser(userId, "PLATFORM_BAN", "Bạn đã bị cấm đặt sân vĩnh viễn. Vui lòng liên hệ bộ phận quản trị nếu muốn được mở tài khoản lại.",
                     payload("reason", "FIELD_VIOLATION_THRESHOLD"));
+        }
+    }
+
+    private void clearLocalPlatformBanIfBelowThreshold(UUID userId) {
+        if (violationRepository.countByUserIdAndBannedTrue(userId) < PLATFORM_BAN_FIELD_THRESHOLD) {
+            platformBanRepository.deleteByUserId(userId);
         }
     }
 
@@ -343,6 +411,31 @@ public class BookingModerationServiceImpl implements BookingModerationService {
                 .build();
     }
 
+    private BookingNoShowReportResponse toNoShowReportResponse(BookingNoShowReport report) {
+        return BookingNoShowReportResponse.builder()
+                .id(report.getId())
+                .bookingId(report.getBookingId())
+                .fieldId(report.getFieldId())
+                .reportedUserId(report.getReportedUserId())
+                .ownerId(report.getOwnerId())
+                .createdAt(report.getCreatedAt())
+                .updatedAt(report.getUpdatedAt())
+                .build();
+    }
+
+    private ModerationAuditLogResponse toAuditLogResponse(ModerationAuditLog log) {
+        return ModerationAuditLogResponse.builder()
+                .id(log.getId())
+                .actorId(log.getActorId())
+                .targetUserId(log.getTargetUserId())
+                .fieldId(log.getFieldId())
+                .action(log.getAction())
+                .details(log.getDetails())
+                .createdAt(log.getCreatedAt())
+                .updatedAt(log.getUpdatedAt())
+                .build();
+    }
+
     private PageResponse<FieldViolationResponse> enrichViolationUsers(PageResponse<FieldViolationResponse> response) {
         List<FieldViolationResponse> violations = response.getContent();
         if (violations == null || violations.isEmpty()) {
@@ -363,6 +456,127 @@ public class BookingModerationServiceImpl implements BookingModerationService {
             }
         });
         return response;
+    }
+
+    private PageResponse<BookingNoShowReportResponse> enrichNoShowReportUsers(PageResponse<BookingNoShowReportResponse> response) {
+        List<BookingNoShowReportResponse> reports = response.getContent();
+        if (reports == null || reports.isEmpty()) {
+            return response;
+        }
+
+        Set<UUID> userIds = reports.stream()
+                .map(BookingNoShowReportResponse::getReportedUserId)
+                .collect(Collectors.toSet());
+        Map<UUID, UserProjectionRepository.UserContactView> usersById = userProjectionRepository.findContactByUserIdIn(userIds).stream()
+                .collect(Collectors.toMap(UserProjectionRepository.UserContactView::getUserId, contact -> contact));
+
+        reports.forEach(report -> {
+            UserProjectionRepository.UserContactView user = usersById.get(report.getReportedUserId());
+            if (user != null) {
+                report.setReportedUsername(displayUsername(user.getUsername(), user.getUserId()));
+                report.setReportedPhoneNumber(user.getPhoneNumber());
+            }
+        });
+        return response;
+    }
+
+    private PageResponse<ModerationAuditLogResponse> enrichAuditLogUsers(PageResponse<ModerationAuditLogResponse> response) {
+        List<ModerationAuditLogResponse> logs = response.getContent();
+        if (logs == null || logs.isEmpty()) {
+            return response;
+        }
+
+        Set<UUID> userIds = logs.stream()
+                .map(ModerationAuditLogResponse::getTargetUserId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return response;
+        }
+        Map<UUID, UserProjectionRepository.UserContactView> usersById = userProjectionRepository.findContactByUserIdIn(userIds).stream()
+                .collect(Collectors.toMap(UserProjectionRepository.UserContactView::getUserId, contact -> contact));
+
+        logs.forEach(log -> {
+            UserProjectionRepository.UserContactView user = usersById.get(log.getTargetUserId());
+            if (user != null) {
+                log.setTargetUsername(displayUsername(user.getUsername(), user.getUserId()));
+                log.setTargetPhoneNumber(user.getPhoneNumber());
+            }
+        });
+        return response;
+    }
+
+    private PageResponse<PaymentDisputeReportResponse> enrichDisputeUsers(PageResponse<PaymentDisputeReportResponse> response) {
+        List<PaymentDisputeReportResponse> reports = response.getContent();
+        if (reports == null || reports.isEmpty()) {
+            return response;
+        }
+
+        Set<UUID> userIds = reports.stream()
+                .map(PaymentDisputeReportResponse::getReportedUserId)
+                .collect(Collectors.toSet());
+        Map<UUID, UserProjectionRepository.UserContactView> usersById = userProjectionRepository.findContactByUserIdIn(userIds).stream()
+                .collect(Collectors.toMap(UserProjectionRepository.UserContactView::getUserId, contact -> contact));
+
+        reports.forEach(report -> enrichDisputeUser(report, usersById.get(report.getReportedUserId())));
+        return response;
+    }
+
+    private PaymentDisputeReportResponse enrichDisputeUser(PaymentDisputeReportResponse response) {
+        userProjectionRepository.findContactByUserIdIn(Set.of(response.getReportedUserId())).stream()
+                .findFirst()
+                .ifPresent(user -> enrichDisputeUser(response, user));
+        return response;
+    }
+
+    private void enrichDisputeUser(PaymentDisputeReportResponse response, UserProjectionRepository.UserContactView user) {
+        if (user == null) {
+            return;
+        }
+        response.setReportedUsername(displayUsername(user.getUsername(), user.getUserId()));
+        response.setReportedPhoneNumber(user.getPhoneNumber());
+        response.setReportedUserStatus(user.getStatus());
+    }
+
+    private PageResponse<PaymentDisputeReportResponse> enrichDisputes(PageResponse<PaymentDisputeReportResponse> response) {
+        enrichDisputeUsers(response);
+        enrichDisputeBookings(response);
+        return response;
+    }
+
+    private void enrichDisputeBookings(PageResponse<PaymentDisputeReportResponse> response) {
+        List<PaymentDisputeReportResponse> reports = response.getContent();
+        if (reports == null || reports.isEmpty()) {
+            return;
+        }
+
+        Set<UUID> bookingIds = reports.stream()
+                .map(PaymentDisputeReportResponse::getBookingId)
+                .collect(Collectors.toSet());
+        Map<UUID, Booking> bookingsById = bookingRepository.findAllById(bookingIds).stream()
+                .collect(Collectors.toMap(Booking::getId, booking -> booking));
+
+        reports.forEach(report -> {
+            Booking booking = bookingsById.get(report.getBookingId());
+            if (booking == null) {
+                return;
+            }
+            report.setBookingCode(booking.getBookingCode());
+            report.setSubFieldId(booking.getSubFieldId());
+            report.setBookingDate(booking.getBookingDate());
+            report.setStartDateTime(booking.getStartDateTime());
+            report.setEndDateTime(booking.getEndDateTime());
+            report.setStartTime(booking.getStartTime());
+            report.setEndTime(booking.getEndTime());
+            report.setBookingPrice(booking.getBookingPrice());
+            report.setPlatformBookingFee(booking.getPlatformBookingFee());
+            report.setBookingStatus(booking.getStatus());
+            report.setBookingPaymentStatus(booking.getPaymentStatus());
+            if (booking.getSubField() != null) {
+                report.setFieldName(booking.getSubField().getFieldName());
+                report.setSubFieldName(booking.getSubField().getName());
+            }
+        });
     }
 
     private String displayUsername(String username, UUID userId) {

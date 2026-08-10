@@ -14,6 +14,7 @@ import com.project.booking.exception.BookingConflictException;
 import com.project.booking.kafka.RecurringBookingOccurrenceEventPublisher;
 import com.project.booking.mapper.BookingMapper;
 import com.project.booking.mapper.RecurringBookingMapper;
+import com.project.booking.moderation.service.BookingModerationService;
 import com.project.booking.repository.BookingRepository;
 import com.project.booking.repository.BookingSubFieldProjectionRepository;
 import com.project.booking.repository.RecurringBookingRepository;
@@ -52,11 +53,13 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private static final List<BookingStatus> RESERVING_STATUSES = List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
     private static final String ELIGIBILITY_MESSAGE =
             "You must complete at least one booking at this field before creating recurring bookings.";
+    private static final String ELIGIBILITY_CODE = "RECURRING_BOOKING_COMPLETED_BOOKING_REQUIRED";
     private static final String IMMUTABLE_UPDATE_MESSAGE =
             "Only the recurring booking end date can be changed.";
     private static final String SUBFIELD_CLOSED_CODE = "SUBFIELD_CLOSED";
     private static final String RECURRING_SUBFIELD_CLOSED_ON_DATE_CODE = "RECURRING_SUBFIELD_CLOSED_ON_DATE";
     private static final DateTimeFormatter DISPLAY_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final int MAX_RECURRING_BOOKING_YEARS = 1;
 
     private final RecurringBookingRepository recurringBookingRepository;
     private final BookingRepository bookingRepository;
@@ -65,6 +68,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private final RecurringBookingMapper recurringBookingMapper;
     private final BookingMapper bookingMapper;
     private final BookingService bookingService;
+    private final BookingModerationService bookingModerationService;
     private final RecurringBookingOccurrenceEventPublisher occurrenceEventPublisher;
     private final AvailabilityCacheService availabilityCacheService;
 
@@ -349,7 +353,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
     private RecurringBooking getRequired(UUID id) {
         return recurringBookingRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Recurring booking not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Recurring booking not found with id: " + id, "RECURRING_BOOKING_NOT_FOUND"));
     }
 
     private void validateRule(LocalTime startTime, LocalTime endTime, LocalDate startDate, LocalDate endDate,
@@ -360,6 +364,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         if (!endDate.isAfter(startDate)) {
             throw new BadRequestException("End date must be after start date");
         }
+        validateRecurringEndDateLimit(startDate, endDate);
         if (intervalDays == null || intervalDays < 1 || intervalDays > 7) {
             throw new BadRequestException("Interval days must be between 1 and 7");
         }
@@ -371,7 +376,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private void validateEligibility(UUID userId, UUID fieldId) {
         boolean eligible = bookingRepository.existsCompletedBookingAtField(userId, fieldId, BookingStatus.COMPLETED);
         if (!eligible) {
-            throw new ForbiddenException(ELIGIBILITY_MESSAGE);
+            throw new ForbiddenException(ELIGIBILITY_MESSAGE, ELIGIBILITY_CODE);
         }
     }
 
@@ -387,7 +392,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                         subFieldId, candidateStartDate, endDate, RecurringBookingStatus.ACTIVE, excludeId),
                 startTime, endTime, startDate, endDate, intervalDays);
         if (userOverlap || subFieldOverlap) {
-            throw new ConflictException("Recurring booking overlaps an existing recurring booking.");
+            throw new ConflictException("Recurring booking overlaps an existing recurring booking.", "RECURRING_BOOKING_CONFLICT");
         }
     }
 
@@ -397,7 +402,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                 || !recurringBooking.getEndTime().equals(request.getEndTime())
                 || !recurringBooking.getStartDate().equals(request.getStartDate())
                 || !recurringBooking.getIntervalDays().equals(request.getIntervalDays())) {
-            throw new BadRequestException(IMMUTABLE_UPDATE_MESSAGE);
+            throw new BadRequestException(IMMUTABLE_UPDATE_MESSAGE, "BOOKING_CANNOT_MODIFY");
         }
     }
 
@@ -410,6 +415,16 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         }
         if (!endDate.isAfter(startDate)) {
             throw new BadRequestException("End date must be after start date");
+        }
+        validateRecurringEndDateLimit(startDate, endDate);
+    }
+
+    private void validateRecurringEndDateLimit(LocalDate startDate, LocalDate endDate) {
+        LocalDate latestEndDate = startDate.plusYears(MAX_RECURRING_BOOKING_YEARS);
+        if (endDate.isAfter(latestEndDate)) {
+            throw new BadRequestException(
+                    "Recurring booking end date cannot be more than 1 year after the start date",
+                    "RECURRING_BOOKING_END_DATE_OUT_OF_RANGE");
         }
     }
 
@@ -453,8 +468,9 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
     private void validateCanResume(RecurringBooking recurringBooking) {
         if (recurringBooking.getStatus() == RecurringBookingStatus.COMPLETED) {
-            throw new BadRequestException("Completed recurring bookings cannot be resumed");
+            throw new BadRequestException("Completed recurring bookings cannot be resumed", "RECURRING_BOOKING_ALREADY_ACTIVE");
         }
+        bookingModerationService.ensureCanBook(recurringBooking.getUserId(), recurringBooking.getFieldId());
     }
 
     private Optional<RecurringBooking> findExactActiveRule(UUID userId, CreateRecurringBookingRequest request) {

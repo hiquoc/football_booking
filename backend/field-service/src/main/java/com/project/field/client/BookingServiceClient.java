@@ -19,4 +19,9 @@ public interface BookingServiceClient {
             @RequestParam("subFieldIds") Collection<UUID> subFieldIds,
             @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate);
+
+    @GetMapping("/api/v1/bookings/internal/completed-at-field")
+    ApiResponse<Boolean> hasCompletedBookingAtField(
+            @RequestParam("userId") UUID userId,
+            @RequestParam("fieldId") UUID fieldId);
 }

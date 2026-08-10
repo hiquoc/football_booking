@@ -6,6 +6,7 @@ import com.project.booking.dto.response.RecurringBookingResponse;
 import com.project.booking.service.RecurringBookingService;
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
+import com.project.common.enums.ApiStatusCode;
 import com.project.common.enums.RecurringBookingStatus;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
@@ -38,7 +39,7 @@ public class RecurringBookingController {
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody CreateRecurringBookingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Recurring booking created successfully",
+                .body(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_CREATED, "Recurring booking created successfully",
                         recurringBookingService.create(user.id(), request)));
     }
 
@@ -81,7 +82,7 @@ public class RecurringBookingController {
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateRecurringBookingRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking updated successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_UPDATED, "Recurring booking updated successfully",
                 recurringBookingService.update(user.id(), id, request)));
     }
 
@@ -91,7 +92,7 @@ public class RecurringBookingController {
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> pause(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking paused successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_PAUSED, "Recurring booking paused successfully",
                 recurringBookingService.pause(user.id(), id)));
     }
 
@@ -101,7 +102,7 @@ public class RecurringBookingController {
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> resume(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking resumed successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_RESUMED, "Recurring booking resumed successfully",
                 recurringBookingService.resume(user.id(), id)));
     }
 
@@ -111,7 +112,7 @@ public class RecurringBookingController {
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> cancel(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking cancelled successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_CANCELLED, "Recurring booking cancelled successfully",
                 recurringBookingService.cancel(user.id(), id)));
     }
 
@@ -121,7 +122,7 @@ public class RecurringBookingController {
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> ownerPause(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking paused successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_PAUSED, "Recurring booking paused successfully",
                 recurringBookingService.ownerPause(user.id(), id)));
     }
 
@@ -131,7 +132,7 @@ public class RecurringBookingController {
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> ownerResume(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking resumed successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_RESUMED, "Recurring booking resumed successfully",
                 recurringBookingService.ownerResume(user.id(), id)));
     }
 
@@ -141,7 +142,7 @@ public class RecurringBookingController {
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> ownerCancel(
             @CurrentUser UserPrincipal user,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success("Recurring booking cancelled successfully",
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_CANCELLED, "Recurring booking cancelled successfully",
                 recurringBookingService.ownerCancel(user.id(), id)));
     }
 
@@ -149,20 +150,20 @@ public class RecurringBookingController {
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/admin/{id}/pause")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> adminPause(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(recurringBookingService.adminPause(id)));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_PAUSED, recurringBookingService.adminPause(id)));
     }
 
     @Operation(summary = "Admin resume recurring booking")
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/admin/{id}/resume")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> adminResume(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(recurringBookingService.adminResume(id)));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_RESUMED, recurringBookingService.adminResume(id)));
     }
 
     @Operation(summary = "Admin cancel recurring booking")
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/admin/{id}")
     public ResponseEntity<ApiResponse<RecurringBookingResponse>> adminCancel(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(recurringBookingService.adminCancel(id)));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RECURRING_BOOKING_CANCELLED, recurringBookingService.adminCancel(id)));
     }
 }

@@ -9,6 +9,10 @@ import org.springframework.data.domain.Pageable;
 import java.util.UUID;
 
 public interface ReviewService {
-    ReviewDto create(UserPrincipal user, ReviewRequest request);
+    ReviewMutationResult create(UserPrincipal user, ReviewRequest request);
     PageResponse<ReviewDto> getByFieldId(UUID fieldId, Pageable pageable);
+    ReviewDto getCurrentUserReview(UserPrincipal user, UUID fieldId);
+
+    record ReviewMutationResult(ReviewDto review, boolean created) {
+    }
 }

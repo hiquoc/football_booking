@@ -49,6 +49,7 @@ import java.util.stream.Collectors;
 public class SubFieldServiceImpl implements SubFieldService {
     private static final int MINUTES_PER_DAY = 24 * 60;
     private static final LocalTime END_OF_DAY_TIME = LocalTime.of(23, 59);
+    private static final String TIME_PRICE_RULES_COVERAGE_CODE = "TIME_PRICE_RULES_OPERATING_HOURS_COVERAGE_REQUIRED";
 
     private final SubFieldRepository subFieldRepository;
     private final FieldRepository fieldRepository;
@@ -308,6 +309,8 @@ public class SubFieldServiceImpl implements SubFieldService {
         }
         if (field.getFieldTypes() == null) {
             field.setFieldTypes(new HashSet<>());
+        } else if (!(field.getFieldTypes() instanceof HashSet<?>)) {
+            field.setFieldTypes(new HashSet<>(field.getFieldTypes()));
         }
         Set<SportType> requiredFieldTypes = subFields.stream()
                 .map(SubField::getSubFieldType)
@@ -489,7 +492,9 @@ public class SubFieldServiceImpl implements SubFieldService {
         int length = end > start ? end - start : MINUTES_PER_DAY - start + end;
         for (int offset = 0; offset < length; offset++) {
             if (!coveredMinutes[(start + offset) % MINUTES_PER_DAY]) {
-                throw new BadRequestException("Time price rules must cover all field operating hours");
+                throw new BadRequestException(
+                        "Time price rules must cover all field operating hours",
+                        TIME_PRICE_RULES_COVERAGE_CODE);
             }
         }
     }

@@ -68,6 +68,8 @@ cloudinary:
   cloud_name: ${CLOUDINARY_CLOUD_NAME}
   api_key: ${CLOUDINARY_API_KEY}
   api_secret: ${CLOUDINARY_API_SECRET}
+  placeholder-cleanup-interval-ms: 3600000
+  placeholder-cleanup-jitter-ms: 300000
 
 internal:
   gateway:
@@ -76,6 +78,7 @@ internal:
 outbox:
   batch-size: 50
   poll-interval: 5000
+  scheduler-jitter-ms: 0
   max-retries: 5
   scheduler-concurrency: 8
   retry-delays:
@@ -91,6 +94,7 @@ outbox:
 inbox:
   batch-size: 50
   poll-interval: 5000
+  scheduler-jitter-ms: 0
   max-retries: 5
   scheduler-concurrency: 1
   retry-delays:

@@ -88,6 +88,7 @@ public class CommunityMapper {
                 .cancelledUnexpectedly(evaluation.getCancelledUnexpectedly())
                 .fairPlay(evaluation.getFairPlay())
                 .wouldPlayAgain(evaluation.getWouldPlayAgain())
+                .skillLevel(evaluation.getSkillLevel())
                 .comment(evaluation.getComment())
                 .createdAt(evaluation.getCreatedAt())
                 .build();

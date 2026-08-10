@@ -22,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -203,7 +204,8 @@ class FieldServiceApiTest {
                 .andExpect(jsonPath("$.data.id").value(FIELD_ID.toString()));
 
         when(fieldScheduleService.getFieldOperatingHours(FIELD_ID)).thenReturn(List.of(operatingHoursDto()));
-        when(reviewService.getByFieldId(FIELD_ID)).thenReturn(List.of());
+        when(reviewService.getByFieldId(eq(FIELD_ID), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(reviewPage(List.of()));
 
         mockMvc.perform(get("/api/v1/fields/{id}/details", FIELD_ID)
                         .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
@@ -220,7 +222,8 @@ class FieldServiceApiTest {
     void getFieldDetailsPassesAuthenticatedOwnerToService() throws Exception {
         when(fieldService.getWithDetailsById(eq(FIELD_ID), org.mockito.ArgumentMatchers.any())).thenReturn(fieldDto());
         when(fieldScheduleService.getFieldOperatingHours(FIELD_ID)).thenReturn(List.of(operatingHoursDto()));
-        when(reviewService.getByFieldId(FIELD_ID)).thenReturn(List.of());
+        when(reviewService.getByFieldId(eq(FIELD_ID), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(reviewPage(List.of()));
 
         mockMvc.perform(get("/api/v1/fields/{id}/details", FIELD_ID)
                         .headers(ownerHeaders()))
@@ -439,7 +442,7 @@ class FieldServiceApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(closureRequest())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Closure end date cannot be before start date"));
+                .andExpect(jsonPath("$.message").value("Invalid request."));
     }
 
     @Test
@@ -575,8 +578,11 @@ class FieldServiceApiTest {
                 .comment("Great")
                 .build();
         when(reviewService.create(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(ReviewRequest.class)))
+                .thenReturn(new ReviewService.ReviewMutationResult(dto, true));
+        when(reviewService.getByFieldId(eq(FIELD_ID), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(reviewPage(List.of(dto)));
+        when(reviewService.getCurrentUserReview(org.mockito.ArgumentMatchers.any(), eq(FIELD_ID)))
                 .thenReturn(dto);
-        when(reviewService.getByFieldId(FIELD_ID)).thenReturn(List.of(dto));
 
         mockMvc.perform(post("/api/v1/reviews")
                         .headers(clientHeaders())
@@ -587,13 +593,19 @@ class FieldServiceApiTest {
                                 .comment("Great")
                                 .build())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusCode").value("REVIEW_CREATED"))
                 .andExpect(jsonPath("$.message").value("Review submitted successfully"))
                 .andExpect(jsonPath("$.data.userId").value(USER_ID.toString()));
 
         mockMvc.perform(get("/api/v1/reviews/field/{fieldId}", FIELD_ID)
                         .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value(REVIEW_ID.toString()));
+                .andExpect(jsonPath("$.data.content[0].id").value(REVIEW_ID.toString()));
+
+        mockMvc.perform(get("/api/v1/reviews/field/{fieldId}/me", FIELD_ID)
+                        .headers(clientHeaders()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(REVIEW_ID.toString()));
     }
 
     @Test
@@ -735,6 +747,19 @@ class FieldServiceApiTest {
                 .defaultBookingDurationMinutes(60)
                 .description("Football")
                 .active(true)
+                .build();
+    }
+
+    private PageResponse<ReviewDto> reviewPage(List<ReviewDto> reviews) {
+        return PageResponse.<ReviewDto>builder()
+                .content(reviews)
+                .page(0)
+                .size(6)
+                .totalElements(reviews.size())
+                .totalPages(reviews.isEmpty() ? 0 : 1)
+                .first(true)
+                .last(true)
+                .empty(reviews.isEmpty())
                 .build();
     }
 

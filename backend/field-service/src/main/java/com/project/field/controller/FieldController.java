@@ -23,6 +23,7 @@ import com.project.common.dto.ApiResponse;
 import com.project.field.dto.FieldDto;
 import com.project.field.dto.FieldDetailsDto;
 import com.project.field.dto.FieldCardDto;
+import com.project.field.dto.FieldSearchOptionResponse;
 import java.math.BigDecimal;
 import com.project.field.dto.OperatingHoursDto;
 import com.project.field.dto.OperatingHoursRequest;
@@ -221,6 +222,14 @@ public class FieldController {
             @CurrentUser UserPrincipal currentUser) {
         return ApiResponse.success(fieldService.searchCards(keyword, fieldType, subFieldType, district, provinceCode,
                 latitude, longitude, radiusKm, sortBy, direction, page, size, currentUser));
+    }
+
+    @Operation(summary = "Search approved fields for admin filters", description = "Returns minimal field IDs and names for admin moderation filters.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/search")
+    public ApiResponse<List<FieldSearchOptionResponse>> searchAdminFields(
+            @RequestParam(required = false, defaultValue = "") String keyword) {
+        return ApiResponse.success(fieldService.searchFieldOptions(keyword));
     }
 
     @Operation(

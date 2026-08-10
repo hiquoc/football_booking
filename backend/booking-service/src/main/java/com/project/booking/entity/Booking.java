@@ -50,6 +50,9 @@ public class Booking extends BaseEntity {
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
+    @Column(name = "opponent_id")
+    private UUID opponentId;
+
     @Column(name = "booking_date", nullable = false)
     private LocalDate bookingDate;
 

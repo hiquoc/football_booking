@@ -15,6 +15,7 @@ import com.project.booking.community.repository.CommunityModerationHistoryReposi
 import com.project.booking.community.repository.CommunityPostReportRepository;
 import com.project.booking.community.repository.CommunityPostRepository;
 import com.project.booking.community.repository.CommunityUserViolationRepository;
+import com.project.booking.moderation.service.BookingModerationService;
 import com.project.common.exception.BadRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,8 @@ class CommunityModerationServiceImplTest {
     private CommunityMapper mapper;
     @Mock
     private CommunityNotificationEventPublisher notifications;
+    @Mock
+    private BookingModerationService bookingModerationService;
 
     @InjectMocks
     private CommunityModerationServiceImpl service;

@@ -2,11 +2,13 @@ package com.project.field.controller;
 
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
+import com.project.common.enums.ApiStatusCode;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import com.project.field.dto.ReviewDto;
 import com.project.field.dto.ReviewRequest;
 import com.project.field.service.ReviewService;
+import com.project.field.service.ReviewService.ReviewMutationResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -31,8 +33,8 @@ public class ReviewController {
     private final ReviewService reviewService;
 
     @Operation(
-            summary = "Submit a review",
-            description = "Posts a rating and optional comment for a field. The field's average rating and total review count are updated automatically.",
+            summary = "Create or update a review",
+            description = "Creates the authenticated user's review for a field, or updates their existing review. The user must have completed a booking at the field. The response statusCode is REVIEW_CREATED for inserts and REVIEW_UPDATED for updates.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
                     content = @Content(
@@ -49,11 +51,12 @@ public class ReviewController {
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200", description = "Review submitted",
+                    responseCode = "200", description = "Review created or updated",
                     content = @Content(schema = @Schema(implementation = ApiResponse.class),
                             examples = @ExampleObject(value = """
                                     {
                                       "success": true,
+                                      "statusCode": "REVIEW_CREATED",
                                       "message": "Review submitted successfully",
                                       "data": {
                                         "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -66,6 +69,7 @@ public class ReviewController {
                                     }
                                     """))
             ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Completed booking required or invalid input", content = @Content),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Field not found", content = @Content)
     })
     @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
@@ -73,10 +77,13 @@ public class ReviewController {
     public ApiResponse<ReviewDto> create(
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody ReviewRequest request) {
-        return ApiResponse.success("Review submitted successfully", reviewService.create(user, request));
+        ReviewMutationResult result = reviewService.create(user, request);
+        ApiStatusCode statusCode = result.created() ? ApiStatusCode.REVIEW_CREATED : ApiStatusCode.REVIEW_UPDATED;
+        String message = result.created() ? "Review submitted successfully" : "Review updated successfully";
+        return ApiResponse.success(statusCode, message, result.review());
     }
 
-    @Operation(summary = "Get reviews for a field", description = "Returns paginated reviews submitted for the specified field, ordered by newest first. Reviewer contact data is not exposed; fullName is either the user's name or a masked fallback.")
+    @Operation(summary = "Get reviews for a field", description = "Returns paginated reviews submitted for the specified field, ordered by newest first. Fetch the authenticated user's review with /field/{fieldId}/me to prefill the review form. Reviewer contact data is not exposed; fullName is either the user's name or a masked fallback.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reviews returned")
     @GetMapping("/field/{fieldId}")
     public ApiResponse<PageResponse<ReviewDto>> getByFieldId(
@@ -85,5 +92,15 @@ public class ReviewController {
             @RequestParam(defaultValue = "6") int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(1, Math.min(size, 20)));
         return ApiResponse.success(reviewService.getByFieldId(fieldId, pageable));
+    }
+
+    @Operation(summary = "Get my review for a field", description = "Returns the authenticated user's existing review for the field, or null when the user has not reviewed it.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Current user's review returned")
+    @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+    @GetMapping("/field/{fieldId}/me")
+    public ApiResponse<ReviewDto> getCurrentUserReview(
+            @CurrentUser UserPrincipal user,
+            @PathVariable UUID fieldId) {
+        return ApiResponse.success(reviewService.getCurrentUserReview(user, fieldId));
     }
 }

@@ -9,9 +9,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Query;
 import jakarta.persistence.LockModeType;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,4 +29,18 @@ public interface FieldRepository extends JpaRepository<Field, UUID>, JpaSpecific
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select f from Field f where f.id = :id")
     Optional<Field> findByIdForUpdate(UUID id);
+
+    @Query("""
+            select f.id as fieldId, f.name as name
+            from Field f
+            where f.status = com.project.field.enums.FieldStatus.APPROVED
+              and (:keyword = '' or lower(f.name) like lower(concat('%', :keyword, '%')))
+            order by lower(f.name), f.name
+            """)
+    List<FieldSearchView> searchApprovedFieldOptions(@Param("keyword") String keyword, Pageable pageable);
+
+    interface FieldSearchView {
+        UUID getFieldId();
+        String getName();
+    }
 }

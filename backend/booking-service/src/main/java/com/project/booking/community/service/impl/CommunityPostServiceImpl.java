@@ -26,6 +26,7 @@ import com.project.booking.repository.UserProjectionRepository;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.BookingStatus;
 import com.project.common.exception.BadRequestException;
+import com.project.common.exception.NotFoundException;
 import com.project.common.exception.UnauthorizedException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -42,9 +43,11 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class CommunityPostServiceImpl implements CommunityPostService, CommunityPostMaintenanceService {
-    private static final List<CommunityPostStatus> ACTIVE_POST_STATUSES = List.of(CommunityPostStatus.OPEN);
+    private static final List<CommunityPostStatus> ACTIVE_POST_STATUSES = List.of(CommunityPostStatus.OPEN,CommunityPostStatus.MATCHED,CommunityPostStatus.FULL);
     private static final List<CommunityApplicationStatus> ACTIVE_APPLICATION_STATUSES = List.of(
             CommunityApplicationStatus.PENDING, CommunityApplicationStatus.ACCEPTED);
+    private static final Set<String> SKILL_LEVELS = Set.of(
+            "VERY_WEAK", "WEAK", "AVERAGE", "ABOVE_AVERAGE", "GOOD", "VERY_GOOD", "SEMI_PRO", "PRO");
 
     private final CommunityPostRepository postRepository;
     private final CommunityApplicationRepository applicationRepository;
@@ -57,6 +60,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     private final CommunityModerationService moderationService;
     private final UserProjectionRepository userProjectionRepository;
     private final MatchResultRepository matchResultRepository;
+
 
     @Override
     @Transactional
@@ -74,7 +78,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
             throw new BadRequestException("Cannot create a post after the match has started");
         }
         if (postRepository.existsByBookingIdAndStatusIn(booking.getId(), ACTIVE_POST_STATUSES)) {
-            throw new BadRequestException("This booking already has an active community post");
+            throw new BadRequestException("This booking already has an active community post", "POST_ALREADY_EXISTS");
         }
         validatePlayersNeeded(request.getPostType(), request.getPlayersNeeded());
 
@@ -146,9 +150,9 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     @Transactional(readOnly = true)
     public CommunityPostResponse get(UUID viewerId, UUID postId) {
         CommunityPost post = postRepository.findById(postId)
-                .orElseThrow(() -> new BadRequestException("Community post not found"));
+                .orElseThrow(() -> new NotFoundException("Community post not found", "POST_NOT_FOUND"));
         if (post.getStatus() == CommunityPostStatus.HIDDEN) {
-            throw new BadRequestException("Post unavailable");
+            throw new BadRequestException("Post unavailable", "POST_NOT_FOUND");
         }
         return withMatchResultSubmitted(withOwnerStatistics(mapper.toPostResponse(post, true,
                 moderationService.isUserUnderModeration(post.getOwnerId()))));
@@ -170,7 +174,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
             throw new BadRequestException("You cannot apply to your own post");
         }
         if (applicationRepository.existsActiveApplication(postId, userId, ACTIVE_APPLICATION_STATUSES)) {
-            throw new BadRequestException("You already have an active application for this post");
+            throw new BadRequestException("You already have an active application for this post", "DUPLICATE_REQUEST");
         }
         CommunityApplication application = CommunityApplication.builder()
                 .post(post)
@@ -193,7 +197,7 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
     public CommunityApplicationResponse withdraw(UUID userId, UUID postId) {
         CommunityApplication application = applicationRepository
                 .findByPostIdAndApplicantIdAndStatus(postId, userId, CommunityApplicationStatus.PENDING)
-                .orElseThrow(() -> new BadRequestException("No pending application found"));
+                .orElseThrow(() -> new BadRequestException("No pending application found", "RESOURCE_NOT_FOUND"));
         application.setStatus(CommunityApplicationStatus.WITHDRAWN);
         application.setWithdrawnAt(LocalDateTime.now());
         notifications.publish(application.getPost().getOwnerId(), "COMMUNITY_APPLICATION_WITHDRAWN", "Ung vien da rut yeu cau",
@@ -213,6 +217,9 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
             post.setStatus(CommunityPostStatus.MATCHED);
             post.setMatchedApplicationId(application.getId());
             post.setClosedAt(LocalDateTime.now());
+            Booking booking = bookingRepository.findById(post.getBookingId())
+                    .orElseThrow(() -> new BookingNotFoundException(post.getBookingId()));
+            booking.setOpponentId(application.getApplicantId());
             List<CommunityApplication> rejectedApplications = applicationRepository
                     .findByPostIdAndStatus(postId, CommunityApplicationStatus.PENDING)
                     .stream()
@@ -248,33 +255,65 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
 
     @Override
     @Transactional
+    public List<MatchEvaluationResponse> getEvaluations(UUID userId, UUID postId) {
+        CommunityPost post = post(postId);
+        validateEvaluationParticipant(userId, post, null);
+        return evaluationRepository.findByPostIdAndEvaluatorId(postId, userId)
+                .stream()
+                .map(mapper::toEvaluationResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
     public MatchEvaluationResponse evaluate(UUID userId, UUID postId, MatchEvaluationRequest request) {
-        CommunityPost post = postRepository.findById(postId)
-                .orElseThrow(() -> new BadRequestException("Community post not found"));
-        if (post.getPostType() != CommunityPostType.LOOKING_OPPONENT || post.getStatus() != CommunityPostStatus.MATCHED) {
-            throw new BadRequestException("Evaluation only applies to matched opponent posts");
-        }
-        if (!post.getOwnerId().equals(userId) && post.getApplications().stream()
-                .noneMatch(app -> app.getApplicantId().equals(userId) && app.getStatus() == CommunityApplicationStatus.ACCEPTED)) {
-            throw new UnauthorizedException("Only matched participants may evaluate this match");
-        }
-        if (evaluationRepository.existsByPostIdAndEvaluatorIdAndEvaluatedUserId(postId, userId, request.getEvaluatedUserId())) {
-            throw new BadRequestException("Evaluation already submitted");
-        }
-        MatchEvaluation evaluation = MatchEvaluation.builder()
-                .postId(postId)
-                .bookingId(post.getBookingId())
-                .evaluatorId(userId)
-                .evaluatedUserId(request.getEvaluatedUserId())
-                .arrivedOnTime(request.getArrivedOnTime())
-                .cancelledUnexpectedly(request.getCancelledUnexpectedly())
-                .fairPlay(request.getFairPlay())
-                .wouldPlayAgain(request.getWouldPlayAgain())
-                .comment(request.getComment())
-                .build();
+        CommunityPost post = post(postId);
+        validateEvaluationParticipant(userId, post, request.getEvaluatedUserId());
+        String skillLevel = request.getSkillLevel().trim().toUpperCase(Locale.ROOT);
+        validateSkillLevel(skillLevel);
+        MatchEvaluation evaluation = evaluationRepository.findByPostIdAndEvaluatorIdAndEvaluatedUserId(postId, userId, request.getEvaluatedUserId())
+                .orElseGet(() -> MatchEvaluation.builder()
+                        .postId(postId)
+                        .bookingId(post.getBookingId())
+                        .evaluatorId(userId)
+                        .evaluatedUserId(request.getEvaluatedUserId())
+                        .build());
+        evaluation.setArrivedOnTime(request.getArrivedOnTime());
+        evaluation.setCancelledUnexpectedly(Boolean.FALSE);
+        evaluation.setFairPlay(request.getFairPlay());
+        evaluation.setWouldPlayAgain(request.getWouldPlayAgain());
+        evaluation.setSkillLevel(skillLevel);
+        evaluation.setComment(request.getComment());
         MatchEvaluation saved = evaluationRepository.save(evaluation);
         evaluationEvents.publish(saved);
         return mapper.toEvaluationResponse(saved);
+    }
+
+    private CommunityPost post(UUID postId) {
+        return postRepository.findById(postId)
+                .orElseThrow(() -> new NotFoundException("Community post not found", "POST_NOT_FOUND"));
+    }
+
+    private void validateEvaluationParticipant(UUID userId, CommunityPost post, UUID evaluatedUserId) {
+        if (post.getPostType() != CommunityPostType.LOOKING_OPPONENT || post.getMatchedApplicationId() == null) {
+            throw new BadRequestException("Evaluation only applies to matched opponent posts", "OPERATION_NOT_ALLOWED");
+        }
+        if (!List.of(CommunityPostStatus.MATCHED, CommunityPostStatus.CLOSED).contains(post.getStatus())) {
+            throw new BadRequestException("Evaluation is available only after the match is completed", "OPERATION_NOT_ALLOWED");
+        }
+        if (LocalDateTime.of(post.getBookingDate(), post.getEndTime()).isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Evaluation is available only after the match has ended", "OPERATION_NOT_ALLOWED");
+        }
+        CommunityApplication matchedApplication = post.getApplications().stream()
+                .filter(app -> app.getId().equals(post.getMatchedApplicationId()) && app.getStatus() == CommunityApplicationStatus.ACCEPTED)
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Matched application not found", "RESOURCE_NOT_FOUND"));
+        UUID applicantId = matchedApplication.getApplicantId();
+        boolean ownerReviewsApplicant = post.getOwnerId().equals(userId) && (evaluatedUserId == null || applicantId.equals(evaluatedUserId));
+        boolean applicantReviewsOwner = applicantId.equals(userId) && (evaluatedUserId == null || post.getOwnerId().equals(evaluatedUserId));
+        if (!ownerReviewsApplicant && !applicantReviewsOwner) {
+            throw new UnauthorizedException("Only matched participants may evaluate this match");
+        }
     }
 
     @Override
@@ -285,14 +324,14 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
 
     @Override
     @Transactional
-    public int closeStartedOpenPosts() {
+    public int closeEndedActivePosts() {
         LocalDateTime now = LocalDateTime.now();
-        List<CommunityPost> posts = postRepository.findStartedOpenPosts(
-                CommunityPostStatus.OPEN, now.toLocalDate(), now.toLocalTime());
+        List<CommunityPost> posts = postRepository.findEndedActivePosts(
+                ACTIVE_POST_STATUSES, now.toLocalDate(), now.toLocalTime());
         posts.forEach(post -> {
             post.setStatus(CommunityPostStatus.CLOSED);
             post.setClosedAt(now);
-            applicationHandlingEvents.publish(post.getId(), "COMMUNITY_POST_CLOSED", "Bai dang da dong");
+            applicationHandlingEvents.publish(post.getId(), "COMMUNITY_POST_CLOSED", "Bài đăng đã đóng");
         });
         return posts.size();
     }
@@ -306,11 +345,17 @@ public class CommunityPostServiceImpl implements CommunityPostService, Community
         }
     }
 
+    private void validateSkillLevel(String skillLevel) {
+        if (!SKILL_LEVELS.contains(skillLevel)) {
+            throw new BadRequestException("Invalid skill level", "VALIDATION_ERROR");
+        }
+    }
+
     private CommunityPost openPost(UUID postId) {
         CommunityPost post = postRepository.findPostOnlyById(postId)
-                .orElseThrow(() -> new BadRequestException("Community post not found"));
+                .orElseThrow(() -> new NotFoundException("Community post not found", "POST_NOT_FOUND"));
         if (post.getStatus() != CommunityPostStatus.OPEN) {
-            throw new BadRequestException("This community post is not open");
+            throw new BadRequestException("This community post is not open", "OPERATION_NOT_ALLOWED");
         }
         return post;
     }

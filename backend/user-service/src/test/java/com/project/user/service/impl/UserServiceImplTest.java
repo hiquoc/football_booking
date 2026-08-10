@@ -4,6 +4,7 @@ import com.project.common.enums.UserType;
 import com.project.common.exception.ForbiddenException;
 import com.project.user.dto.UserDto;
 import com.project.user.entity.User;
+import com.project.user.kafka.UserNotificationEventPublisher;
 import com.project.user.kafka.UserProfileEventPublisher;
 import com.project.user.mapper.UserMapper;
 import com.project.user.repository.UserRepository;
@@ -35,11 +36,14 @@ class UserServiceImplTest {
     @Mock
     private UserProfileEventPublisher userProfileEventPublisher;
 
+    @Mock
+    private UserNotificationEventPublisher userNotificationEventPublisher;
+
     private UserServiceImpl userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userRepository, userMapper, userProfileEventPublisher);
+        userService = new UserServiceImpl(userRepository, userMapper, userProfileEventPublisher, userNotificationEventPublisher);
     }
 
     @Test
@@ -51,6 +55,7 @@ class UserServiceImplTest {
         verify(userRepository, never()).findById(any());
         verify(userRepository, never()).save(any());
         verify(userProfileEventPublisher, never()).publishUpdated(any());
+        verify(userNotificationEventPublisher, never()).publishModerationNotification(any(), any(), any(), any());
     }
 
     @Test
@@ -77,5 +82,6 @@ class UserServiceImplTest {
         assertEquals(UserType.OWNER, user.getUserType());
         assertEquals(UserType.OWNER, result.getUserType());
         verify(userProfileEventPublisher).publishUpdated(user);
+        verify(userNotificationEventPublisher, never()).publishModerationNotification(any(), any(), any(), any());
     }
 }

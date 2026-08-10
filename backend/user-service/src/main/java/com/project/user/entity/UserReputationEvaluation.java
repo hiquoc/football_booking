@@ -29,6 +29,9 @@ public class UserReputationEvaluation extends BaseEntity {
     @UuidGenerator
     private UUID id;
 
+    @Column(name = "source_evaluation_id", unique = true)
+    private UUID sourceEvaluationId;
+
     @Column(name = "post_id", nullable = false)
     private UUID postId;
 
@@ -52,6 +55,9 @@ public class UserReputationEvaluation extends BaseEntity {
 
     @Column(name = "would_play_again", nullable = false)
     private boolean wouldPlayAgain;
+
+    @Column(name = "skill_level", nullable = false, length = 40)
+    private String skillLevel;
 
     @Column(name = "comment", length = 1000)
     private String comment;

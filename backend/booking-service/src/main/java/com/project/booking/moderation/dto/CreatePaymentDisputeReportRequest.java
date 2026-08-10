@@ -1,10 +1,10 @@
 package com.project.booking.moderation.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +16,5 @@ public class CreatePaymentDisputeReportRequest {
     @NotBlank
     private String description;
 
-    @NotEmpty
-    private List<@NotBlank String> imageUrls;
+    private List<@NotBlank String> imageUrls = new ArrayList<>();
 }

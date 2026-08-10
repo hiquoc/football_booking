@@ -11,6 +11,7 @@ import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.BookingService;
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
+import com.project.common.enums.ApiStatusCode;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,6 +62,15 @@ public class BookingController {
                 subFieldIds, startDate, endDate,
                 List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED));
         return ApiResponse.success(conflicts);
+    }
+
+    @Operation(summary = "Check completed booking at field", description = "Internal endpoint used by field-service to verify a user has completed a booking at a field before submitting a review.")
+    @GetMapping("/internal/completed-at-field")
+    public ApiResponse<Boolean> hasCompletedBookingAtField(
+            @RequestParam UUID userId,
+            @RequestParam UUID fieldId) {
+        boolean completed = bookingRepository.existsCompletedBookingAtField(userId, fieldId, BookingStatus.COMPLETED);
+        return ApiResponse.success(completed);
     }
 
     @Operation(summary = "Get booking configuration", description = "Returns public booking configuration used for booking fee estimates.")
@@ -124,7 +134,7 @@ public class BookingController {
             @Valid @RequestBody CreateBookingRequest request) {
         BookingResponse response = bookingService.createBooking(user.id(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Booking created successfully", response));
+                .body(ApiResponse.success(ApiStatusCode.BOOKING_CREATED, "Booking created successfully", response));
     }
 
     @Operation(
@@ -138,7 +148,7 @@ public class BookingController {
             @Valid @RequestBody CreateBookingRequest request) {
         BookingResponse response = bookingService.createReservation(user.id(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Reservation created successfully", response));
+                .body(ApiResponse.success(ApiStatusCode.RESERVATION_CREATED, "Reservation created successfully", response));
     }
 
     @Operation(summary = "Update reservation", description = "Updates an owner reservation and keeps its total price at 0 VND.")
@@ -150,7 +160,7 @@ public class BookingController {
             @Valid @RequestBody UpdateReservationRequest request) {
         request.setReservationId(reservationId);
         BookingResponse response = bookingService.updateReservation(user.id(), request);
-        return ResponseEntity.ok(ApiResponse.success("Reservation updated successfully", response));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RESERVATION_UPDATED, "Reservation updated successfully", response));
     }
 
     @Operation(summary = "Cancel reservation", description = "Cancels an owner reservation without payment or refund side effects.")
@@ -160,7 +170,7 @@ public class BookingController {
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody CancelBookingRequest request) {
         BookingResponse response = bookingService.cancelReservation(user.id(), request);
-        return ResponseEntity.ok(ApiResponse.success("Reservation cancelled successfully", response));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.RESERVATION_CANCELLED, "Reservation cancelled successfully", response));
     }
 
     @Operation(
@@ -215,7 +225,7 @@ public class BookingController {
             @Valid @RequestBody CancelBookingRequest request) {
 
         BookingResponse response = bookingService.cancelBooking(user.id(), request);
-        return ResponseEntity.ok(ApiResponse.success("Booking cancelled successfully", response));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.BOOKING_CANCELLED, "Booking cancelled successfully", response));
     }
 
     @Operation(summary = "Pay pending booking from wallet", description = "Deducts the booking fee from the authenticated user's wallet and confirms the pending booking.")
@@ -225,7 +235,7 @@ public class BookingController {
             @PathVariable UUID bookingId,
             @CurrentUser UserPrincipal user) {
         BookingResponse response = bookingService.payPendingBooking(user.id(), bookingId);
-        return ResponseEntity.ok(ApiResponse.success("Booking paid successfully", response));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.BOOKING_PAID, "Booking paid successfully", response));
     }
 
     @Operation(
@@ -251,7 +261,7 @@ public class BookingController {
             @Valid @RequestBody CancelBookingRequest request) {
 
         BookingResponse response = bookingService.cancelBookingByManager(user.id(), user.role(), request);
-        return ResponseEntity.ok(ApiResponse.success("Booking cancelled successfully", response));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.BOOKING_CANCELLED, "Booking cancelled successfully", response));
     }
 
     @Operation(summary = "Get my bookings", description = "Returns paginated booking history for the authenticated client. Supports bookingDate, status, page, size, and sort query parameters.")
@@ -362,7 +372,7 @@ public class BookingController {
             @CurrentUser UserPrincipal user,
             @Valid @RequestBody UpsertMatchResultRequest request) {
         BookingResponse response = matchResultService.upsert(user.id(), user.role(), bookingId, request);
-        return ResponseEntity.ok(ApiResponse.success("Match result saved successfully", response));
+        return ResponseEntity.ok(ApiResponse.success(ApiStatusCode.MATCH_RESULT_SAVED, "Match result saved successfully", response));
     }
 
     @Operation(summary = "Get booking by ID", description = "Returns the detail of a single booking")

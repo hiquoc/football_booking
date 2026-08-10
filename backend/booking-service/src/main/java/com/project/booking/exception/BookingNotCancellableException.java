@@ -6,6 +6,6 @@ import java.util.UUID;
 public class BookingNotCancellableException extends BadRequestException {
 
     public BookingNotCancellableException(UUID bookingId, String currentStatus) {
-        super("Booking with id " + bookingId + " cannot be cancelled. Current status: " + currentStatus, "INVALID_REQUEST");
+        super("Booking with id " + bookingId + " cannot be cancelled. Current status: " + currentStatus, "BOOKING_CANNOT_CANCEL");
     }
 }

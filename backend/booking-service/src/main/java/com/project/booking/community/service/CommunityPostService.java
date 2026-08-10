@@ -17,5 +17,6 @@ public interface CommunityPostService {
     CommunityApplicationResponse withdraw(UUID userId, UUID postId);
     CommunityApplicationResponse accept(UUID userId, UUID postId, UUID applicationId);
     CommunityApplicationResponse reject(UUID userId, UUID postId, UUID applicationId);
+    java.util.List<MatchEvaluationResponse> getEvaluations(UUID userId, UUID postId);
     MatchEvaluationResponse evaluate(UUID userId, UUID postId, MatchEvaluationRequest request);
 }

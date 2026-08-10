@@ -58,12 +58,12 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, UU
     @Query("""
             SELECT p
             FROM CommunityPost p
-            WHERE p.status = :openStatus
+            WHERE p.status IN :openStatuses
               AND (p.bookingDate < :currentDate
-                   OR (p.bookingDate = :currentDate AND p.startTime <= :currentTime))
+                   OR (p.bookingDate = :currentDate AND p.endTime <= :currentTime))
             """)
-    List<CommunityPost> findStartedOpenPosts(
-            @Param("openStatus") CommunityPostStatus openStatus,
+    List<CommunityPost> findEndedActivePosts(
+            @Param("openStatuses") List<CommunityPostStatus> openStatuses,
             @Param("currentDate") LocalDate currentDate,
             @Param("currentTime") LocalTime currentTime);
 

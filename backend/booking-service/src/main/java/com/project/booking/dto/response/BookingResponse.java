@@ -27,6 +27,9 @@ public class BookingResponse {
     private String clientName;
     private String clientPhoneNumber;
     private String clientAvatarUrl;
+    private UUID opponentId;
+    private String opponentName;
+    private String opponentPhoneNumber;
     private UUID subFieldId;
     private String subFieldName;
     private UUID fieldId;

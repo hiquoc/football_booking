@@ -9,6 +9,7 @@ import com.project.common.cache.CacheKeys;
 import com.project.common.cache.CacheNames;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,9 @@ import java.time.LocalDateTime;
 public class BookingConfigServiceImpl implements BookingConfigService {
 
     private final BookingConfigRepository repository;
+
+    @Value("${booking.max-booking-days-in-future:30}")
+    private int maxBookingDaysInFuture = 30;
 
     @PostConstruct
     @Transactional
@@ -75,6 +79,7 @@ public class BookingConfigServiceImpl implements BookingConfigService {
                 config.getNotFirstBookingFee(),
                 config.getRefundBeforeHours(),
                 config.getRefundEnabled(),
+                maxBookingDaysInFuture,
                 config.getCreatedAt(),
                 config.getUpdatedAt());
     }

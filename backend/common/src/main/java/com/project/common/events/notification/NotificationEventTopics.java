@@ -12,6 +12,7 @@ public final class NotificationEventTopics {
     public static final String USER_COMPLETED_BOOKING_COUNT_CHANGED = "user.completed-booking-count.changed";
     public static final String MODERATION_NOTIFICATION = "moderation.notification";
     public static final String PLATFORM_BAN_REQUESTED = "platform-ban.requested";
+    public static final String PLATFORM_BAN_CLEARED = "platform-ban.cleared";
     public static final String USER_BALANCE_REFUND_REQUESTED = "user.balance.refund-requested";
     public static final String USER_BALANCE_DEDUCTION_REQUESTED = "user.balance.deduction-requested";
     public static final String USER_BALANCE_TOP_UP_SUCCEEDED = "user.balance.top-up-succeeded";

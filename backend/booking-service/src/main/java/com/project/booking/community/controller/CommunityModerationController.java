@@ -9,6 +9,7 @@ import com.project.booking.community.enums.CommunityReportStatus;
 import com.project.booking.community.service.CommunityModerationService;
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
+import com.project.common.enums.ApiStatusCode;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,7 +55,7 @@ public class CommunityModerationController {
             @CurrentUser UserPrincipal user,
             @PathVariable UUID postId,
             @Valid @RequestBody RestorePostRequest request) {
-        return ApiResponse.success(service.restorePost(user.id(), postId, request.getReason(), request.getNote()));
+        return ApiResponse.success(ApiStatusCode.POST_RESTORED, service.restorePost(user.id(), postId, request.getReason(), request.getNote()));
     }
 
     @Operation(summary = "View community violation history for a user")

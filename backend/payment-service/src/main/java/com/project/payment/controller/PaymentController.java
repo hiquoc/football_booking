@@ -1,5 +1,6 @@
 package com.project.payment.controller;
 import com.project.common.dto.ApiResponse;
+import com.project.common.enums.ApiStatusCode;
 import com.project.common.security.*;
 import com.project.payment.dto.*;
 import com.project.payment.service.PaymentService;
@@ -18,7 +19,7 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')") @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<CheckoutResponse>> checkout(@CurrentUser UserPrincipal user,
             @Valid @RequestBody CreateCheckoutRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Checkout session created", paymentService.createCheckout(user.id(), request)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(ApiStatusCode.PAYMENT_CHECKOUT_CREATED, "Checkout session created", paymentService.createCheckout(user.id(), request)));
     }
     @Operation(summary="Get payment status for a booking")
     @PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')") @GetMapping("/{bookingId}")

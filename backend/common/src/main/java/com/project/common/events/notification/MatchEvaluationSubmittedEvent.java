@@ -13,6 +13,7 @@ public record MatchEvaluationSubmittedEvent(
         boolean cancelledUnexpectedly,
         boolean fairPlay,
         boolean wouldPlayAgain,
+        String skillLevel,
         String comment,
         Instant occurredAt
 ) {

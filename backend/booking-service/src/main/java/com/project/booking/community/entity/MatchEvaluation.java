@@ -39,6 +39,8 @@ public class MatchEvaluation extends BaseEntity {
     private Boolean fairPlay;
     @Column(name = "would_play_again", nullable = false)
     private Boolean wouldPlayAgain;
+    @Column(name = "skill_level", nullable = false, length = 40)
+    private String skillLevel;
     @Column(name = "comment", length = 1000)
     private String comment;
 }

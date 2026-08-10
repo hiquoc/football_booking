@@ -12,6 +12,7 @@ import com.project.user.dto.UserDto;
 import com.project.user.dto.PublicProfileDto;
 import com.project.user.entity.User;
 import com.project.user.kafka.UserProfileEventPublisher;
+import com.project.user.kafka.UserNotificationEventPublisher;
 import com.project.user.mapper.UserMapper;
 import com.project.user.repository.UserRepository;
 import com.project.user.service.UserService;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final UserProfileEventPublisher userProfileEventPublisher;
+    private final UserNotificationEventPublisher userNotificationEventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -166,10 +169,33 @@ public class UserServiceImpl implements UserService {
         }
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + targetUserId));
+        String previousStatus = user.getStatus();
         user.setStatus(normalized);
         User saved = userRepository.save(user);
         userProfileEventPublisher.publishUpdated(saved);
+        publishStatusChangeNotification(actorId, saved, previousStatus, normalized);
         return userMapper.toDtoWithBan(saved);
+    }
+
+    private void publishStatusChangeNotification(UUID actorId, User user, String previousStatus, String nextStatus) {
+        if (nextStatus.equals(previousStatus)) {
+            return;
+        }
+        if (PLATFORM_BANNED_STATUS.equals(nextStatus)) {
+            userNotificationEventPublisher.publishModerationNotification(
+                    user.getId(),
+                    "PLATFORM_BAN",
+                    "Tài khoản của bạn đã bị cấm",
+                    Map.of("updatedBy", actorId, "status", nextStatus));
+            return;
+        }
+        if (PLATFORM_BANNED_STATUS.equals(previousStatus) && ACTIVE_STATUS.equals(nextStatus)) {
+            userNotificationEventPublisher.publishModerationNotification(
+                    user.getId(),
+                    "PLATFORM_UNBAN",
+                    "Tài khoản của bạn đã được gỡ cấm",
+                    Map.of("updatedBy", actorId, "status", nextStatus));
+        }
     }
 
 

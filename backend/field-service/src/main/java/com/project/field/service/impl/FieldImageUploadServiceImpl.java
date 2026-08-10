@@ -1,5 +1,6 @@
 package com.project.field.service.impl;
 
+import com.project.common.cache.CacheNames;
 import com.project.common.exception.*;
 import com.project.field.dto.*;
 import com.project.field.entity.*;
@@ -8,6 +9,7 @@ import com.project.field.mapper.FieldMapper;
 import com.project.field.repository.*;
 import com.project.field.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -75,6 +77,7 @@ public class FieldImageUploadServiceImpl implements FieldImageUploadService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = {CacheNames.FIELD_DETAIL, CacheNames.FIELD_SEARCH}, allEntries = true)
     public List<FieldImageDto> confirmBatch(UUID fieldId, UUID ownerId, ImageUploadBatchConfirmRequest request) {
         Map<String, ImageUploadConfirmRequest> requestsByPublicId = new LinkedHashMap<>();
         for (ImageUploadConfirmRequest upload : request.uploads()) {

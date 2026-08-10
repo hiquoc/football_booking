@@ -27,6 +27,7 @@ public class MatchEvaluationEventPublisher {
                 Boolean.TRUE.equals(evaluation.getCancelledUnexpectedly()),
                 Boolean.TRUE.equals(evaluation.getFairPlay()),
                 Boolean.TRUE.equals(evaluation.getWouldPlayAgain()),
+                evaluation.getSkillLevel(),
                 evaluation.getComment(),
                 evaluation.getCreatedAt() == null ? Instant.now() : evaluation.getCreatedAt().toInstant(ZoneOffset.UTC));
         outboxService.save(new OutboxSaveRequest(

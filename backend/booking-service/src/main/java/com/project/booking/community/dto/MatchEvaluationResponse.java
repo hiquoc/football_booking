@@ -22,6 +22,7 @@ public class MatchEvaluationResponse {
     private Boolean cancelledUnexpectedly;
     private Boolean fairPlay;
     private Boolean wouldPlayAgain;
+    private String skillLevel;
     private String comment;
     private LocalDateTime createdAt;
 }

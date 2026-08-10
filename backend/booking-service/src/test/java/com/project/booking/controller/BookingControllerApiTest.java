@@ -53,6 +53,7 @@ class BookingControllerApiTest {
     private static final UUID USER_ID = UUID.fromString("b1e1c606-6b76-4154-af38-7dda890395ce");
     private static final UUID BOOKING_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID SUB_FIELD_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID FIELD_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final String INTERNAL_SECRET = "dev-internal-gateway-secret";
 
     @Autowired
@@ -86,6 +87,19 @@ class BookingControllerApiTest {
                         .param("subFieldIds", SUB_FIELD_ID.toString())
                         .param("startDate", startDate.toString())
                         .param("endDate", endDate.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void internalCompletedBookingAtFieldCheckReturnsRepositoryResult() throws Exception {
+        when(bookingRepository.existsCompletedBookingAtField(USER_ID, FIELD_ID, BookingStatus.COMPLETED))
+                .thenReturn(true);
+
+        mockMvc.perform(get("/api/v1/bookings/internal/completed-at-field")
+                        .header(GlobalConstants.HEADER_INTERNAL_SECRET, INTERNAL_SECRET)
+                        .param("userId", USER_ID.toString())
+                        .param("fieldId", FIELD_ID.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(true));
     }

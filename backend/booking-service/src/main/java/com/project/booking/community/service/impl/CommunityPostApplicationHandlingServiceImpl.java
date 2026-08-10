@@ -9,6 +9,7 @@ import com.project.booking.community.repository.CommunityApplicationRepository;
 import com.project.booking.community.repository.CommunityPostRepository;
 import com.project.booking.community.service.CommunityPostApplicationHandlingService;
 import com.project.common.exception.BadRequestException;
+import com.project.common.exception.NotFoundException;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -35,7 +36,7 @@ public class CommunityPostApplicationHandlingServiceImpl implements CommunityPos
     @Transactional
     public void handlePostClosed(UUID postId, String notificationCode, String notificationTitle, String phase, int page) {
         CommunityPost post = postRepository.findPostOnlyById(postId)
-                .orElseThrow(() -> new BadRequestException("Community post not found"));
+                .orElseThrow(() -> new NotFoundException("Community post not found", "POST_NOT_FOUND"));
         if ("ACCEPTED".equalsIgnoreCase(phase)) {
             notifyAcceptedApplicationsBatch(post, notificationCode, notificationTitle, page);
             return;
