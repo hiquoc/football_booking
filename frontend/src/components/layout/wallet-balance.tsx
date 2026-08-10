@@ -100,7 +100,7 @@ export function WalletBalance() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-12 z-50 w-72 rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-xl">
+        <div className="absolute right-0 top-12 z-50 w-78 rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-xl">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="font-black text-slate-950">Nạp tiền</h2>

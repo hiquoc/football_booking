@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   CalendarDays,
@@ -79,7 +80,7 @@ export function BookingDetailContent({
                 {data.bookingCode}
               </p>
               <h1 className="mt-2 text-4xl font-black leading-tight text-slate-950">
-                {data.fieldName}
+                <FieldNameLink fieldId={data.fieldId} fieldName={data.fieldName} />
               </h1>
               <p className="mt-3 flex items-center gap-2 text-base font-semibold text-slate-600">
                 <MapPin className="size-4 text-green-600" />
@@ -247,6 +248,23 @@ export function BookingDetailContent({
         </aside>
       </div>
     </div>
+  );
+}
+
+function FieldNameLink({
+  fieldId,
+  fieldName,
+}: {
+  fieldId?: string;
+  fieldName: string;
+}) {
+  if (!fieldId) {
+    return <>{fieldName}</>;
+  }
+  return (
+    <Link href={`/fields/${fieldId}`} className="hover:text-green-700 hover:underline">
+      {fieldName}
+    </Link>
   );
 }
 

@@ -81,6 +81,10 @@ export function submitCommunityMatchEvaluation(id: string, input: MatchEvaluatio
   });
 }
 
+export function fetchCommunityMatchEvaluations(id: string) {
+  return requestJson<MatchEvaluation[]>(`/api/community-posts/${encodeURIComponent(id)}/evaluations`);
+}
+
 export function fetchCommunityReports(page: number, size = 20, status?: CommunityReportStatus) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) query.set("status", status);

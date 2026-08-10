@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FieldManagementNav } from "@/components/owner/field-management-nav";
 import { OwnerReservationsPanel } from "@/components/owner/owner-reservations-panel";
 import { BackLink } from "@/components/ui/back-link";
@@ -15,7 +16,15 @@ export default async function FieldReservationsPage({
         Sân của tôi
       </BackLink>
       <FieldManagementNav fieldId={id} />
-      <PageHeading eyebrow="Quản lý sân" title="Lịch giữ sân" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeading eyebrow="Quản lý sân" title="Lịch giữ sân" />
+        <Link
+          href={`/fields/${id}`}
+          className="action-button w-fit bg-green-600 px-5 text-white hover:bg-green-700"
+        >
+          Tạo lịch giữ sân
+        </Link>
+      </div>
       <div className="mt-8">
         <OwnerReservationsPanel fieldId={id} />
       </div>

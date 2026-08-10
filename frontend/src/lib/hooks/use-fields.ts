@@ -9,6 +9,7 @@ import {
   fetchFieldCards,
   fetchFieldDetails,
   fetchFieldReviews,
+  fetchMyFieldReview,
   fetchFavoriteFields,
   fetchAdminFieldSearch,
   removeFavoriteField,
@@ -131,6 +132,14 @@ export function useFieldReviews(id: string, page = 0, size = 6, initialData?: Pa
   });
 }
 
+export function useMyFieldReview(id: string) {
+  return useQuery({
+    queryKey: fieldQueryKeys.myReview(id),
+    queryFn: () => fetchMyFieldReview(id),
+    retry: false,
+  });
+}
+
 export function useSubFieldFilterOptions(search = "", enabled = true) {
   return useQuery({
     queryKey: fieldQueryKeys.subFieldFilterOptions(search),
@@ -188,6 +197,9 @@ export function useCreateReview(fieldId: string) {
       });
       void queryClient.invalidateQueries({
         queryKey: fieldQueryKeys.reviews(fieldId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: fieldQueryKeys.myReview(fieldId),
       });
     },
   });

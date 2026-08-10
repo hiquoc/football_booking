@@ -101,6 +101,13 @@ export function submitMatchEvaluation(id: string, input: MatchEvaluationInput) {
   );
 }
 
+export function getMatchEvaluations(id: string) {
+  return authenticatedGatewayRequest<MatchEvaluation[]>(
+    `/api/v1/community-posts/${encodeURIComponent(id)}/evaluations`,
+    { cache: "no-store" },
+  );
+}
+
 export function getCommunityReports(page = 0, size = 20, status?: CommunityReportStatus) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) query.set("status", status);

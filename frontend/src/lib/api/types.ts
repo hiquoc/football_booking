@@ -312,6 +312,9 @@ export interface Booking {
   clientName: string | null;
   clientPhoneNumber: string | null;
   clientAvatarUrl: string | null;
+  opponentId?: string | null;
+  opponentName?: string | null;
+  opponentPhoneNumber?: string | null;
   subFieldId: string;
   subFieldName: string;
   fieldId?: string;
@@ -348,6 +351,7 @@ export interface BookingConfig {
   notFirstBookingFee: number;
   refundBeforeHours: number;
   refundEnabled: boolean;
+  maxBookingDaysInFuture: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -625,9 +629,10 @@ export interface MatchEvaluation {
   evaluatorId: string;
   evaluatedUserId: string;
   arrivedOnTime: boolean;
-  cancelledUnexpectedly: boolean;
+  cancelledUnexpectedly?: boolean;
   fairPlay: boolean;
   wouldPlayAgain: boolean;
+  skillLevel: SkillLevel | string;
   comment: string | null;
   createdAt: string;
 }
@@ -635,9 +640,10 @@ export interface MatchEvaluation {
 export interface MatchEvaluationInput {
   evaluatedUserId: string;
   arrivedOnTime: boolean;
-  cancelledUnexpectedly: boolean;
+  cancelledUnexpectedly?: boolean;
   fairPlay: boolean;
   wouldPlayAgain: boolean;
+  skillLevel: SkillLevel | string;
   comment?: string;
 }
 

@@ -30,6 +30,8 @@ import { openWalletTopUpPanel } from "@/lib/client/wallet-top-up-panel";
 
 const DEFAULT_FIRST_BOOKING_FEE = 5000;
 const DEFAULT_RETURNING_BOOKING_FEE = 1000;
+const DEFAULT_MAX_BOOKING_DAYS_IN_FUTURE = 30;
+const MAX_RECURRING_BOOKING_YEARS = 1;
 const BOOKING_DRAFT_NOTE_PREFIX = "football.bookingDraftNote.";
 
 export type BookingFormInitialSelection = Partial<{
@@ -78,6 +80,9 @@ export function BookingForm({
   const createRecurringMutation = useCreateRecurringBooking();
   const currentUser = useCurrentUser();
   const bookingConfig = useBookingConfig();
+  const maxBookingDaysInFuture = bookingConfig.data?.maxBookingDaysInFuture ?? DEFAULT_MAX_BOOKING_DAYS_IN_FUTURE;
+  const maxBookingDate = addDays(initialDate, maxBookingDaysInFuture);
+  const maxRecurringEndDate = addYears(date, MAX_RECURRING_BOOKING_YEARS);
   const now = useCurrentTime();
 
   const activeSubFields = subFields.data?.filter((item) => item.active) ?? [];
@@ -141,10 +146,21 @@ export function BookingForm({
     recurringEndDate,
     recurringIntervalDays,
   );
+  const bookingDateOutOfRange = date > maxBookingDate;
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (date > maxBookingDate) {
+      setDate(maxBookingDate);
+      setSelectedSlotKey("");
+    }
+    if (recurringEndDate > maxRecurringEndDate) {
+      setRecurringEndDate(maxRecurringEndDate);
+    }
+  }, [date, maxBookingDate, maxRecurringEndDate, recurringEndDate]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -207,6 +223,7 @@ export function BookingForm({
     event.preventDefault();
     setIsProcessing(true);
     if (createMutation.isPending || createRecurringMutation.isPending || createReservationMutation.isPending) return;
+    if (bookingDateOutOfRange) return;
     if (!selectedSubField || !selectedSlot || (!reservationMode && !isFeeReady)) return;
     if (!reservationMode && !hasEnoughBalance) {
       setIsProcessing(false);
@@ -366,12 +383,20 @@ export function BookingForm({
               <input
                 type="date"
                 min={initialDate}
+                max={maxBookingDate}
                 value={date}
                 onChange={(event) => {
-                  const nextDate = event.target.value;
+                  const nextDate = event.target.value > maxBookingDate ? maxBookingDate : event.target.value;
                   setDate(nextDate);
                   if (recurringEndDate < nextDate) {
-                    setRecurringEndDate(addDays(nextDate, 7));
+                    const nextRecurringEndDate = addDays(nextDate, 7);
+                    const nextMaxRecurringEndDate = addYears(nextDate, MAX_RECURRING_BOOKING_YEARS);
+                    setRecurringEndDate(nextRecurringEndDate > nextMaxRecurringEndDate ? nextMaxRecurringEndDate : nextRecurringEndDate);
+                  } else {
+                    const nextMaxRecurringEndDate = addYears(nextDate, MAX_RECURRING_BOOKING_YEARS);
+                    if (recurringEndDate > nextMaxRecurringEndDate) {
+                      setRecurringEndDate(nextMaxRecurringEndDate);
+                    }
                   }
                   resetTimeSelection();
                 }}
@@ -488,8 +513,9 @@ export function BookingForm({
                 <input
                   type="date"
                   min={date}
+                  max={maxRecurringEndDate}
                   value={recurringEndDate}
-                  onChange={(e) => setRecurringEndDate(e.target.value)}
+                  onChange={(e) => setRecurringEndDate(e.target.value > maxRecurringEndDate ? maxRecurringEndDate : e.target.value)}
                   className="input-field"
                 />
               </Field>
@@ -656,6 +682,16 @@ function formatLocalDateTime(value: Date) {
   const minutes = String(value.getMinutes()).padStart(2, "0");
   const seconds = String(value.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+function addYears(dateString: string, years: number) {
+  if (!dateString || !years) return dateString;
+  const date = new Date(`${dateString}T00:00:00`);
+  date.setFullYear(date.getFullYear() + years);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function initialBookingQuery(

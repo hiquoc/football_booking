@@ -28,15 +28,21 @@ import {
   authenticatedGatewayRequest,
   sessionGatewayRequest,
 } from "./authenticated-gateway";
-import { gatewayRequest } from "./gateway";
+import { ApiError, gatewayRequest } from "./gateway";
 import { getAccessToken } from "./session";
 
 const fieldCacheTag = (id: string) => `field-${id}`;
+const fieldCollectionCacheTag = "fields";
+
+function revalidateFieldCaches(id?: string) {
+  if (id) revalidateTag(fieldCacheTag(id), "max");
+  revalidateTag(fieldCollectionCacheTag, "max");
+}
 
 export async function getFeaturedFields() {
   return sessionGatewayRequest<PageResponse<FieldCardData>>(
     "/api/v1/fields/cards?page=0&size=6&sortBy=rating&direction=desc",
-    { next: { revalidate: 60 } },
+    { next: { revalidate: 60, tags: [fieldCollectionCacheTag] } },
   );
 }
 
@@ -71,7 +77,7 @@ export async function getRecentlyBookedFieldCards(userId: string, limit = 4) {
         .map(fieldToCardData);
     },
     [`recently-booked-fields-${userId}`],
-    { revalidate: 120, tags: [`recently-booked-fields-${userId}`] },
+    { revalidate: 120, tags: [`recently-booked-fields-${userId}`, fieldCollectionCacheTag] },
   )();
 }
 
@@ -110,6 +116,7 @@ export async function getFieldCards(
   if (!query.has("direction")) query.set("direction", "desc");
   return sessionGatewayRequest<PageResponse<FieldCardData>>(
     `/api/v1/fields/cards?${query}`,
+    { next: { revalidate: 60, tags: [fieldCollectionCacheTag] } },
   );
 }
 
@@ -194,7 +201,7 @@ export async function getFieldDetails(id: string) {
 export async function getFieldOperatingHours(id: string) {
   return gatewayRequest<OperatingHours[]>(
     `/api/v1/fields/${encodeURIComponent(id)}/operating-hours`,
-    { next: { revalidate: 60 } },
+    { next: { revalidate: 60, tags: [fieldCacheTag(id)] } },
   );
 }
 
@@ -202,7 +209,7 @@ export async function getSubFields(id: string) {
   return gatewayRequest<SubField[]>(
     `/api/v1/sub-fields/field/${encodeURIComponent(id)}`,
     {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [fieldCacheTag(id)] },
     },
   );
 }
@@ -220,9 +227,22 @@ export async function getFieldReviews(id: string, page = 0, size = 6) {
   return gatewayRequest<PageResponse<Review>>(
     `/api/v1/reviews/field/${encodeURIComponent(id)}?${query}`,
     {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [fieldCacheTag(id)] },
     },
   );
+}
+
+export async function getMyFieldReview(id: string) {
+  try {
+    return await authenticatedGatewayRequest<Review | null>(
+      `/api/v1/reviews/field/${encodeURIComponent(id)}/me`,
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function createFieldReview(
@@ -234,22 +254,26 @@ export async function createFieldReview(
     method: "POST",
     body: JSON.stringify({ fieldId, rating, comment }),
   });
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return review;
 }
 
-export function createField(input: FieldInput) {
-  return authenticatedGatewayRequest<Field>("/api/v1/fields", {
+export async function createField(input: FieldInput) {
+  const field = await authenticatedGatewayRequest<Field>("/api/v1/fields", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  revalidateFieldCaches(field.id);
+  return field;
 }
 
-export function updateFieldStatus(id: string, status: FieldStatus) {
-  return authenticatedGatewayRequest<Field>(
+export async function updateFieldStatus(id: string, status: FieldStatus) {
+  const field = await authenticatedGatewayRequest<Field>(
     `/api/v1/fields/${encodeURIComponent(id)}/status`,
     { method: "PATCH", body: JSON.stringify({ status }) },
   );
+  revalidateFieldCaches(id);
+  return field;
 }
 
 export async function updateField(id: string, input: FieldInput) {
@@ -257,7 +281,7 @@ export async function updateField(id: string, input: FieldInput) {
     `/api/v1/fields/${encodeURIComponent(id)}`,
     { method: "PUT", body: JSON.stringify(input) },
   );
-  revalidateTag(fieldCacheTag(id), "max");
+  revalidateFieldCaches(id);
   return field;
 }
 
@@ -266,7 +290,7 @@ export async function createSubField(fieldId: string, input: SubFieldInput) {
     `/api/v1/sub-fields/field/${encodeURIComponent(fieldId)}`,
     { method: "POST", body: JSON.stringify(input) },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return subField;
 }
 
@@ -275,7 +299,7 @@ export async function deleteSubField(fieldId: string, id: string) {
     `/api/v1/sub-fields/${encodeURIComponent(id)}`,
     { method: "DELETE" },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return result;
 }
 
@@ -284,7 +308,7 @@ export async function updateSubField(fieldId: string, id: string, input: SubFiel
     `/api/v1/sub-fields/${encodeURIComponent(id)}`,
     { method: "PUT", body: JSON.stringify(input) },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return subField;
 }
 
@@ -355,7 +379,7 @@ export async function confirmFieldImageUploads(fieldId: string, results: Cloudin
         })) }),
     },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return images;
 }
 
@@ -364,7 +388,7 @@ export async function deleteFieldImage(fieldId: string, imageId: number) {
     `/api/v1/fields/${encodeURIComponent(fieldId)}/images/${imageId}`,
     { method: "DELETE" },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return result;
 }
 
@@ -376,7 +400,7 @@ export async function changeFieldImageOrder(
     `/api/v1/fields/${encodeURIComponent(fieldId)}/images/order`,
     { method: "PUT", body: JSON.stringify({ imageIds }) },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return images;
 }
 
@@ -396,7 +420,7 @@ export async function addFavoriteField(fieldId: string) {
     `/api/v1/users/me/favorites/${encodeURIComponent(fieldId)}`,
     { method: "POST" },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return field;
 }
 
@@ -405,7 +429,7 @@ export async function removeFavoriteField(fieldId: string) {
     `/api/v1/users/me/favorites/${encodeURIComponent(fieldId)}`,
     { method: "DELETE" },
   );
-  revalidateTag(fieldCacheTag(fieldId), "max");
+  revalidateFieldCaches(fieldId);
   return result;
 }
 

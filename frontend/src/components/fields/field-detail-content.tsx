@@ -65,7 +65,9 @@ export function FieldDetailContent({
             </div>
             <div className="mt-12">
               <ReviewList fieldId={fieldId} initialReviews={reviews} />
-              <ReviewForm fieldId={fieldId} />
+              {viewerRole === "CLIENT" || viewerRole === "EMPLOYEE" ? (
+                <ReviewForm fieldId={fieldId} />
+              ) : null}
             </div>
           </div>
           <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">

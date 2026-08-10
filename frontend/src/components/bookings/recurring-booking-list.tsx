@@ -13,6 +13,7 @@ import {
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 
 const statuses: Array<RecurringBookingStatus | "ALL"> = ["ALL", "ACTIVE", "PAUSED", "CANCELLED", "COMPLETED"];
+const MAX_RECURRING_BOOKING_YEARS = 1;
 
 type ConfirmAction =
   | { id: string; action: "pause" | "cancel" }
@@ -56,6 +57,7 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
           const showAbortLatest = item.status === "PAUSED" && latestBooking?.status === "CONFIRMED";
           const canEdit = scope !== "owner" && item.status !== "CANCELLED" && item.status !== "COMPLETED";
           const canManage = item.status !== "CANCELLED" && item.status !== "COMPLETED";
+          const maxEndDate = addYears(item.startDate, MAX_RECURRING_BOOKING_YEARS);
           return (
             <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -174,7 +176,14 @@ export function RecurringBookingList({ scope }: { scope: "my" | "owner" | "admin
                     }, { onSuccess: () => setEditingId(null) });
                   }}
                 >
-                  <input name="endDate" type="date" min={item.startDate} defaultValue={item.endDate} className="input-field" />
+                  <input
+                    name="endDate"
+                    type="date"
+                    min={item.startDate}
+                    max={maxEndDate}
+                    defaultValue={item.endDate > maxEndDate ? maxEndDate : item.endDate}
+                    className="input-field"
+                  />
                   <button type="submit" className="action-button bg-green-600 px-4 text-white">
                     <Save className="size-4" /> Lưu ngày kết thúc
                   </button>
@@ -252,4 +261,14 @@ function formatMatchDateTime(value: string) {
   const [datePart, timePart = ""] = value.split(/[T ]/);
   const [year, month, day] = datePart.split("-");
   return `${timePart.slice(0, 5)} ${Number(day)}/${Number(month)}/${year}`;
+}
+
+function addYears(dateString: string, years: number) {
+  if (!dateString || !years) return dateString;
+  const date = new Date(`${dateString}T00:00:00`);
+  date.setFullYear(date.getFullYear() + years);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

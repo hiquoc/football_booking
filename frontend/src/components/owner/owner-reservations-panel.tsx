@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BookingCard } from "@/components/bookings/booking-card";
 import { DataEmpty, DataError, ListSkeleton } from "@/components/ui/data-state";
 import { useCancelReservation, useOwnerReservations } from "@/lib/hooks/use-bookings";
 
-export function OwnerReservationsPanel({ fieldId }: { fieldId?: string }) {
+export function OwnerReservationsPanel(_props: { fieldId?: string }) {
   const searchParams = useSearchParams();
   const page = Math.max(0, (Number(searchParams.get("page")) || 1) - 1);
   const filters = {
@@ -55,14 +54,6 @@ export function OwnerReservationsPanel({ fieldId }: { fieldId?: string }) {
           }
         />
       ))}
-      {fieldId ? (
-        <Link
-          href={`/fields/${fieldId}/book?mode=reservation`}
-          className="action-button w-fit bg-green-600 px-5 text-white hover:bg-green-700"
-        >
-          Tạo lịch giữ sân
-        </Link>
-      ) : null}
     </div>
   );
 }

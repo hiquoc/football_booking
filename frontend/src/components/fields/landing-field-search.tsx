@@ -90,12 +90,9 @@ export function LandingFieldSearch() {
       params.set("radiusKm", radiusKm);
       params.set("latitude", latitude);
       params.set("longitude", longitude);
-      params.set("sortBy", "distance");
-      params.set("direction", "asc");
-    } else {
-      params.set("sortBy", sort.sortBy);
-      params.set("direction", sort.direction);
     }
+    params.set("sortBy", sort.sortBy);
+    params.set("direction", sort.direction);
     window.location.href = `/fields${params.size ? `?${params}` : ""}`;
   }
 

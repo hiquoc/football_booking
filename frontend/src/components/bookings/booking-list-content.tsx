@@ -129,15 +129,15 @@ function BookingFilters({
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const fields = useCurrentManagedFields(0, 100);
+  const fields = owner? useCurrentManagedFields(0, 100) : undefined;
   const subFieldTypes = useSubFieldTypes();
-  const fieldTypeOptions = Array.from(
+  const fieldTypeOptions =owner ? Array.from(
     new Set(
-      fields.data?.content.flatMap((field) =>
+      fields?.data?.content.flatMap((field) =>
         field.fieldTypes.map((type) => type.name),
       ) ?? [],
     ),
-  );
+  ) : [];
 
   function applyFilters(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
@@ -176,16 +176,16 @@ function BookingFilters({
           name="fieldId"
           defaultValue={filters.fieldId ?? ""}
           className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 disabled:text-slate-400"
-          disabled={fields.isPending || fields.isError}
+          disabled={fields?.isPending || fields?.isError}
         >
           <option value="">
-            {fields.isPending
+            {fields?.isPending
               ? "Đang tải sân..."
-              : fields.isError
+              : fields?.isError
                 ? "Không thể tải sân"
                 : "Tất cả sân"}
           </option>
-          {fields.data?.content.map((field) => (
+          {fields?.data?.content.map((field) => (
             <option key={field.id} value={field.id}>
               {field.name}
             </option>
@@ -197,7 +197,7 @@ function BookingFilters({
           name="fieldType"
           defaultValue={filters.fieldType ?? ""}
           className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 disabled:text-slate-400"
-          disabled={fields.isPending || fields.isError}
+          disabled={fields?.isPending || fields?.isError}
         >
           <option value="">Tất cả môn</option>
           {fieldTypeOptions.map((type) => (
@@ -212,17 +212,17 @@ function BookingFilters({
           name="subFieldType"
           defaultValue={filters.subFieldType ?? ""}
           className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 disabled:text-slate-400"
-          disabled={subFieldTypes.isPending || subFieldTypes.isError}
+          disabled={subFieldTypes?.isPending || subFieldTypes?.isError}
         >
           <option value="">Tất cả loại sân</option>
-          {subFieldTypes.data?.map((type) => (
+          {subFieldTypes?.data?.map((type) => (
             <option key={type} value={type}>
               {formatFieldType(type)}
             </option>
           ))}
         </select>
       ) : null}
-      {owner && fields.isSuccess && fields.data.content.length === 0 ? (
+      {owner && fields?.isSuccess && fields.data.content.length === 0 ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 md:col-span-5">
           Chưa có sân để lọc.
         </p>

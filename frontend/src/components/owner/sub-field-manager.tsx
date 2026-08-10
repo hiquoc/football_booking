@@ -23,8 +23,8 @@ import {
 type PriceRule = { startTime: string; endTime: string; hourlyPrice: number };
 
 const defaultPriceRule: PriceRule = {
-  startTime: "06:00",
-  endTime: "23:00",
+  startTime: "00:00",
+  endTime: "23:59",
   hourlyPrice: 200000,
 };
 const priceRuleStartOptions = clockTimeOptions();
@@ -156,7 +156,7 @@ export function SubFieldManager({ fieldId }: { fieldId: string }) {
             <input
               name="min"
               type="number"
-              defaultValue={editing?.bookingRule?.minimumBookingDurationMinutes ?? 60}
+              defaultValue={editing?.bookingRule?.minimumBookingDurationMinutes ?? 90}
               min={15}
               className="input-field"
             />

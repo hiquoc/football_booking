@@ -84,7 +84,7 @@ export function FieldCreateForm() {
               },
         ),
       });
-      window.location.assign(`/fields/${field.id}`);
+      window.location.assign(`/owner/fields/${field.id}/sub-fields`);
     } catch {
       /* Error is rendered below. */
     }

@@ -17,6 +17,7 @@ import {
   submitAdminModeration,
   submitCommunityApplication,
   submitCommunityDecision,
+  fetchCommunityMatchEvaluations,
   submitCommunityPost,
   submitCommunityPostAction,
   submitCommunityPostUpdate,
@@ -134,9 +135,22 @@ export function useOwnerHideCommunityPost(id: string) {
 }
 
 export function useSubmitMatchEvaluation(id: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: MatchEvaluationInput) => submitCommunityMatchEvaluation(id, input),
     retry: false,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: communityQueryKeys.evaluations(id) });
+      void queryClient.invalidateQueries({ queryKey: communityQueryKeys.detail(id) });
+    },
+  });
+}
+
+export function useMatchEvaluations(id: string, enabled = true) {
+  return useQuery({
+    queryKey: communityQueryKeys.evaluations(id),
+    queryFn: () => fetchCommunityMatchEvaluations(id),
+    enabled,
   });
 }
 

@@ -80,6 +80,12 @@ export function fetchFieldReviews(id: string, page = 0, size = 6) {
   );
 }
 
+export function fetchMyFieldReview(id: string) {
+  return requestJson<Review | null>(
+    `/api/fields/${encodeURIComponent(id)}/reviews/me`,
+  );
+}
+
 export function submitFieldReview(
   fieldId: string,
   rating: number,

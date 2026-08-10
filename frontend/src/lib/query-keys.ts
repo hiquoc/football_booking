@@ -18,6 +18,7 @@ export const fieldQueryKeys = {
   reviews: (id: string) => ["reviews", id] as const,
   reviewPage: (id: string, page: number, size: number) =>
     [...fieldQueryKeys.reviews(id), { page, size }] as const,
+  myReview: (id: string) => [...fieldQueryKeys.reviews(id), "me"] as const,
 };
 
 export const bookingQueryKeys = {
@@ -89,6 +90,7 @@ export const communityQueryKeys = {
   list: (page: number, size = 10, filters: object = {}) =>
     [...communityQueryKeys.all, "list", { page, size, filters }] as const,
   detail: (id: string) => [...communityQueryKeys.all, id] as const,
+  evaluations: (id: string) => [...communityQueryKeys.detail(id), "evaluations"] as const,
   reports: (page: number, size = 20, status?: string) =>
     [...communityQueryKeys.all, "reports", { page, size, status }] as const,
 };

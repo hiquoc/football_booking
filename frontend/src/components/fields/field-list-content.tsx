@@ -6,11 +6,19 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { Provinces } from "vietnam-divisions-js";
 import type { District } from "vietnam-divisions-js/districts";
 import type { Province } from "vietnam-divisions-js/provinces";
-import { ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, LocateFixed, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleAlert, LoaderCircle, Search, X } from "lucide-react";
 import { useFieldCards } from "@/lib/hooks/use-fields";
 import type { FieldCardFilters, User } from "@/lib/api/types";
 import { fieldTypeOptions, subFieldTypeOptions } from "@/lib/field-format";
 import { FieldCard } from "./field-card";
+
+const distanceOptions = [
+  ["", "Tất cả"],
+  ["2", "≤ 2 km"],
+  ["5", "≤ 5 km"],
+  ["10", "≤ 10 km"],
+  ["20", "≤ 20 km"],
+] as const;
 
 export function FieldListContent({
   pageNumber,
@@ -83,12 +91,7 @@ function FieldFilters({
   const [selectedDistrict, setSelectedDistrict] = useState(filters.district ?? "");
   const [keywordInput, setKeywordInput] = useState(filters.keyword ?? "");
   const sortValue = `${filters.sortBy ?? "rating"}:${filters.direction ?? "desc"}`;
-  const isNearby = Boolean(
-    filters.latitude &&
-      filters.longitude &&
-      filters.sortBy === "distance" &&
-      filters.direction === "asc",
-  );
+  const hasLocation = Boolean(filters.latitude && filters.longitude);
 
   useEffect(() => {
     onPendingChange(isPending);
@@ -141,28 +144,43 @@ function FieldFilters({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    submitFilters(event.currentTarget);
+  };
+
+  const submitFilters = (
+    formElement: HTMLFormElement,
+    overrides: Record<string, string | null> = {},
+  ) => {
+    const form = new FormData(formElement);
     const params = new URLSearchParams();
     ["keyword", "fieldType", "subFieldType", "district", "provinceCode", "latitude", "longitude", "radiusKm"].forEach((key) => {
-      const value = String(form.get(key) ?? "").trim();
+      const overrideValue = overrides[key];
+      const value = overrideValue === undefined ? String(form.get(key) ?? "").trim() : overrideValue;
       if (value) params.set(key, value);
     });
     const [sortBy, direction] = String(form.get("sort") ?? "rating:desc").split(":");
-    params.set("sortBy", sortBy);
-    params.set("direction", direction);
+    if (sortBy === "distance" && (!params.get("latitude") || !params.get("longitude"))) {
+      params.set("sortBy", "rating");
+      params.set("direction", "desc");
+    } else {
+      params.set("sortBy", sortBy);
+      params.set("direction", direction);
+    }
     navigate(params);
   };
 
-  const useMyLocation = () => {
+  const selectRadius = (formElement: HTMLFormElement, radiusKm: string) => {
     setLocationError(null);
-    if (isNearby) {
-      const params = filtersToParams(filters);
-      params.delete("latitude");
-      params.delete("longitude");
-      params.delete("radiusKm");
-      params.set("sortBy", "rating");
-      params.set("direction", "desc");
-      navigate(params);
+    if (!radiusKm) {
+      submitFilters(formElement, {
+        radiusKm: null,
+        latitude: null,
+        longitude: null,
+      });
+      return;
+    }
+    if (hasLocation) {
+      submitFilters(formElement, { radiusKm });
       return;
     }
     if (!navigator.geolocation) {
@@ -173,13 +191,11 @@ function FieldFilters({
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         setIsLocating(false);
-        const params = filtersToParams(filters);
-        params.set("latitude", coords.latitude.toFixed(6));
-        params.set("longitude", coords.longitude.toFixed(6));
-        params.set("radiusKm", filters.radiusKm ?? "10");
-        params.set("sortBy", "distance");
-        params.set("direction", "asc");
-        navigate(params);
+        submitFilters(formElement, {
+          radiusKm,
+          latitude: coords.latitude.toFixed(6),
+          longitude: coords.longitude.toFixed(6),
+        });
       },
       (error) => {
         setIsLocating(false);
@@ -207,8 +223,8 @@ function FieldFilters({
         />
       </label>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <FilterSelect name="fieldType" label="Môn thể thao" defaultValue={filters.fieldType} options={fieldTypeOptions} />
-        <FilterSelect name="subFieldType" label="Loại sân" defaultValue={filters.subFieldType} options={subFieldTypeOptions} />
+        <FilterSelect name="fieldType" label="Môn thể thao" defaultValue={filters.fieldType} options={fieldTypeOptions} onChange={submitFilters} />
+        <FilterSelect name="subFieldType" label="Loại sân" defaultValue={filters.subFieldType} options={subFieldTypeOptions} onChange={submitFilters} />
         <label className="text-sm font-bold text-slate-700">
           Tỉnh / thành phố
           <select
@@ -218,6 +234,9 @@ function FieldFilters({
               setSelectedProvinceCode(event.target.value);
               setSelectedDistrict("");
               setDistricts([]);
+              if (event.currentTarget.form) {
+                submitFilters(event.currentTarget.form, { district: null });
+              }
             }}
             className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
           >
@@ -235,7 +254,10 @@ function FieldFilters({
             name="district"
             value={selectedDistrict}
             disabled={!selectedProvinceCode}
-            onChange={(event) => setSelectedDistrict(event.target.value)}
+            onChange={(event) => {
+              setSelectedDistrict(event.target.value);
+              if (event.currentTarget.form) submitFilters(event.currentTarget.form);
+            }}
             className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-400"
           >
             <option value="">Tất cả</option>
@@ -250,36 +272,45 @@ function FieldFilters({
       <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end">
         <label className="flex-1 text-sm font-bold text-slate-700">
           Sắp xếp
-          <select name="sort" defaultValue={sortValue} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100">
+          <select
+            name="sort"
+            defaultValue={sortValue}
+            onChange={(event) => {
+              if (event.currentTarget.form) submitFilters(event.currentTarget.form);
+            }}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+          >
             <option value="rating:desc">Đánh giá cao nhất</option>
             <option value="reviews:desc">Nhiều đánh giá nhất</option>
             <option value="newest:desc">Mới nhất</option>
             {filters.latitude && filters.longitude ? <option value="distance:asc">Gần tôi nhất</option> : null}
           </select>
         </label>
+        <label className="flex-1 text-sm font-bold text-slate-700">
+          Khoảng cách
+          <select
+            name="radiusKm"
+            defaultValue={filters.radiusKm ?? ""}
+            disabled={isLocating}
+            onChange={(event) => {
+              if (event.currentTarget.form) {
+                selectRadius(event.currentTarget.form, event.currentTarget.value);
+              }
+            }}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 disabled:cursor-wait disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            {distanceOptions.map(([value, text]) => (
+              <option key={value} value={value}>
+                {text}
+              </option>
+            ))}
+          </select>
+        </label>
         <input type="hidden" name="latitude" value={filters.latitude ?? ""} />
         <input type="hidden" name="longitude" value={filters.longitude ?? ""} />
-        <input type="hidden" name="radiusKm" value={filters.radiusKm ?? ""} />
-        <button
-          type="button"
-          onClick={useMyLocation}
-          disabled={isLocating || isPending}
-          aria-pressed={isNearby}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-70 ${
-            isNearby
-              ? "border-green-600 bg-green-600 text-white shadow-sm shadow-green-200"
-              : "border-green-200 text-green-700 hover:bg-green-50"
-          }`}
-        >
-          {isLocating ? (
-            <LoaderCircle className="size-4 animate-spin" />
-          ) : (
-            <LocateFixed className="size-4" />
-          )}
-          {isLocating ? "Đang định vị..." : isNearby ? "Tắt lọc gần tôi" : "Gần tôi"}
-        </button>
         <button disabled={isLocating || isPending} className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:cursor-wait disabled:opacity-60">
-          <Search className="size-4" /> Lọc sân
+          {isLocating ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+          Lọc sân
         </button>
         <Link href="/fields" className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100">
           <X className="size-4" /> Xóa lọc
@@ -290,11 +321,30 @@ function FieldFilters({
   );
 }
 
-function FilterSelect({ name, label, defaultValue, options }: { name: string; label: string; defaultValue?: string; options: ReadonlyArray<readonly [string, string]> }) {
+function FilterSelect({
+  name,
+  label,
+  defaultValue,
+  options,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  defaultValue?: string;
+  options: ReadonlyArray<readonly [string, string]>;
+  onChange: (formElement: HTMLFormElement) => void;
+}) {
   return (
     <label className="text-sm font-bold text-slate-700">
       {label}
-      <select name={name} defaultValue={defaultValue ?? ""} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100">
+      <select
+        name={name}
+        defaultValue={defaultValue ?? ""}
+        onChange={(event) => {
+          if (event.currentTarget.form) onChange(event.currentTarget.form);
+        }}
+        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-medium outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
+      >
         <option value="">Tất cả</option>
         {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select>

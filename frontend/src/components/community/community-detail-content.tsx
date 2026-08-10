@@ -7,12 +7,13 @@ import { CommunityPostStatusButton } from "@/components/ui/community-post-status
 import { SkillLevelButton } from "@/components/ui/skill-level-button";
 import { BackLink } from "@/components/ui/back-link";
 import { CommunityDetailSkeleton } from "@/components/community/community-detail-skeleton";
-import type { CommunityApplication, CommunityPost, CommunityReportReason, PublicProfile, User } from "@/lib/api/types";
+import type { CommunityApplication, CommunityPost, CommunityReportReason, MatchEvaluation, PublicProfile, User } from "@/lib/api/types";
 import {
   useApplyCommunityPost,
   useCommunityPost,
   useCommunityPostAction,
   useDecideCommunityApplication,
+  useMatchEvaluations,
   useOwnerHideCommunityPost,
   useReportCommunityPost,
   useSubmitMatchEvaluation,
@@ -37,6 +38,16 @@ export function CommunityDetailContent({
   const decide = useDecideCommunityApplication(postId);
   const report = useReportCommunityPost(postId);
   const ownerHide = useOwnerHideCommunityPost(postId);
+  const evaluations = useMatchEvaluations(
+    postId,
+    Boolean(
+      viewer &&
+      post?.postType === "LOOKING_OPPONENT" &&
+      (post.status === "MATCHED" || post.status === "CLOSED") &&
+      post.matchedApplicationId &&
+      hasMatchEnded(post),
+    ),
+  );
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -49,6 +60,7 @@ export function CommunityDetailContent({
   const [reportReason, setReportReason] = useState<CommunityReportReason>("SPAM");
   const [reportDescription, setReportDescription] = useState("");
   const [hideReason, setHideReason] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   if (isPending) return <CommunityDetailSkeleton />;
   if (isError || !post) return <div className="mx-auto w-full max-w-6xl p-8">Không thể tải bài đăng.</div>;
@@ -70,11 +82,15 @@ export function CommunityDetailContent({
   const canReviewMatch = Boolean(
     viewer &&
     post.postType === "LOOKING_OPPONENT" &&
-    post.status === "MATCHED" &&
-    post.matchResultSubmitted &&
+    (post.status === "MATCHED" || post.status === "CLOSED") &&
+    hasMatchEnded(post) &&
     evaluationTarget,
   );
-  const canReport = Boolean(viewer && !isOwner && !report.isSuccess);
+  const existingEvaluation = evaluationTarget
+    ? evaluations.data?.find((item) => item.evaluatedUserId === evaluationTarget.userId)
+    : undefined;
+  const reportableStatuses: Array<CommunityPost["status"]> = ["OPEN", "MATCHED", "FULL"];
+  const canReport = Boolean(viewer && !isOwner && !report.isSuccess && reportableStatuses.includes(post.status));
   const hasActionControls = canReport || (isOwner && post.status === "OPEN");
   const ownerName = post.ownerDisplayName ?? "Người đăng";
 
@@ -152,6 +168,9 @@ export function CommunityDetailContent({
                   <Link href={`/users/${post.ownerId}/profile`} className="text-green-700 hover:text-green-800">
                     {ownerName}
                   </Link>
+                  {!isOwner && canReviewMatch && evaluationTarget?.userId === post.ownerId ? (
+                    <ReviewButton reviewed={Boolean(existingEvaluation)} onClick={() => setReviewOpen(true)} />
+                  ) : null}
                 </p>
                 <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">{post.description}</p>
               </>
@@ -249,8 +268,13 @@ export function CommunityDetailContent({
             </section>
           ) : null}
 
-          {canReviewMatch && evaluationTarget ? (
-            <MatchEvaluationPanel postId={post.id} target={evaluationTarget} />
+          {reviewOpen && canReviewMatch && evaluationTarget ? (
+            <MatchEvaluationPanel
+              postId={post.id}
+              target={evaluationTarget}
+              existingEvaluation={existingEvaluation}
+              onClose={() => setReviewOpen(false)}
+            />
           ) : null}
 
           {viewer && !isOwner ? (
@@ -351,6 +375,9 @@ export function CommunityDetailContent({
                             <Link href={`/users/${application.applicantId}/profile`} className="font-bold text-green-700 hover:text-green-800">
                               {application.applicantDisplayName ?? "Người chơi"}
                             </Link>
+                            {isOwner && canReviewMatch && evaluationTarget?.userId === application.applicantId ? (
+                              <ReviewButton reviewed={Boolean(existingEvaluation)} onClick={() => setReviewOpen(true)} />
+                            ) : null}
                             {isViewerApplication ? (
                               <span className="rounded-lg bg-slate-500 px-2 py-1 text-[11px] font-black text-white">Bạn</span>
                             ) : null}
@@ -456,34 +483,53 @@ function StatBar({
 function MatchEvaluationPanel({
   postId,
   target,
+  existingEvaluation,
+  onClose,
 }: {
   postId: string;
   target: { userId: string; displayName: string };
+  existingEvaluation?: MatchEvaluation;
+  onClose: () => void;
 }) {
   const evaluation = useSubmitMatchEvaluation(postId);
-  const [arrivedOnTime, setArrivedOnTime] = useState(true);
-  const [cancelledUnexpectedly, setCancelledUnexpectedly] = useState(false);
-  const [fairPlay, setFairPlay] = useState(true);
-  const [wouldPlayAgain, setWouldPlayAgain] = useState(true);
-  const [comment, setComment] = useState("");
+  const [arrivedOnTime, setArrivedOnTime] = useState(existingEvaluation?.arrivedOnTime ?? true);
+  const [fairPlay, setFairPlay] = useState(existingEvaluation?.fairPlay ?? true);
+  const [wouldPlayAgain, setWouldPlayAgain] = useState(existingEvaluation?.wouldPlayAgain ?? true);
+  const [skillLevel, setSkillLevel] = useState(String(existingEvaluation?.skillLevel ?? "AVERAGE"));
+  const [comment, setComment] = useState(existingEvaluation?.comment ?? "");
 
   if (evaluation.isSuccess) {
     return (
       <section className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm font-bold text-green-800">
-        Đã gửi đánh giá người chơi.
+        Đã đánh giá.
       </section>
     );
   }
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-black text-slate-950">Đánh giá người chơi</h2>
-      <p className="mt-1 text-sm text-slate-500">Đánh giá {target.displayName} sau khi kết quả trận đấu đã được lưu.</p>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-lg font-black text-slate-950">{existingEvaluation ? "Cập nhật đánh giá" : "Đánh giá người chơi"}</h2>
+        <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900" aria-label="Đóng">
+          <X className="size-4" />
+        </button>
+      </div>
+      <p className="mt-1 text-sm text-slate-500">Đánh giá{" "}
+        <Link href={`/users/${target.userId}/profile`} className="font-bold text-green-700 hover:text-green-800">
+          {target.displayName ?? "người chơi"}
+        </Link> sau khi trận đấu đã kết thúc.</p>
       <div className="mt-4 grid gap-3 text-sm font-bold text-slate-700">
         <Toggle label="Đến đúng giờ" checked={arrivedOnTime} onChange={setArrivedOnTime} />
-        <Toggle label="Hủy bất ngờ" checked={cancelledUnexpectedly} onChange={setCancelledUnexpectedly} />
         <Toggle label="Fair play" checked={fairPlay} onChange={setFairPlay} />
         <Toggle label="Muốn chơi lại" checked={wouldPlayAgain} onChange={setWouldPlayAgain} />
+        <label className="grid gap-1">
+          <span>Trình độ</span>
+          <select value={skillLevel} onChange={(event) => setSkillLevel(event.target.value)} className={inputClassName}>
+            {skillLevelOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <textarea
         value={comment}
@@ -498,19 +544,31 @@ function MatchEvaluationPanel({
           evaluation.mutate({
             evaluatedUserId: target.userId,
             arrivedOnTime,
-            cancelledUnexpectedly,
             fairPlay,
             wouldPlayAgain,
+            skillLevel,
             comment: comment.trim() || undefined,
           })
         }
         disabled={evaluation.isPending}
         className="action-button mt-3 min-h-12 bg-green-600 px-4 text-sm text-white disabled:opacity-60"
       >
-        {evaluation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} Gửi đánh giá
+        {evaluation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} {existingEvaluation ? "Cập nhật đánh giá" : "Gửi đánh giá"}
       </button>
       {evaluation.error ? <p className="mt-2 text-sm font-semibold text-rose-600">{evaluation.error.message}</p> : null}
     </section>
+  );
+}
+
+function ReviewButton({ reviewed, onClick }: { reviewed: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ml-2 inline-flex rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-xs font-black text-green-700 hover:bg-green-100"
+    >
+      {reviewed ? "Đã đánh giá" : "Đánh giá"}
+    </button>
   );
 }
 
@@ -561,6 +619,10 @@ function getEvaluationTarget({
     };
   }
   return null;
+}
+
+function hasMatchEnded(post: CommunityPost) {
+  return new Date(`${post.bookingDate}T${post.endTime}`).getTime() <= Date.now();
 }
 
 function formatPercent(value: number) {
