@@ -29,7 +29,7 @@ COPY notification-service notification-service
 COPY payment-service payment-service
 
 RUN ./mvnw -q -pl "${SERVICE_DIR}" -am -Dmaven.test.skip=true package && \
-    cp "${SERVICE_DIR}/target/${ARTIFACT_ID}-0.0.1-SNAPSHOT.jar" /workspace/app.jar
+    cp "${SERVICE_DIR}"/target/*.jar /workspace/app.jar
 
 FROM eclipse-temurin:21-jre-alpine
 
@@ -42,4 +42,4 @@ COPY --from=builder /workspace/app.jar /app/app.jar
 USER app
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]

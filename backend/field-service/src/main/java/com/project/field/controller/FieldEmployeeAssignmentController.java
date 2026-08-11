@@ -30,12 +30,12 @@ import java.util.UUID;
 public class FieldEmployeeAssignmentController {
     private final FieldEmployeeAssignmentService assignmentService;
 
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER','EMPLOYEE')")
     @GetMapping("/{fieldId}/employees")
     public ApiResponse<List<FieldEmployeeDto>> getFieldEmployees(
             @PathVariable UUID fieldId,
             @CurrentUser UserPrincipal user) {
-        return ApiResponse.success(assignmentService.getFieldEmployees(user.id(), fieldId));
+        return ApiResponse.success(assignmentService.getFieldEmployees(user, fieldId));
     }
 
     @PreAuthorize("hasRole('OWNER')")

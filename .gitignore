@@ -46,6 +46,9 @@ Desktop.ini
 .env.dev
 .env.prod
 .env.staging
+.env.docker.prod
+.env-docker-prod.properties
+.env-prod.properties.before-docker-rename
 *.env.local
 
 # Docker

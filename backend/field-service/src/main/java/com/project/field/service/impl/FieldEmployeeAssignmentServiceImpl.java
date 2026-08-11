@@ -6,6 +6,7 @@ import com.project.common.enums.UserType;
 import com.project.common.exception.BadRequestException;
 import com.project.common.exception.ForbiddenException;
 import com.project.common.exception.NotFoundException;
+import com.project.common.security.UserPrincipal;
 import com.project.field.client.UserServiceClient;
 import com.project.field.dto.FieldDto;
 import com.project.field.dto.FieldEmployeeDto;
@@ -73,8 +74,8 @@ public class FieldEmployeeAssignmentServiceImpl implements FieldEmployeeAssignme
 
     @Override
     @Transactional(readOnly = true)
-    public List<FieldEmployeeDto> getFieldEmployees(UUID ownerId, UUID fieldId) {
-        requireOwnedField(ownerId, fieldId);
+    public List<FieldEmployeeDto> getFieldEmployees(UserPrincipal user, UUID fieldId) {
+        requireFieldManager(user, fieldId);
         return assignmentRepository.findByFieldIdOrderByCreatedAtAsc(fieldId).stream()
                 .map(assignment -> toDto(assignment, getUser(assignment.getEmployeeId())))
                 .toList();
@@ -113,6 +114,14 @@ public class FieldEmployeeAssignmentServiceImpl implements FieldEmployeeAssignme
             throw new ForbiddenException("Only the field owner can manage employee assignments");
         }
         return field;
+    }
+
+    private Field requireFieldManager(UserPrincipal user, UUID fieldId) {
+        Field field = fieldRepository.findById(fieldId).orElseThrow(() -> new FieldNotFoundException(fieldId));
+        if (field.getOwnerId().equals(user.id()) || assignmentRepository.existsByEmployeeIdAndFieldId(user.id(), fieldId)) {
+            return field;
+        }
+        throw new ForbiddenException("Only the field owner or an assigned employee can view employee assignments");
     }
 
     private UserDto requireAssignableUser(UUID employeeId) {

@@ -11,55 +11,72 @@ import type {
   CloudinaryUploadResult,
 } from "@/lib/api/types";
 import { jsonBody, requestJson } from "./http";
+
+const MAX_FIELD_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function formatFileSize(bytes: number) {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
+}
+
 export function fetchOwnerFields(page: number, size = 10) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   return requestJson<PageResponse<Field>>(`/api/owner/fields?${query}`);
 }
+
 export function fetchAssignedFields(page: number, size = 10) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   return requestJson<PageResponse<Field>>(`/api/employee/fields?${query}`);
 }
+
 export function fetchManagedFields(page: number, size = 10) {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   return requestJson<PageResponse<Field>>(`/api/owner/managed-fields?${query}`);
 }
+
 export function fetchFieldEmployees(fieldId: string) {
   return requestJson<FieldEmployee[]>(`/api/owner/fields/${fieldId}/employees`);
 }
+
 export function submitFieldEmployee(fieldId: string, employeeId: string) {
   return requestJson<FieldEmployee>(`/api/owner/fields/${fieldId}/employees`, {
     method: "POST",
     ...jsonBody({ employeeId }),
   });
 }
+
 export function submitFieldEmployeeRemoval(fieldId: string, employeeId: string) {
   return requestJson<void>(`/api/owner/fields/${fieldId}/employees/${employeeId}`, {
     method: "DELETE",
   });
 }
+
 export function submitField(input: FieldInput) {
   return requestJson<Field>("/api/owner/fields", {
     method: "POST",
     ...jsonBody(input),
   });
 }
+
 export function submitFieldUpdate(id: string, input: FieldInput) {
   return requestJson<Field>(`/api/owner/fields/${id}`, {
     method: "PUT",
     ...jsonBody(input),
   });
 }
+
 export function submitSubField(fieldId: string, input: SubFieldInput) {
   return requestJson<SubField>(`/api/owner/fields/${fieldId}/sub-fields`, {
     method: "POST",
     ...jsonBody(input),
   });
 }
+
 export function submitSubFieldDelete(fieldId: string, id: string) {
   return requestJson<void>(`/api/owner/fields/${fieldId}/sub-fields/${id}`, {
     method: "DELETE",
   });
 }
+
 export function submitSubFieldUpdate(
   fieldId: string,
   id: string,
@@ -70,11 +87,13 @@ export function submitSubFieldUpdate(
     { method: "PUT", ...jsonBody(input) },
   );
 }
+
 export function fetchClosures(fieldId: string, subFieldId: string) {
   return requestJson<FieldClosure[]>(
     `/api/owner/fields/${fieldId}/closures?subFieldId=${subFieldId}`,
   );
 }
+
 export function submitClosure(
   fieldId: string,
   input: {
@@ -89,11 +108,13 @@ export function submitClosure(
     ...jsonBody(input),
   });
 }
+
 export function submitClosureDelete(fieldId: string, id: string) {
   return requestJson<void>(`/api/owner/fields/${fieldId}/closures/${id}`, {
     method: "DELETE",
   });
 }
+
 export function submitClosureUpdate(
   fieldId: string,
   id: string,
@@ -109,6 +130,7 @@ export function submitClosureUpdate(
     { method: "PUT", ...jsonBody(input) },
   );
 }
+
 function requestUploadSlots(fieldId: string, requestId: string, count: number) {
   return requestJson<ImageUploadSlot[]>(`/api/owner/fields/${fieldId}/images/upload-slots`, {
     method: "POST",
@@ -142,6 +164,9 @@ export async function submitImages(fieldId: string, files: FileList) {
   if (selected.some((file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type))) {
     throw new Error("Chỉ hỗ trợ ảnh JPEG, PNG và WEBP");
   }
+  if (selected.some((file) => file.size > MAX_FIELD_IMAGE_BYTES)) {
+    throw new Error(`Mỗi ảnh không được vượt quá ${formatFileSize(MAX_FIELD_IMAGE_BYTES)}`);
+  }
   const requestId = crypto.randomUUID();
   let slots: ImageUploadSlot[];
   try {
@@ -153,11 +178,13 @@ export async function submitImages(fieldId: string, files: FileList) {
   const results = await Promise.all(selected.map((file, index) => uploadToCloudinary(file, slots[index])));
   return confirmUploads(fieldId, results);
 }
+
 export function submitImageDelete(fieldId: string, id: number) {
   return requestJson<void>(`/api/owner/fields/${fieldId}/images/${id}`, {
     method: "DELETE",
   });
 }
+
 export function submitImageOrderChange(
   fieldId: string,
   imageIds: number[],

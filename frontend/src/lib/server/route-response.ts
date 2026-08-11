@@ -23,7 +23,12 @@ export function errorJson(
 
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("Origin");
-  if (origin && new URL(origin).host !== new URL(request.url).host) {
+  const requestHost =
+    request.headers.get("X-Forwarded-Host") ??
+    request.headers.get("Host") ??
+    new URL(request.url).host;
+
+  if (origin && new URL(origin).host !== requestHost) {
     throw new ApiError("Cross-origin request rejected", 403, "INVALID_ORIGIN");
   }
 }

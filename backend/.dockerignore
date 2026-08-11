@@ -8,5 +8,6 @@
 common/.env.properties
 common/.env-dev.properties
 common/.env-prod.properties
+common/.env-prod.properties.before-docker-rename
 
 docker-compose.override.yml

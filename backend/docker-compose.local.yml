@@ -1,12 +1,12 @@
-name: football-prd
-
 x-backend-environment: &backend-environment
-  APP_MODE: PROD
+  APP_MODE: ${APP_MODE:-dev}
   REDIS_HOST: redis
   REDIS_PORT: 6379
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
   EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
-  USER_SERVICE_URL: http://user-service:8081
+  INTERNAL_GATEWAY_SECRET: ${INTERNAL_GATEWAY_SECRET:-dev-internal-gateway-secret}
+  USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8081}
+  JWT_SECRET: ${JWT_SECRET:-ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==}
   USER_DB_URL: ${USER_DB_URL:-jdbc:postgresql://postgres:5432/user_db}
   USER_DB_USERNAME: ${USER_DB_USERNAME:-football}
   USER_DB_PASSWORD: ${USER_DB_PASSWORD:-football}
@@ -22,24 +22,22 @@ x-backend-environment: &backend-environment
   PAYMENT_DB_URL: ${PAYMENT_DB_URL:-jdbc:postgresql://postgres:5432/payment_db}
   PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME:-football}
   PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-football}
-  INTERNAL_GATEWAY_SECRET: ${INTERNAL_GATEWAY_SECRET:?Set INTERNAL_GATEWAY_SECRET for production}
-  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET for production}
-  CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:?Set CLOUDINARY_CLOUD_NAME for production}
-  CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:?Set CLOUDINARY_API_KEY for production}
-  CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:?Set CLOUDINARY_API_SECRET for production}
-  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-  FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-}
-  FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-}
-  SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST for production}
-  SMTP_PORT: ${SMTP_PORT:-587}
+  CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-dev-cloudinary-cloud}
+  CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-dev-cloudinary-key}
+  CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-dev-cloudinary-secret}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-dev-google-client}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-dev-google-secret}
+  FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-dev-facebook-client}
+  FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-dev-facebook-secret}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
   SMTP_USERNAME: ${SMTP_USERNAME:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-  N8N_URL: ${N8N_URL:-}
-  N8N_KEY: ${N8N_KEY:-}
-  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?Set STRIPE_SECRET_KEY for production}
-  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Set STRIPE_WEBHOOK_SECRET for production}
-  FRONTEND_URL: ${FRONTEND_URL:?Set FRONTEND_URL for production}
+  N8N_URL: ${N8N_URL:-http://localhost:5678/webhook/test}
+  N8N_KEY: ${N8N_KEY:-dev-n8n-key}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_replace_me}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_replace_me}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
 
 x-backend-build: &backend-build
   context: .
@@ -48,11 +46,14 @@ x-backend-build: &backend-build
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: postgres
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-football}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-football}
-      POSTGRES_DB: ${POSTGRES_DB:-football}
+      POSTGRES_USER: football
+      POSTGRES_PASSWORD: football
+      POSTGRES_DB: football
       POSTGRES_MULTIPLE_DATABASES: user_db,field_db,booking_db,notification_db,payment_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -60,15 +61,18 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
     restart: unless-stopped
+    ports:
+      - "29092:29092"
     environment:
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -77,128 +81,190 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: redis
     restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
   discovery-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: discovery-service
         ARTIFACT_ID: discovery
+    container_name: discovery-service
     restart: unless-stopped
-    depends_on:
-      - postgres
-      - kafka
-      - redis
+    ports:
+      - "8761:8761"
     environment:
-      APP_MODE: PROD
+      APP_MODE: ${APP_MODE:-dev}
       EUREKA_HOSTNAME: discovery-service
       EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
 
   gateway-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: gateway-service
         ARTIFACT_ID: gateway
+    container_name: gateway-service
     restart: unless-stopped
     depends_on:
       - discovery-service
       - redis
     ports:
-      - "${PRD_GATEWAY_BIND:-0.0.0.0}:${PRD_GATEWAY_PORT:-8080}:8080"
+      - "8080:8080"
     environment:
       <<: *backend-environment
 
   user-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: user-service
         ARTIFACT_ID: user
+    container_name: user-service
     restart: unless-stopped
     depends_on:
       - postgres
       - kafka
       - redis
       - discovery-service
+    ports:
+      - "8081:8081"
     environment:
       <<: *backend-environment
 
   field-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: field-service
         ARTIFACT_ID: field
+    container_name: field-service
     restart: unless-stopped
     depends_on:
       - postgres
       - kafka
       - redis
       - discovery-service
+    ports:
+      - "8082:8082"
     environment:
       <<: *backend-environment
 
   booking-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: booking-service
         ARTIFACT_ID: booking
+    container_name: booking-service
     restart: unless-stopped
     depends_on:
       - postgres
       - kafka
       - redis
       - discovery-service
+    ports:
+      - "8083:8083"
     environment:
       <<: *backend-environment
 
   notification-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: notification-service
         ARTIFACT_ID: notification
+    container_name: notification-service
     restart: unless-stopped
     depends_on:
       - postgres
       - kafka
       - discovery-service
+      - mailpit
+    ports:
+      - "8084:8084"
     environment:
       <<: *backend-environment
 
   payment-service:
+    profiles:
+      - app
     build:
       <<: *backend-build
       args:
         SERVICE_DIR: payment-service
         ARTIFACT_ID: payment
+    container_name: payment-service
     restart: unless-stopped
     depends_on:
       - postgres
       - kafka
       - discovery-service
+    ports:
+      - "8085:8085"
     environment:
       <<: *backend-environment
 
   frontend:
+    profiles:
+      - app
     build:
       context: ../frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_APP_URL: ${FRONTEND_URL:?Set FRONTEND_URL for production}
-        NEXT_PUBLIC_GATEWAY_WS_URL: ${NEXT_PUBLIC_GATEWAY_WS_URL:?Set NEXT_PUBLIC_GATEWAY_WS_URL for production}
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+        NEXT_PUBLIC_GATEWAY_WS_URL: ws://localhost:8080/ws
+    container_name: frontend
     restart: unless-stopped
     depends_on:
       - gateway-service
     ports:
-      - "${PRD_FRONTEND_BIND:-0.0.0.0}:${PRD_FRONTEND_PORT:-80}:3000"
+      - "3000:3000"
     environment:
       API_BASE_URL: http://gateway-service:8080
-      NEXT_PUBLIC_APP_URL: ${FRONTEND_URL:?Set FRONTEND_URL for production}
-      NEXT_PUBLIC_GATEWAY_WS_URL: ${NEXT_PUBLIC_GATEWAY_WS_URL:?Set NEXT_PUBLIC_GATEWAY_WS_URL for production}
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_GATEWAY_WS_URL: ws://localhost:8080/ws
+
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+#    profiles:
+#      - stripe
+    container_name: stripe-cli
+    restart: unless-stopped
+    env_file:
+      - ./common/.env-dev.properties
+    volumes:
+      - stripe_cli_config:/root/.config/stripe
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if test -n "$$STRIPE_SECRET_KEY"; then API_KEY_ARGS="--api-key $$STRIPE_SECRET_KEY"; else API_KEY_ARGS=""; fi;
+        exec stripe listen $$API_KEY_ARGS --forward-to http://host.docker.internal:8080/api/v1/payments/webhook --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
 
 volumes:
   postgres_data:
+  stripe_cli_config:
+    name: stripe_cli_config

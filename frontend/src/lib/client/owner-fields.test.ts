@@ -236,6 +236,19 @@ describe("owner field client requests", () => {
     ]);
   });
 
+  it("rejects oversized field images before requesting upload slots", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetchMock);
+    const files = [
+      new File([new Uint8Array(10 * 1024 * 1024 + 1)], "large.webp", { type: "image/webp" }),
+    ] as unknown as FileList;
+
+    await expect(submitImages("field-1", files)).rejects.toThrow(
+      "Mỗi ảnh không được vượt quá 10 MB",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("sends image delete and order update requests", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

@@ -25,12 +25,12 @@ export default async function OwnerModerationHistoryPage({
   return (
     <>
       <BackLink href="/owner" className="mb-5">
-        Quan ly san
+        Quản lý sân
       </BackLink>
       <PageHeading
-        eyebrow="Kiem duyet"
-        title="Bao cao vang mat va nhat ky cam"
-        description="Theo doi cac bao cao vang mat da ghi nhan va lich su thao tac cam/go cam theo tung san."
+        eyebrow="Kiểm duyệt"
+        title="Báo cáo vắng mặt và nhật ký cấm"
+        description="Theo dõi các báo cáo vắng mặt đã ghi nhận và lịch sử thao tác cấm/gỡ cấm theo từng sân."
       />
       <ModerationHistoryPanel
         key={`${selectedFieldId ?? ""}-${page}`}

@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "res.cloudinary.com" },
     ],
   },
+  output: "standalone",
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

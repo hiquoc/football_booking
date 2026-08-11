@@ -7,7 +7,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type MouseEventHandler, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   sendOtpSchema,
@@ -20,6 +20,7 @@ import { useSendOtp, useVerifyOtp } from "@/lib/hooks/use-auth";
 import { safeAuthRedirect } from "@/lib/auth-redirect";
 
 type Step = "phone" | "otp";
+const DEFAULT_OTP_CODE = "111111";
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const RESEND_RETRY_DELAYS_MS = [1000, 1500, 2500];
 
@@ -48,7 +49,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
   });
   const otpForm = useForm<VerifyOtpInput>({
     resolver: zodResolver(verifyOtpSchema),
-    defaultValues: { phoneNumber: "", code: "" },
+    defaultValues: { phoneNumber: "", code: DEFAULT_OTP_CODE },
   });
 
   const otpCooldownSeconds = otpCooldownUntil
@@ -82,6 +83,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
       await sendOtpMutation.mutateAsync(input);
       setPhoneNumber(input.phoneNumber);
       otpForm.setValue("phoneNumber", input.phoneNumber);
+      otpForm.setValue("code", DEFAULT_OTP_CODE);
       startOtpCooldown();
       setStep("otp");
     } catch {
@@ -99,7 +101,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
       setIsResendingOtp(true);
       sendOtpMutation.reset();
       await sendOtpWithCooldownRetry({ phoneNumber });
-      otpForm.setValue("code", "");
+      otpForm.setValue("code", DEFAULT_OTP_CODE);
       startOtpCooldown();
     } catch {
       // React Query stores the error for display below.
@@ -127,6 +129,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
       setIsSubmitting(true);
       await verifyOtpMutation.mutateAsync(input);
       router.replace(safeAuthRedirect(nextPath));
+      router.refresh();
     } catch {
       setIsSubmitting(false);
       // React Query stores the error for display below.
@@ -172,7 +175,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
-              placeholder="000000"
+              placeholder={DEFAULT_OTP_CODE}
               autoFocus
               {...otpForm.register("code")}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-4 pr-28 text-center text-2xl font-bold tracking-wide text-slate-950 outline-none transition focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100"
@@ -212,7 +215,7 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
 
   return (
     <form
-      onSubmit={phoneForm.handleSubmit(sendOtp)}
+      onSubmit={(event) => event.preventDefault()}
       className="space-y-5"
       noValidate
     >
@@ -252,6 +255,8 @@ export function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
       />
       <SubmitButton
         pending={ isSubmitting }
+        type="button"
+        onClick={phoneForm.handleSubmit(sendOtp)}
         label="Gửi mã xác minh"
       />
       <p className="text-center text-xs leading-5 text-slate-400">
@@ -306,10 +311,21 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function SubmitButton({ pending, label }: { pending: boolean; label: string }) {
+function SubmitButton({
+  pending,
+  label,
+  type = "submit",
+  onClick,
+}: {
+  pending: boolean;
+  label: string;
+  type?: "button" | "submit";
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+}) {
   return (
     <button
-      type="submit"
+      type={type}
+      onClick={onClick}
       disabled={pending}
       className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-600 px-5 py-4 text-sm font-black text-white transition hover:bg-green-700 disabled:cursor-wait disabled:opacity-60"
     >

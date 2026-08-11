@@ -9,6 +9,7 @@ import com.project.field.mapper.FieldMapper;
 import com.project.field.repository.*;
 import com.project.field.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +24,16 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class FieldImageUploadServiceImpl implements FieldImageUploadService {
+    private static final long DEFAULT_MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
+
     private final FieldRepository fieldRepository;
     private final FieldImageRepository imageRepository;
     private final CloudinaryService cloudinary;
     private final FieldMapper mapper;
     private final PlatformTransactionManager transactionManager;
+
+    @Value("${cloudinary.max-image-bytes:" + DEFAULT_MAX_IMAGE_BYTES + "}")
+    private long maxImageBytes;
 
     @Override
     public List<ImageUploadSlotDto> issueSlots(UUID fieldId, UUID ownerId, ImageUploadSlotRequest request) {
@@ -148,6 +154,9 @@ public class FieldImageUploadServiceImpl implements FieldImageUploadService {
     }
 
     private void validateCloudinaryResult(ImageUploadConfirmRequest request) {
+        if (request.bytes() > maxImageBytes) {
+            throw new BadRequestException("Image exceeds the maximum allowed size of " + formatBytes(maxImageBytes));
+        }
         if (!cloudinary.verifyUploadResult(request.publicId(), request.version(), request.signature())) {
             throw new BadRequestException("Invalid Cloudinary upload result signature");
         }
@@ -174,5 +183,12 @@ public class FieldImageUploadServiceImpl implements FieldImageUploadService {
 
     private void requireOwner(Field field, UUID ownerId) {
         if (!ownerId.equals(field.getOwnerId())) throw new ForbiddenException("You don't have permission to do this");
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes % (1024L * 1024L) == 0) {
+            return (bytes / (1024L * 1024L)) + " MB";
+        }
+        return bytes + " bytes";
     }
 }

@@ -30,12 +30,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup -S app && adduser -S app -G app
 
-COPY package.json package-lock.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --chown=app:app --from=builder /app/.next/standalone ./
+COPY --chown=app:app --from=builder /app/.next/static ./.next/static
 
 USER app
+
 EXPOSE 3000
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

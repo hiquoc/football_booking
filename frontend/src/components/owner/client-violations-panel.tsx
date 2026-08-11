@@ -40,20 +40,20 @@ export function ClientViolationsPanel({
       <FieldFilter fields={fields} selectedFieldId={currentFieldId} onChange={selectField} />
       {requestedDenied ? (
         <p className="mt-3 text-sm font-semibold text-amber-700">
-          San duoc yeu cau khong thuoc tai khoan cua ban, nen danh sach da duoc chuyen ve san hop le.
+          Sân được yêu cầu không thuộc tài khoản của bạn, nên danh sách đã được chuyển về sân hợp lệ.
         </p>
       ) : null}
       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white">
         {query.isPending ? <ListSkeleton /> : null}
-        {query.isError ? <DataError title="Khong the tai luot vang mat" /> : null}
+        {query.isError ? <DataError title="Không thể tải lượt vắng mặt" /> : null}
         {query.data ? (
           <table className="w-full text-center text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
-                <th className="px-4 py-3">Khach</th>
-                <th className="px-4 py-3">So lan vi pham</th>
-                <th className="px-4 py-3">Vi pham gan nhat</th>
-                <th className="px-4 py-3">Trang thai / thao tac</th>
+                <th className="px-4 py-3">Khách</th>
+                <th className="px-4 py-3">Số lần vi phạm</th>
+                <th className="px-4 py-3">Vi phạm gần nhất</th>
+                <th className="px-4 py-3">Trạng thái / thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -75,7 +75,7 @@ export function ClientViolationsPanel({
               {!query.data.content.length ? (
                 <tr className="border-t border-slate-100">
                   <td className="px-4 py-8 text-center text-slate-500" colSpan={4}>
-                    {currentFieldId ? "Chua co vi pham nao cho san nay." : "Tai khoan cua ban chua co san de quan ly."}
+                    {currentFieldId ? "Chưa có vi phạm nào cho sân này." : "Tài khoản của bạn chưa có sân để quản lý."}
                   </td>
                 </tr>
               ) : null}
@@ -85,7 +85,7 @@ export function ClientViolationsPanel({
       </div>
       {query.data && query.data.totalPages > 1 ? (
         <div className="mt-6 flex items-center justify-center gap-3">
-          {currentPage > 0 ? <PageLink fieldId={currentFieldId} page={currentPage - 1}>Truoc</PageLink> : null}
+          {currentPage > 0 ? <PageLink fieldId={currentFieldId} page={currentPage - 1}>Trước</PageLink> : null}
           <span className="text-sm font-semibold text-slate-500">Trang {query.data.page + 1}/{Math.max(query.data.totalPages, 1)}</span>
           {!query.data.last ? <PageLink fieldId={currentFieldId} page={currentPage + 1} primary>Sau</PageLink> : null}
         </div>
@@ -98,14 +98,14 @@ function FieldFilter({ fields, selectedFieldId, onChange }: { fields: FieldOptio
   return (
     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
       <label className="block text-sm font-semibold text-slate-700">
-        San
+        Sân
         <select
           value={selectedFieldId}
           onChange={(event) => onChange(event.target.value)}
           className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
           disabled={!fields.length}
         >
-          {!fields.length ? <option value="">Chua co san quan ly</option> : null}
+          {!fields.length ? <option value="">Chưa có sân quản lý</option> : null}
           {fields.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}
         </select>
       </label>

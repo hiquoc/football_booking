@@ -12,8 +12,12 @@ public class UserServiceClientConfig {
     @Qualifier("userServiceRestClient")
     public RestClient userServiceRestClient(
             RestClient.Builder builder,
-            @Value("${internal.user-service.url:http://localhost:8081}") String baseUrl) {
-        return builder.baseUrl(baseUrl).build();
+            @Value("${internal.user-service.url:http://localhost:8081}") String baseUrl,
+            @Value("${internal.gateway.secret}") String internalGatewaySecret) {
+        return builder
+                .baseUrl(baseUrl)
+                .defaultHeader(com.project.common.constants.GlobalConstants.HEADER_INTERNAL_SECRET, internalGatewaySecret)
+                .build();
     }
 
     @Bean

@@ -26,12 +26,12 @@ export default async function OwnerClientViolationsPage({
   return (
     <>
       <BackLink href="/owner" className="mb-5">
-        Quan ly san
+        Quản lý sân
       </BackLink>
       <PageHeading
-        eyebrow="Vi pham"
-        title="Luot vang mat cua khach"
-        description="Theo doi cac luot vang mat va cam khach dat san khi can thiet."
+        eyebrow="Vi phạm"
+        title="Lượt vắng mặt của khách"
+        description="Theo dõi các lượt vắng mặt và cấm khách đặt sân khi cần thiết."
       />
       <ClientViolationsPanel
         key={`${selectedFieldId ?? ""}-${page}`}

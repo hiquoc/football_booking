@@ -311,3 +311,11 @@ cd ../backend
 ./mvnw test
 docker compose config
 ```
+
+## Load Testing
+
+A k6 mock load test is available in `load-tests/`. Start with:
+
+```bash
+TARGET_URL=http://YOUR_VPS_IP:8080 TEST_PROFILE=vps k6 run load-tests/server-load-smoke.js
+```

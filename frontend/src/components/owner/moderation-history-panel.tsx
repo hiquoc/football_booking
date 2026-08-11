@@ -37,23 +37,23 @@ export function ModerationHistoryPanel({
     <>
       <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
         <label className="block text-sm font-semibold text-slate-700">
-          San
+          Sân
           <select
             value={currentFieldId}
             onChange={(event) => selectField(event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100"
             disabled={!fields.length}
           >
-            {!fields.length ? <option value="">Chua co san quan ly</option> : null}
+            {!fields.length ? <option value="">Chưa có sân quản lý</option> : null}
             {fields.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}
           </select>
         </label>
       </div>
 
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-lg font-black text-slate-950">Bao cao vang mat</h2>
+        <h2 className="text-lg font-black text-slate-950">Báo cáo vắng mặt</h2>
         {noShows.isPending ? <ListSkeleton /> : null}
-        {noShows.isError ? <DataError title="Khong the tai bao cao vang mat" /> : null}
+        {noShows.isError ? <DataError title="Không thể tải báo cáo vắng mặt" /> : null}
         {noShows.data ? (
           <div className="mt-4 grid gap-3">
             {noShows.data.content.map((report) => (
@@ -72,15 +72,15 @@ export function ModerationHistoryPanel({
                 </div>
               </article>
             ))}
-            {!noShows.data.content.length ? <EmptyText selectedFieldId={currentFieldId} text="Chua co bao cao vang mat nao cho san nay." /> : null}
+            {!noShows.data.content.length ? <EmptyText selectedFieldId={currentFieldId} text="Chưa có báo cáo vắng mặt nào cho sân này." /> : null}
           </div>
         ) : null}
       </section>
 
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="text-lg font-black text-slate-950">Nhat ky kiem duyet</h2>
+        <h2 className="text-lg font-black text-slate-950">Nhật ký kiểm duyệt</h2>
         {auditLogs.isPending ? <ListSkeleton /> : null}
-        {auditLogs.isError ? <DataError title="Khong the tai nhat ky kiem duyet" /> : null}
+        {auditLogs.isError ? <DataError title="Không thể tải nhật ký kiểm duyệt" /> : null}
         {auditLogs.data ? (
           <div className="mt-4 grid gap-3">
             {auditLogs.data.content.map((log) => (
@@ -100,14 +100,14 @@ export function ModerationHistoryPanel({
                 </div>
               </article>
             ))}
-            {!auditLogs.data.content.length ? <EmptyText selectedFieldId={currentFieldId} text="Chua co nhat ky kiem duyet nao cho san nay." /> : null}
+            {!auditLogs.data.content.length ? <EmptyText selectedFieldId={currentFieldId} text="Chưa có nhật ký kiểm duyệt nào cho sân này." /> : null}
           </div>
         ) : null}
       </section>
 
       {auditLogs.data && auditLogs.data.totalPages > 1 ? (
         <div className="mt-6 flex items-center justify-center gap-3">
-          {currentPage > 0 ? <PageLink fieldId={currentFieldId} page={currentPage - 1}>Truoc</PageLink> : null}
+          {currentPage > 0 ? <PageLink fieldId={currentFieldId} page={currentPage - 1}>Trước</PageLink> : null}
           <span className="text-sm font-semibold text-slate-500">Trang {currentPage + 1}</span>
           {!auditLogs.data.last ? <PageLink fieldId={currentFieldId} page={currentPage + 1} primary>Sau</PageLink> : null}
         </div>
@@ -119,20 +119,20 @@ export function ModerationHistoryPanel({
 function EmptyText({ selectedFieldId, text }: { selectedFieldId: string; text: string }) {
   return (
     <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm font-semibold text-slate-500">
-      {selectedFieldId ? text : "Tai khoan cua ban chua co san de quan ly."}
+      {selectedFieldId ? text : "Tài khoản của bạn chưa có sân để quản lý."}
     </p>
   );
 }
 
 function actionLabel(action: string) {
   const labels: Record<string, string> = {
-    NO_SHOW_REPORTED: "Bao cao vang mat",
-    FIELD_BAN: "Cam dat san",
-    FIELD_UNBAN: "Go cam dat san",
-    PLATFORM_UNBAN_RESET: "Go cam toan he thong",
-    PAYMENT_DISPUTE_SUBMITTED: "Gui tranh chap thanh toan",
-    PAYMENT_DISPUTE_APPROVED: "Duyet tranh chap thanh toan",
-    PAYMENT_DISPUTE_REJECTED: "Tu choi tranh chap thanh toan",
+    NO_SHOW_REPORTED: "Báo cáo vắng mặt",
+    FIELD_BAN: "Cấm đặt sân",
+    FIELD_UNBAN: "Gỡ cấm đặt sân",
+    PLATFORM_UNBAN_RESET: "Gỡ cấm toàn hệ thống",
+    PAYMENT_DISPUTE_SUBMITTED: "Gửi tranh chấp thanh toán",
+    PAYMENT_DISPUTE_APPROVED: "Duyệt tranh chấp thanh toán",
+    PAYMENT_DISPUTE_REJECTED: "Từ chối tranh chấp thanh toán",
   };
   return labels[action] ?? action;
 }
