@@ -3,6 +3,18 @@
 
 This repository contains a full-stack Football Field Booking platform. The system allows field owners to manage venues, sub-fields, schedules, pricing, images, and bookings, while clients can search available slots, book fields, pay online, and receive real-time notifications.
 
+## Website Access
+
+Live website: [https://huyquocweb.dpdns.org/](https://huyquocweb.dpdns.org/)
+
+Use the OTP `111111` with one of these demo phone numbers:
+
+| Role | Phone numbers |
+|------|---------------|
+| Admin | `0900000001` |
+| Owner | `0900000011`, `0900000012`, `0900000013` |
+| Client | `0900000021` through `0900000025` |
+
 ## Architecture
 
 The system is built on a microservices architecture, promoting separation of concerns, scalability, and independent deployment. The core services communicate asynchronously via Apache Kafka for an event-driven approach, ensuring loose coupling and resilience.
@@ -275,14 +287,6 @@ The system is now running. The frontend is accessible at `http://localhost:3000`
 ### Development demo data
 
 With the default `dev` profile, Flyway automatically loads a complete linked data set across all service databases. It includes users, venues, sub-fields, schedules, prices, images, reviews, closures, bookings, and notifications. Production only runs schema migrations and never loads demo rows.
-
-Use the development OTP `111111` with one of these phone numbers:
-
-| Role | Phone numbers |
-|------|---------------|
-| Admin | `0900000001` |
-| Owner | `0900000011`, `0900000012`, `0900000013` |
-| Client | `0900000021` through `0900000025` |
 
 ## API Documentation
 

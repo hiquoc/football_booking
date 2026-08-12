@@ -119,6 +119,12 @@ services:
 
   payment-service:
     image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-payment-service:${IMAGE_TAG:-1}
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     SERVICE_DIR: payment-service
+    #     ARTIFACT_ID: payment
     restart: unless-stopped
     depends_on:
       - postgres
@@ -130,6 +136,13 @@ services:
 
   frontend:
     image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-frontend:${IMAGE_TAG:-1}
+    # build:
+    #   context: ../frontend
+    #   dockerfile: Dockerfile
+    #   args:
+    #     NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    #     NEXT_PUBLIC_GATEWAY_WS_URL: ${NEXT_PUBLIC_GATEWAY_WS_URL}
+    # docker compose --env-file ../frontend/.env.docker.prod build --no-cache frontend
     restart: unless-stopped
     depends_on:
       - gateway-service
@@ -138,8 +151,6 @@ services:
       - "${PRD_FRONTEND_BIND:-0.0.0.0}:${PRD_FRONTEND_PORT:-3000}:3000"
     environment:
       API_BASE_URL: http://gateway-service:8080
-      NEXT_PUBLIC_APP_URL: ${FRONTEND_URL:-http://localhost:3000}
-      NEXT_PUBLIC_GATEWAY_WS_URL: ${NEXT_PUBLIC_GATEWAY_WS_URL:-ws://localhost:8080/ws}
 
 volumes:
   postgres_data:
