@@ -68,7 +68,6 @@ export function useFavoriteFields(page: number, size = 4) {
 
 export function useToggleFavoriteField(fieldId: string) {
   const queryClient = useQueryClient();
-  const { showToast } = useToast();
 
   type Snapshot = Array<[QueryKey, unknown]>;
 
@@ -105,13 +104,8 @@ export function useToggleFavoriteField(fieldId: string) {
     },
     onError: (_error, _saved, snapshot) => {
       snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      showToast("Could not update saved field. Please try again.", "error");
     },
     onSuccess: (_result, saved) => {
-      showToast(
-        saved ? "Field saved." : "Field removed from saved fields.",
-        "success",
-      );
       void queryClient.invalidateQueries({ queryKey: fieldQueryKeys.all });
     },
   });

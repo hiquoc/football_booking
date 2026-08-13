@@ -15,6 +15,15 @@ Use the OTP `111111` with one of these demo phone numbers:
 | Owner | `0900000011`, `0900000012`, `0900000013` |
 | Client | `0900000021` through `0900000025` |
 
+Stripe test credential for successful checkout:
+
+| Field | Value |
+|-------|-------|
+| Card number | `4242 4242 4242 4242` |
+| Expiry | Any future date |
+| CVC | Any 3 digits |
+| ZIP/postal code | Any valid ZIP/postal code |
+
 ## Architecture
 
 The system is built on a microservices architecture, promoting separation of concerns, scalability, and independent deployment. The core services communicate asynchronously via Apache Kafka for an event-driven approach, ensuring loose coupling and resilience.

@@ -23,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/users/me/favorites")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE')")
+@PreAuthorize("hasAnyRole('CLIENT','EMPLOYEE','OWNER')")
 public class FavoriteFieldController {
 
     private final FavoriteFieldService favoriteFieldService;

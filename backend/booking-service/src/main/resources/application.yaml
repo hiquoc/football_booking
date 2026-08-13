@@ -28,6 +28,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 1
     validate-on-migrate: true
+    ignore-migration-patterns: "*:ignored"
   data:
     redis:
       host: ${REDIS_HOST:localhost}
