@@ -1,7 +1,7 @@
 # Football Field Booking System
 [![Ask DeepWiki](https://devin.ai/assets/askdeepwiki.png)](https://deepwiki.com/hiquoc/football_booking)
 
-This repository contains a full-stack Football Field Booking platform. The system allows field owners to manage venues, sub-fields, schedules, pricing, images, and bookings, while clients can search available slots, book fields, pay online, and receive real-time notifications.
+This repository contains a full-stack Football Field Booking platform. The system allows field owners and assigned employees to manage venues, sub-fields, schedules, pricing, images, and bookings, while clients can search available slots, book fields, top up wallet balance through Stripe, join community match posts, and receive real-time notifications.
 
 ## Website Access
 
@@ -38,26 +38,28 @@ The system is built on a microservices architecture, promoting separation of con
     -   Handles OTP-based login/registration via phone number.
     -   Supports social login with Google and Facebook (OAuth2).
     -   Issues and refreshes JWT tokens.
-    -   Manages user profiles and role assignments (ADMIN, OWNER, CLIENT).
+    -   Manages user profiles, avatars, wallet balances, and role assignments (ADMIN, OWNER, EMPLOYEE, CLIENT).
 
 -   **Field Service (`field-service`):** The source of truth for all field-related information.
     -   CRUD operations for fields (venues), sub-fields (e.g., Pitch A, Pitch B), and sport types (e.g., Football, Badminton).
     -   Manages complex schedules, including weekly operating hours and temporary closures.
     -   Handles image uploads to Cloudinary.
+    -   Manages favorites, employee assignments, and field-management permissions.
     -   Manages user reviews and calculates average ratings.
     -   Publishes all data changes as events to Kafka topics (e.g., `field.sub-field.updated.v1`).
 
 -   **Booking Service (`booking-service`):** Responsible for the core booking and availability logic.
     -   Consumes events from the Field Service to maintain a local, read-optimized projection of field data (schedules, pricing, etc.).
     -   Provides high-performance availability checks without calling the Field Service directly.
-    -   Handles booking creation, cancellation, and status changes.
+    -   Handles booking creation, recurring bookings, cancellation, completion, match results, and status changes.
     -   Implements pricing logic based on time-based rules.
     -   Includes a scheduler to automatically expire unpaid, `PENDING` bookings.
+    -   Owns community posts for looking for opponents or players, post applications, reports, moderation history, no-show reports, and banned-client flows.
 
 -   **Payment Service (`payment-service`):** Owns payment sessions, provider integration, and booking payment projections.
-    -   Creates Stripe checkout sessions for card payments.
+    -   Creates Stripe checkout sessions for wallet top-ups.
     -   Handles provider webhook events idempotently.
-    -   Publishes payment result events consumed by the Booking Service.
+    -   Publishes payment and wallet events consumed by Booking, User, and Notification workflows.
 
 -   **Notification Service (`notification-service`):** Consumes notification events and delivers user-facing alerts.
     -   Sends email notifications using HTML templates.
@@ -69,6 +71,7 @@ The system is built on a microservices architecture, promoting separation of con
     -   Provides client, owner, and admin experiences.
     -   Keeps access and refresh tokens in HttpOnly cookies.
     -   Proxies browser requests through server-side route handlers to the API Gateway.
+    -   Includes public search/detail, booking/payment, wallet, community, owner management, employee moderation, admin, and notification screens.
 
 ### Data Flow & Communication
 
@@ -81,7 +84,8 @@ The system is built on a microservices architecture, promoting separation of con
     -   OTP login with Redis-based cooldowns and attempt limits.
     -   Social login integration with Google & Facebook.
     -   JWT-based authentication and authorization with refresh tokens.
-    -   Role-based access control (`CLIENT`, `OWNER`, `ADMIN`).
+    -   Role-based access control (`CLIENT`, `OWNER`, `EMPLOYEE`, `ADMIN`).
+    -   Profile, avatar, and wallet balance support.
 -   **Field & Sub-Field Management:**
     -   Owners can register and manage their sports venues.
     -   Define granular sub-fields with specific types (e.g., `FOOTBALL_5V5`), amenities, and surfaces.
@@ -93,15 +97,20 @@ The system is built on a microservices architecture, promoting separation of con
     -   Real-time availability checks for any given date.
 -   **Booking Workflow:**
     -   Bookings start in a `PENDING` state.
-    -   Payments can be completed through Stripe checkout or user balance.
+    -   Payments can be completed from user balance; Stripe Checkout is used to top up the wallet.
     -   Payment events transition bookings to confirmed, failed, expired, or cancelled states.
     -   A background scheduler automatically moves untended `PENDING` bookings to `EXPIRED`.
+    -   A background scheduler completes confirmed bookings after their end time.
     -   Bookings can be cancelled by the client or the field owner.
     -   A booking spanning multiple price periods is charged proportionally for each overlapping period; the final VND amount is rounded up to the nearest `1,000`.
 -   **Payments & Notifications:**
     -   Stripe checkout session creation and webhook handling.
-    -   User balance deduction and refund event flow.
+    -   User balance top-up, deduction, refund, and update event flows.
     -   In-app, WebSocket, and email notification delivery.
+-   **Community & Moderation:**
+    -   Looking-for-opponent and looking-for-player posts tied to confirmed bookings.
+    -   Post applications, owner accept/reject decisions, reports, owner hide flow, moderation history, and player statistics.
+    -   Field owners and assigned employees can manage booking moderation, no-show reports, banned clients, and unban flows.
 -   **Image & Review System:**
     -   Multi-file image uploads for fields managed via Cloudinary.
     -   Ability to re-order images and set a primary cover photo.
@@ -109,13 +118,15 @@ The system is built on a microservices architecture, promoting separation of con
 -   **Frontend Application:**
     -   Search and field detail pages.
     -   Booking and payment screens.
-    -   Owner field, schedule, image, closure, and booking management.
-    -   Admin field, field type, and user management.
+    -   Wallet top-up and balance display.
+    -   Community feed, detail, create, my-posts, and my-applications pages.
+    -   Owner field, schedule, image, closure, employee, booking, and moderation management.
+    -   Admin field, field type, user, and moderation management.
 
 ## Technology Stack
 
--   **Frontend:** Next.js 16, React 19, TypeScript, TanStack Query, Tailwind CSS
--   **Backend:** Java 21, Spring Boot 3, Spring Cloud (Gateway, Eureka), Spring Data JPA, Spring Security, Spring Kafka
+-   **Frontend:** Next.js 16, React 19, TypeScript, TanStack Query, Tailwind CSS, React Hook Form, Zod, Leaflet, STOMP over WebSocket
+-   **Backend:** Java 21, Spring Boot 3.5, Spring Cloud 2025, Spring Data JPA, Spring Security, Spring Kafka
 -   **Databases:** PostgreSQL (per-service), Redis (for caching, OTP, and session tracking)
 -   **Messaging:** Apache Kafka
 -   **Payments:** Stripe Checkout and webhooks
@@ -156,6 +167,18 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
 INTERNAL_GATEWAY_SECRET=dev-internal-gateway-secret
+JWT_SECRET=ZGV2LXNlY3JldC1kZXYtc2VjcmV0LWRldi1zZWNyZXQtZGV2LXNlY3JldA==
+CLOUDINARY_CLOUD_NAME=dev-cloudinary-cloud
+CLOUDINARY_API_KEY=dev-cloudinary-key
+CLOUDINARY_API_SECRET=dev-cloudinary-secret
+GOOGLE_CLIENT_ID=dev-google-client
+GOOGLE_CLIENT_SECRET=dev-google-secret
+FACEBOOK_CLIENT_ID=dev-facebook-client
+FACEBOOK_CLIENT_SECRET=dev-facebook-secret
+SMTP_HOST=localhost
+SMTP_PORT=1025
+STRIPE_SECRET_KEY=sk_test_replace_me
+STRIPE_WEBHOOK_SECRET=whsec_replace_me
 API_BASE_URL=http://localhost:8080
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_GATEWAY_WS_URL=ws://localhost:8080/ws
@@ -223,20 +246,20 @@ NEXT_PUBLIC_GATEWAY_WS_URL=wss://your-domain.example/ws
 ### 2. Run With Docker Compose
 
 Start the full local stack using Docker Compose. The local file binds browser-facing services to localhost ports:
-frontend `8000`, gateway `8080`, services `8081`-`8085`, discovery `8071`, and Mailpit `8025`.
+frontend `3000`, gateway `8080`, services `8081`-`8085`, discovery `8761`, PostgreSQL `5432`, Kafka `29092`, Redis `6379`, SMTP `1025`, and Mailpit UI `8025`.
 
 ```bash
 cd backend/
-docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml --profile app up -d
 ```
 
-The frontend is available at `http://localhost:8000`, and the API Gateway is available at `http://localhost:8080`.
+The frontend is available at `http://localhost:3000`, and the API Gateway is available at `http://localhost:8080`.
 
 For production, provide the required production environment variables and run:
 
 ```bash
 cd backend/
-docker compose -f docker-compose.prd.yml up -d --build
+docker compose -f docker-compose.yml up -d
 ```
 
 ### 3. Run Services Manually
