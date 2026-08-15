@@ -1,0 +1,265 @@
+name: CI/CD - Build and Deploy Services
+
+on:
+  push:
+    branches: ["main"]
+
+  pull_request:
+    branches: ["main"]
+
+env:
+  IMAGE_PREFIX: huy404/football-prd
+
+jobs:
+
+  # ============================================================
+  # 1. Detect changed services
+  # ============================================================
+  changes:
+    runs-on: ubuntu-latest
+
+    outputs:
+      gateway: ${{ steps.filter.outputs.gateway }}
+      user: ${{ steps.filter.outputs.user }}
+      field: ${{ steps.filter.outputs.field }}
+      booking: ${{ steps.filter.outputs.booking }}
+      payment: ${{ steps.filter.outputs.payment }}
+      notification: ${{ steps.filter.outputs.notification }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            gateway:
+              - 'gateway-service/**'
+              - 'common/**'
+
+            user:
+              - 'user-service/**'
+              - 'common/**'
+
+            field:
+              - 'field-service/**'
+              - 'common/**'
+
+            booking:
+              - 'booking-service/**'
+              - 'common/**'
+
+            payment:
+              - 'payment-service/**'
+              - 'common/**'
+
+            notification:
+              - 'notification-service/**'
+              - 'common/**'
+
+
+  # ============================================================
+  # 2. Test changed services
+  # ============================================================
+  test:
+    needs: changes
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - name: gateway
+            directory: gateway-service
+            changed: ${{ needs.changes.outputs.gateway }}
+
+          - name: user
+            directory: user-service
+            changed: ${{ needs.changes.outputs.user }}
+
+          - name: field
+            directory: field-service
+            changed: ${{ needs.changes.outputs.field }}
+
+          - name: booking
+            directory: booking-service
+            changed: ${{ needs.changes.outputs.booking }}
+
+          - name: payment
+            directory: payment-service
+            changed: ${{ needs.changes.outputs.payment }}
+
+          - name: notification
+            directory: notification-service
+            changed: ${{ needs.changes.outputs.notification }}
+
+    steps:
+      - name: Checkout
+        if: matrix.changed == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        if: matrix.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        if: matrix.changed == 'true'
+        run: chmod +x mvnw
+
+      - name: Run tests
+        if: matrix.changed == 'true'
+        run: ./mvnw test -pl ${{ matrix.directory }} -am
+
+
+  # ============================================================
+  # 3. Build and push Docker images
+  # ============================================================
+  build-and-push:
+    needs:
+      - changes
+      - test
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - name: gateway
+            directory: gateway-service
+            changed: ${{ needs.changes.outputs.gateway }}
+
+          - name: user
+            directory: user-service
+            changed: ${{ needs.changes.outputs.user }}
+
+          - name: field
+            directory: field-service
+            changed: ${{ needs.changes.outputs.field }}
+
+          - name: booking
+            directory: booking-service
+            changed: ${{ needs.changes.outputs.booking }}
+
+          - name: payment
+            directory: payment-service
+            changed: ${{ needs.changes.outputs.payment }}
+
+          - name: notification
+            directory: notification-service
+            changed: ${{ needs.changes.outputs.notification }}
+
+    steps:
+
+      - name: Checkout
+        if: matrix.changed == 'true' && github.event_name == 'push'
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        if: matrix.changed == 'true' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        if: matrix.changed == 'true' && github.event_name == 'push'
+        run: |
+          docker build \
+            --build-arg SERVICE_DIR=${{ matrix.directory }} \
+            --build-arg ARTIFACT_ID=${{ matrix.name }}-service \
+            -t ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ github.sha }} \
+            .
+
+      - name: Push Docker image
+        if: matrix.changed == 'true' && github.event_name == 'push'
+        run: |
+          docker push \
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
+
+
+  # ============================================================
+  # 4. Deploy changed services
+  # ============================================================
+  deploy:
+    needs:
+      - changes
+      - build-and-push
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - name: gateway
+            compose_service: gateway-service
+            env_variable: GATEWAY_VERSION
+            changed: ${{ needs.changes.outputs.gateway }}
+
+          - name: user
+            compose_service: user-service
+            env_variable: USER_VERSION
+            changed: ${{ needs.changes.outputs.user }}
+
+          - name: field
+            compose_service: field-service
+            env_variable: FIELD_VERSION
+            changed: ${{ needs.changes.outputs.field }}
+
+          - name: booking
+            compose_service: booking-service
+            env_variable: BOOKING_VERSION
+            changed: ${{ needs.changes.outputs.booking }}
+
+          - name: payment
+            compose_service: payment-service
+            env_variable: PAYMENT_VERSION
+            changed: ${{ needs.changes.outputs.payment }}
+
+          - name: notification
+            compose_service: notification-service
+            env_variable: NOTIFICATION_VERSION
+            changed: ${{ needs.changes.outputs.notification }}
+
+    steps:
+
+      - name: Deploy service
+        if: matrix.changed == 'true' && github.event_name == 'push'
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            set -e
+
+            cd ${{ secrets.EC2_PROJECT_PATH }}
+
+            echo "Updating ${{ matrix.env_variable }}..."
+
+            if grep -q "^${{ matrix.env_variable }}=" .env; then
+              sed -i "s/^${{ matrix.env_variable }}=.*/${{ matrix.env_variable }}=${{ github.sha }}/" .env
+            else
+              echo "${{ matrix.env_variable }}=${{ github.sha }}" >> .env
+            fi
+
+            echo "Pulling image..."
+
+            docker compose pull ${{ matrix.compose_service }}
+
+            echo "Recreating container..."
+
+            docker compose up -d ${{ matrix.compose_service }}
+
+            echo "Cleaning unused images..."
+
+            docker image prune -f
+
+            echo "Deployment completed."
