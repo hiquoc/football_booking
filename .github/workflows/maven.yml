@@ -36,28 +36,28 @@ jobs:
         with:
           filters: |
             gateway:
-              - 'gateway-service/**'
-              - 'common/**'
-
+              - 'backend/gateway-service/**'
+              - 'backend/common/**'
+          
             user:
-              - 'user-service/**'
-              - 'common/**'
-
+              - 'backend/user-service/**'
+              - 'backend/common/**'
+            
             field:
-              - 'field-service/**'
-              - 'common/**'
-
+              - 'backend/field-service/**'
+              - 'backend/common/**'
+            
             booking:
-              - 'booking-service/**'
-              - 'common/**'
-
+              - 'backend/booking-service/**'
+              - 'backend/common/**'
+            
             payment:
-              - 'payment-service/**'
-              - 'common/**'
-
+              - 'backend/payment-service/**'
+              - 'backend/common/**'
+            
             notification:
-              - 'notification-service/**'
-              - 'common/**'
+              - 'backend/notification-service/**'
+              - 'backend/common/**'
 
   # ============================================================
   # 2. Test changed services
@@ -110,10 +110,11 @@ jobs:
 
       - name: Make Maven wrapper executable
         if: matrix.changed == 'true'
-        run: chmod +x mvnw
-
+        run: chmod +x backend/mvnw
+      
       - name: Run tests
         if: matrix.changed == 'true'
+        working-directory: backend
         run: ./mvnw test -pl ${{ matrix.directory }} -am
 
 
@@ -174,7 +175,7 @@ jobs:
             --build-arg SERVICE_DIR=${{ matrix.directory }} \
             --build-arg ARTIFACT_ID=${{ matrix.name }}-service \
             -t ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}-service:${{ github.sha }} \
-            .
+            backend
 
       - name: Push Docker image
         if: matrix.changed == 'true' && github.event_name == 'push'
