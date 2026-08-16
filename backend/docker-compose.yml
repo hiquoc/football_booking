@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   discovery-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-discovery-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-discovery-service:${DISCOVERY_VERSION:-1}
     restart: unless-stopped
     depends_on:
       - postgres
@@ -59,7 +59,7 @@ services:
       EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
 
   gateway-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-gateway-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-gateway-service:${GATEWAY_VERSION:-1}
     restart: unless-stopped
     depends_on:
       - discovery-service
@@ -71,7 +71,7 @@ services:
       <<: *backend-environment
 
   user-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-user-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-user-service:${USER_VERSION:-1}
     restart: unless-stopped
     depends_on:
       - postgres
@@ -83,7 +83,7 @@ services:
       <<: *backend-environment
 
   field-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-field-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-field-service:${FIELD_VERSION:-1}
     restart: unless-stopped
     depends_on:
       - postgres
@@ -95,7 +95,7 @@ services:
       <<: *backend-environment
 
   booking-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-booking-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-booking-service:${BOOKING_VERSION:-1}
     restart: unless-stopped
     depends_on:
       - postgres
@@ -107,7 +107,7 @@ services:
       <<: *backend-environment
 
   notification-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-notification-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-notification-service:${NOTIFICATION_VERSION:-1}
     restart: unless-stopped
     depends_on:
       - postgres
@@ -118,7 +118,7 @@ services:
       <<: *backend-environment
 
   payment-service:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-payment-service:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-payment-service:${PAYMENT_VERSION:-1}
     # build:
     #   context: .
     #   dockerfile: Dockerfile
@@ -135,7 +135,7 @@ services:
       <<: *backend-environment
 
   frontend:
-    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-frontend:${IMAGE_TAG:-1}
+    image: ${DOCKERHUB_USERNAME:?Set DOCKERHUB_USERNAME}/football-prd-frontend:${FRONTEND_VERSION:-1}
     # build:
     #   context: ../frontend
     #   dockerfile: Dockerfile

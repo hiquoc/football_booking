@@ -15,7 +15,7 @@ export default function NotFound() {
           href="/"
           className="mt-8 inline-flex items-center gap-2 rounded-full bg-green-600 px-6 py-3.5 text-sm font-black text-white"
         >
-          Về trang chủ
+          Trở về trang chủ
         </Link>
       </div>
     </main>
