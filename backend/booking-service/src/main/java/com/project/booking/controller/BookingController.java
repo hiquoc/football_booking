@@ -1,5 +1,26 @@
 package com.project.booking.controller;
 
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+
+import org.springdoc.core.converters.models.PageableAsQueryParam;
+import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.project.booking.dto.request.CancelBookingRequest;
 import com.project.booking.dto.request.CreateBookingRequest;
 import com.project.booking.dto.request.UpdateReservationRequest;
@@ -7,13 +28,19 @@ import com.project.booking.dto.request.UpsertMatchResultRequest;
 import com.project.booking.dto.response.AvailabilityResponse;
 import com.project.booking.dto.response.BookingConfigResponse;
 import com.project.booking.dto.response.BookingResponse;
+import com.project.booking.repository.BookingRepository;
 import com.project.booking.service.BookingConfigService;
 import com.project.booking.service.BookingService;
+import com.project.booking.service.MatchResultService;
 import com.project.common.dto.ApiResponse;
 import com.project.common.dto.PageResponse;
 import com.project.common.enums.ApiStatusCode;
+import com.project.common.enums.BookingStatus;
+import com.project.common.enums.SportType;
+import com.project.common.enums.SubFieldType;
 import com.project.common.security.CurrentUser;
 import com.project.common.security.UserPrincipal;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -23,23 +50,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springdoc.core.converters.models.PageableAsQueryParam;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDate;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
-import com.project.booking.repository.BookingRepository;
-import com.project.common.enums.BookingStatus;
-import com.project.common.enums.SportType;
-import com.project.common.enums.SubFieldType;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -49,7 +59,7 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final BookingConfigService bookingConfigService;
-    private final com.project.booking.service.MatchResultService matchResultService;
+    private final MatchResultService matchResultService;
     private final BookingRepository bookingRepository;
 
     @Operation(summary = "Check booking conflicts", description = "Internal endpoint used before creating or updating field closures.")

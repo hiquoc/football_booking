@@ -1,11 +1,10 @@
 package com.project.field.controller;
 
-import com.project.common.security.CurrentUser;
-import com.project.common.security.UserPrincipal;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-import com.project.common.dto.PageResponse;
+import org.springdoc.core.converters.models.PageableAsQueryParam;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,15 +19,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.project.common.dto.ApiResponse;
-import com.project.field.dto.FieldDto;
-import com.project.field.dto.FieldDetailsDto;
+import com.project.common.dto.PageResponse;
+import com.project.common.security.CurrentUser;
+import com.project.common.security.UserPrincipal;
 import com.project.field.dto.FieldCardDto;
+import com.project.field.dto.FieldDetailsDto;
+import com.project.field.dto.FieldDto;
+import com.project.field.dto.FieldRequest;
 import com.project.field.dto.FieldSearchOptionResponse;
-import java.math.BigDecimal;
+import com.project.field.dto.FieldStatusRequest;
 import com.project.field.dto.OperatingHoursDto;
 import com.project.field.dto.OperatingHoursRequest;
-import com.project.field.dto.FieldRequest;
-import com.project.field.dto.FieldStatusRequest;
 import com.project.field.enums.FieldStatus;
 import com.project.field.service.FieldScheduleService;
 import com.project.field.service.FieldService;
@@ -43,7 +44,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springdoc.core.converters.models.PageableAsQueryParam;
 
 @RestController
 @RequestMapping("/api/v1/fields")
@@ -66,7 +66,7 @@ public class FieldController {
                                     {
                                       "name": "ABC Football Center",
                                       "description": "Premier football venue in the city",
-                                      "address": "123 Nguyen Hue",
+                                      "address": "231 Nguyen Hue",
                                       "ward": "Phuong Sai Gon",
                                       "wardCode": "26743",
                                       "province": "Thanh pho Ho Chi Minh",
