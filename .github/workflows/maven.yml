@@ -59,7 +59,6 @@ jobs:
               - 'notification-service/**'
               - 'common/**'
 
-
   # ============================================================
   # 2. Test changed services
   # ============================================================
@@ -174,14 +173,14 @@ jobs:
           docker build \
             --build-arg SERVICE_DIR=${{ matrix.directory }} \
             --build-arg ARTIFACT_ID=${{ matrix.name }}-service \
-            -t ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ github.sha }} \
+            -t ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}-service:${{ github.sha }} \
             .
 
       - name: Push Docker image
         if: matrix.changed == 'true' && github.event_name == 'push'
         run: |
           docker push \
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}-service:${{ github.sha }}
 
 
   # ============================================================
