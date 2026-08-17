@@ -56,7 +56,7 @@ public class FieldController {
     private final ReviewService reviewService;
 
     @Operation(
-            summary = "Create a new field",
+            summary = "Create a field",
             description = "Creates a new sports field owned by the current user. A field must include a full 7-day operatingHours schedule.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
