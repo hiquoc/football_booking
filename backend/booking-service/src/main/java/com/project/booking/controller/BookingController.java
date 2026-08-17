@@ -90,7 +90,7 @@ public class BookingController {
     }
 
     @Operation(
-        summary = "Create a new booking",
+        summary = "Create new booking",
         description = "Creates a new normal booking for an authenticated client, employee, or owner booking another owner's field. Owners cannot create normal bookings for fields they own.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
