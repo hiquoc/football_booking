@@ -13,7 +13,6 @@ target/
 *.iml
 *.iws
 *.ipr
-.mvn/
 
 # IDE - VS Code
 .vscode/
@@ -61,7 +60,10 @@ logs/
 # Maven Wrapper (keep the wrapper, ignore if generated)
 !mvnw
 !mvnw.cmd
+!.mvn/
+!.mvn/wrapper/
 !.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
 
 # Build outputs
 out/

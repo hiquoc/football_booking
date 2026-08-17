@@ -126,13 +126,20 @@ class BookingControllerApiTest {
     }
 
     @Test
-    void createBookingRejectsOwnerRole() throws Exception {
+    void createBookingWithOwnerHeaderReturnsCreated() throws Exception {
+        CreateBookingRequest request = bookingRequest();
+        BookingResponse response = bookingResponse();
+        when(bookingService.createBooking(eq(USER_ID), org.mockito.ArgumentMatchers.any(CreateBookingRequest.class)))
+                .thenReturn(response);
+
         mockMvc.perform(post("/api/v1/bookings")
                         .headers(ownerHeaders())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(bookingRequest())))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("You do not have permission to perform this operation"));
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Booking created successfully"))
+                .andExpect(jsonPath("$.data.id").value(BOOKING_ID.toString()));
     }
 
     @Test
@@ -155,7 +162,8 @@ class BookingControllerApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(bookingRequest())))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("BOOKING_CONFLICT"));
+                .andExpect(jsonPath("$.statusCode").value("BOOKING_NOT_AVAILABLE"))
+                .andExpect(jsonPath("$.message").value("Booking time is not available."));
     }
 
     @Test
@@ -168,7 +176,8 @@ class BookingControllerApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(bookingRequest())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("SubField is closed on the selected booking date"));
+                .andExpect(jsonPath("$.statusCode").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Invalid request."));
     }
 
     @Test

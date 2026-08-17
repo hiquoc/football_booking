@@ -858,10 +858,11 @@ class BookingServiceImplTest {
                 eq(LocalDateTime.of(request.getBookingDate(), LocalTime.of(10, 0))),
                 anyCollection())).thenReturn(true);
 
-        BookingConflictException exception = assertThrows(BookingConflictException.class,
+        BadRequestException exception = assertThrows(BadRequestException.class,
                 () -> bookingService.createBooking(userId, request));
 
         assertEquals("You have already booked this field successfully.", exception.getMessage());
+        assertEquals("BOOKING_ALREADY_EXISTS", exception.getCode());
     }
 
     @Test
@@ -1112,7 +1113,8 @@ class BookingServiceImplTest {
                 .clientId(clientId)
                 .build();
 
-        when(bookingRepository.findOwnerBookings(eq(ownerId), eq(null), eq(null), eq(null), eq(false), any(), eq(null), any()))
+        when(bookingRepository.findOwnerBookings(eq(ownerId), any(LocalDateTime.class), any(LocalDateTime.class),
+                eq(null), eq(false), anyCollection(), eq(null), any()))
                 .thenReturn(new PageImpl<>(List.of(booking), PageRequest.of(0, 10), 1));
         when(bookingMapper.toResponse(booking)).thenReturn(mapped);
         when(userProjectionRepository.findAllById(any())).thenReturn(List.of(UserProjection.builder()
