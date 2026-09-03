@@ -1,5 +1,7 @@
 package com.project.user.controller;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,7 +23,6 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,12 +36,14 @@ public class AuthController {
     private final AuthService authService;
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
-        Cookie cookie = new Cookie("refreshToken", refreshToken);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true); // Should be true in production
-        cookie.setPath("/");
-        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        response.addCookie(cookie);
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", refreshToken)
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .maxAge(7 * 24 * 60 * 60)
+                .sameSite("Strict")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     @Operation(summary = "Send OTP", description = "Sends a one-time password to the provided phone number", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(schema = @Schema(implementation = SendOtpRequest.class), examples = @ExampleObject(name = "example", value = """
@@ -49,14 +52,14 @@ public class AuthController {
             }
             """))))
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OTP sent successfully", content = @Content(schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(value = """
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OTP sent successfully", content = @Content(schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(value = """
                     {
                       "success": true,
                       "message": "OTP sent successfully",
                       "data": null
                     }
                     """))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid phone number format", content = @Content(examples = @ExampleObject(value = """
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid phone number format", content = @Content(examples = @ExampleObject(value = """
                     {
                       "success": false,
                       "message": "Invalid phone number format",
@@ -77,14 +80,14 @@ public class AuthController {
             }
             """))))
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OTP verified – JWT token returned", content = @Content(schema = @Schema(implementation = TokenResponse.class), examples = @ExampleObject(value = """
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OTP verified – JWT token returned", content = @Content(schema = @Schema(implementation = TokenResponse.class), examples = @ExampleObject(value = """
                     {
                       "success": true,
                       "message": "OTP verified successfully",
                       "data": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                     }
                     """))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired OTP", content = @Content(examples = @ExampleObject(value = """
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired OTP", content = @Content(examples = @ExampleObject(value = """
                     {
                       "success": false,
                       "message": "Invalid or expired OTP",
@@ -114,13 +117,14 @@ public class AuthController {
     @Operation(summary = "Logout", description = "Invalidate a refresh token")
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@RequestBody(required = false) LogoutRequest request,
-                                    @CookieValue(name = "refreshToken", required = false) String refreshTokenCookie,
-                                    HttpServletResponse response) {
+            @CookieValue(name = "refreshToken", required = false) String refreshTokenCookie,
+            HttpServletResponse response) {
         authService.logout(request, refreshTokenCookie);
-        Cookie cookie = new Cookie("refreshToken", null);
-        cookie.setMaxAge(0);
-        cookie.setPath("/");
-        response.addCookie(cookie);
+        ResponseCookie cookie = ResponseCookie
+                .from("refreshToken", null)
+                .maxAge(0).path("/")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         return ApiResponse.success("Logged out successfully", null);
     }
 
