@@ -40,6 +40,7 @@ public class AuthController {
                 .secure(true) // Should be true in production
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days
+                .sameSite("Lax")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }
@@ -123,6 +124,7 @@ public class AuthController {
                 .secure(true)
                 .path("/")
                 .maxAge(0)
+                .sameSite("Lax")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
         return ApiResponse.success("Logged out successfully", null);
